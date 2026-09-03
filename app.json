@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Bookmaker Studio",
+    "slug": "bookmaker-studio",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#1E40AF"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.bookmaker.studio",
+      "adaptiveIcon": {
+        "backgroundColor": "#1E40AF"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4807a534-122c-46d3-890d-ec234d355c46"
+      }
+    },
+    "owner": "dakenyo"
+  }
+}
