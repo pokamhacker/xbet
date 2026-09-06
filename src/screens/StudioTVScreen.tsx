@@ -162,7 +162,7 @@ export default function StudioTVScreen({ navigation }: any) {
         'fr-FR'
       )}\nGains potentiels: ${potentialPayout.toLocaleString(
         'fr-FR'
-      )} F\n\nLe coupon a été ajouté à votre Historique !`,
+      )} ₣\n\nLe coupon a été ajouté à votre Historique !`,
       [
         {
           text: 'Voir l’Historique',
@@ -326,7 +326,7 @@ export default function StudioTVScreen({ navigation }: any) {
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryRowLabel}>Gains potentiels</Text>
-            <Text style={styles.summaryPayout}>{potentialPayout.toLocaleString('fr-FR')} F</Text>
+            <Text style={styles.summaryPayout}>{potentialPayout.toLocaleString('fr-FR')} ₣</Text>
           </View>
 
           <Text style={styles.disclaimerText}>Les cotes TVBet sont prédéfinies et ne peuvent pas être modifiées.</Text>

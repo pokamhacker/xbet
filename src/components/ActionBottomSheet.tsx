@@ -29,7 +29,7 @@ export const ActionBottomSheet: React.FC<ActionBottomSheetProps> = ({
 
   if (!coupon) return null;
 
-  const isWon = coupon.status === 'Payé' || coupon.status === 'Gagné';
+  const isWon = coupon.status === 'Payé' || coupon.status === 'Gagné' || coupon.status === 'Gain';
 
   const handleToggleStatus = () => {
     validateCouponWithResult(coupon.id, !isWon);

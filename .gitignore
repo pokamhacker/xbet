@@ -10,3 +10,8 @@ npm-debug.*
 *.mobileprovision
 *.orig.*
 web-build/
+*.apk
+*.psd
+*.jfif
+*.jpg
+assets/icons_backup/

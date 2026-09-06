@@ -102,8 +102,8 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
         setIsPlaying(false);
         const winAmount = Math.round(numericStake * 349.35);
         deposit(winAmount);
-        recordHistorySlip(10, 349.35, winAmount, 'Gagné');
-        Alert.alert('VICTOIRE SUPRÊME !', `Tu as conquis le palier 10 ! Tu empoches ${winAmount.toLocaleString('fr-FR')} F !`);
+        recordHistorySlip(10, 349.35, winAmount, 'Gain');
+        Alert.alert('VICTOIRE SUPRÊME !', `Tu as conquis le palier 10 ! Tu empoches ${winAmount.toLocaleString('fr-FR')} ₣ !`);
       } else {
         setCurrentTier(row + 1);
       }
@@ -127,7 +127,7 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
 
     Alert.alert(
       'Gains Encaissés !',
-      `Félicitations ! Tu as encaissé ${payout.toLocaleString('fr-FR')} F (Palier ${currentTier - 1}, Cote ${currentMultiplier}x).`
+      `Félicitations ! Tu as encaissé ${payout.toLocaleString('fr-FR')} ₣ (Palier ${currentTier - 1}, Cote ${currentMultiplier}x).`
     );
   };
 
@@ -135,7 +135,7 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
     tierReached: number,
     mult: number,
     payout: number,
-    status: 'Payé' | 'Gagné' | 'Perdu'
+    status: 'Payé' | 'Gagné' | 'Gain' | 'Perdu'
   ) => {
     const couponId = generateCouponId();
     const newCoupon: BetSlip = {
@@ -180,7 +180,7 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
         <Text style={styles.headerTitle}>Apple of Fortune</Text>
         <View style={styles.balanceTag}>
           <Text style={styles.balanceTagText}>
-            {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} F
+            {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ₣
           </Text>
         </View>
       </View>
@@ -298,7 +298,7 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={styles.summarySub}>Gain actuel possible</Text>
                   <Text style={[styles.summaryBigText, { color: Colors.success }]}>
-                    {currentPotentialWin.toLocaleString('fr-FR')} F
+                    {currentPotentialWin.toLocaleString('fr-FR')} ₣
                   </Text>
                 </View>
               </View>
@@ -307,7 +307,7 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
                 <TouchableOpacity style={styles.cashoutBtn} onPress={handleCashout}>
                   <Ionicons name="wallet-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
                   <Text style={styles.cashoutBtnText}>
-                    ENCAISSER {currentPotentialWin.toLocaleString('fr-FR')} F
+                    ENCAISSER {currentPotentialWin.toLocaleString('fr-FR')} ₣
                   </Text>
                 </TouchableOpacity>
               )}

@@ -94,7 +94,7 @@ export default function CrashGameScreen({ navigation }: any) {
 
     Alert.alert(
       'Encaissement Réussi !',
-      `Tu as sauté à ${multiplier.toFixed(2)}x et remporté ${winAmount.toLocaleString('fr-FR')} F !`
+      `Tu as sauté à ${multiplier.toFixed(2)}x et remporté ${winAmount.toLocaleString('fr-FR')} ₣ !`
     );
   };
 
@@ -142,7 +142,7 @@ export default function CrashGameScreen({ navigation }: any) {
         <Text style={styles.headerTitle}>Crash Aviator</Text>
         <View style={styles.balanceTag}>
           <Text style={styles.balanceTagText}>
-            {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} F
+            {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ₣
           </Text>
         </View>
       </View>
@@ -231,12 +231,12 @@ export default function CrashGameScreen({ navigation }: any) {
             <TouchableOpacity style={styles.cashoutBigBtn} onPress={handleCashout}>
               <Text style={styles.cashoutBigBtnSub}>RETIRER LES GAINS</Text>
               <Text style={styles.cashoutBigBtnMain}>
-                {currentPotentialPayout.toLocaleString('fr-FR')} F
+                {currentPotentialPayout.toLocaleString('fr-FR')} ₣
               </Text>
             </TouchableOpacity>
           ) : (
             <>
-              <Text style={styles.fieldLabel}>Mise (F)</Text>
+              <Text style={styles.fieldLabel}>Mise (₣)</Text>
               <TextInput
                 style={styles.inputStake}
                 value={stake}

@@ -73,7 +73,7 @@ export default function PopularScreen({ navigation }: any) {
       <View style={styles.topHeader}>
         <View>
           <Text style={styles.headerLabel}>1xBet / Melbet Studio</Text>
-          <Text style={styles.headerBalance}>{balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} F</Text>
+          <Text style={styles.headerBalance}>{balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ₣</Text>
         </View>
         <TouchableOpacity
           style={styles.depositSmallBtn}
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 88,
   },
   welcomeCard: {
     flexDirection: 'row',

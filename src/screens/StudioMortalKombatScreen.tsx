@@ -127,7 +127,7 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
       'Coupon Mortal Kombat Créé !',
       `Coupon ${newCoupon.type} № ${ticketId}\nCote totale: ${newCoupon.totalOdds}\nGains potentiels: ${potentialPayout.toLocaleString(
         'fr-FR'
-      )} F\n\nLe combat est enregistré dans votre Historique !`,
+      )} ₣\n\nLe combat est enregistré dans votre Historique !`,
       [
         {
           text: 'Voir dans l’Historique',
@@ -358,7 +358,7 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Gains potentiels :</Text>
-            <Text style={styles.summaryPayout}>{potentialPayout.toLocaleString('fr-FR')} F</Text>
+            <Text style={styles.summaryPayout}>{potentialPayout.toLocaleString('fr-FR')} ₣</Text>
           </View>
 
           <TouchableOpacity style={styles.createCouponBtn} onPress={handleCreateCoupon}>

@@ -33,6 +33,7 @@ export interface MatchEvent {
   prediction: string;
   odd: number;
   actualScore?: string;
+  halftimeScore?: string;
   status: BetStatus;
   roundCode?: string;
   badge?: string;

@@ -13,8 +13,10 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
 import { StatusBadge } from '../components/StatusBadge';
+import { useThemeStore } from '../store/themeStore';
 
 export default function MenuScreen({ navigation }: any) {
+  const { theme, setThemeModalVisible } = useThemeStore();
   const {
     balance,
     setBalance,
@@ -40,7 +42,7 @@ export default function MenuScreen({ navigation }: any) {
     const val = parseFloat(balanceInput);
     if (!isNaN(val) && val >= 0) {
       setBalance(val);
-      Alert.alert('Solde mis à jour', `Le solde du compte principal est maintenant de ${val.toLocaleString('fr-FR')} F.`);
+      Alert.alert('Solde mis à jour', `Le solde du compte principal est maintenant de ${val.toLocaleString('fr-FR')} ₣.`);
     }
   };
 
@@ -90,6 +92,32 @@ export default function MenuScreen({ navigation }: any) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Section 0 : White-Label Theme Switcher */}
+        <TouchableOpacity
+          style={styles.themeSelectorCard}
+          activeOpacity={0.85}
+          onPress={() => setThemeModalVisible(true)}
+        >
+          <View style={styles.themeSelectorLeft}>
+            <View style={[styles.themeBadgeCircle, { backgroundColor: theme.primary }]}>
+              <Ionicons name="color-palette" size={20} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.themeCardHeaderRow}>
+                <Text style={styles.themeCardTitle}>Marque : {theme.name}</Text>
+                <View style={[styles.themePill, { backgroundColor: theme.badgeBg }]}>
+                  <Text style={[styles.themePillText, { color: theme.primary }]}>White-Label</Text>
+                </View>
+              </View>
+              <Text style={styles.themeCardSub}>{theme.tagline}</Text>
+            </View>
+          </View>
+          <View style={[styles.themeSwitchBtn, { backgroundColor: theme.isDark ? '#2A2E39' : '#EFF6FF' }]}>
+            <Text style={[styles.themeSwitchBtnText, { color: theme.primary }]}>Changer</Text>
+            <Ionicons name="chevron-forward" size={14} color={theme.primary} />
+          </View>
+        </TouchableOpacity>
+
         {/* Section 1 : Gestion du Solde */}
         <View style={styles.adminCard}>
           <View style={styles.cardHeaderRow}>
@@ -99,7 +127,7 @@ export default function MenuScreen({ navigation }: any) {
 
           <Text style={styles.fieldLabel}>Solde actuel :</Text>
           <Text style={styles.balanceDisplay}>
-            {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} F
+            {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ₣
           </Text>
 
           <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Modifier directement le montant :</Text>
@@ -125,7 +153,7 @@ export default function MenuScreen({ navigation }: any) {
                 onPress={() => handleQuickAdd(amt)}
               >
                 <Text style={styles.quickRechargeText}>
-                  +{(amt / 1000).toLocaleString('fr-FR')} k F
+                  +{(amt / 1000).toLocaleString('fr-FR')} k ₣
                 </Text>
               </TouchableOpacity>
             ))}
@@ -139,11 +167,11 @@ export default function MenuScreen({ navigation }: any) {
             <Text style={styles.cardHeaderTitle}>SAISIE DES RÉSULTATS (COUPONS)</Text>
           </View>
           <Text style={styles.cardHint}>
-            Passe instantanément n'importe quel coupon de ton historique à Gagné/Payé ou Perdu en 1 clic.
+            Passe instantanément n'importe quel coupon de ton historique à Gain/Payé ou Perdu en 1 clic.
           </Text>
 
           {coupons.map((c) => {
-            const isWon = c.status === 'Payé' || c.status === 'Gagné';
+            const isWon = c.status === 'Payé' || c.status === 'Gagné' || c.status === 'Gain';
             return (
               <View key={c.id} style={styles.couponResolverRow}>
                 <View style={{ flex: 1 }}>
@@ -151,7 +179,7 @@ export default function MenuScreen({ navigation }: any) {
                     {c.type} № {c.id}
                   </Text>
                   <Text style={styles.couponResolverSub}>
-                    Mise : {c.stake} F · Payout : {c.potentialPayout.toLocaleString('fr-FR')} F
+                    Mise : {c.stake} ₣ · Payout : {c.potentialPayout.toLocaleString('fr-FR')} ₣
                   </Text>
                   <StatusBadge status={c.status} style={{ alignSelf: 'flex-start', marginTop: 4 }} />
                 </View>
@@ -162,7 +190,7 @@ export default function MenuScreen({ navigation }: any) {
                     onPress={() => validateCouponWithResult(c.id, true)}
                   >
                     <Ionicons name="checkmark" size={16} color="#fff" />
-                    <Text style={styles.btnText}>Gagné</Text>
+                    <Text style={styles.btnText}>Gain</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -275,7 +303,73 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 88,
+  },
+  themeSelectorCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  themeSelectorLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  themeBadgeCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themeCardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  themeCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  themePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  themePillText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  themeCardSub: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  themeSwitchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 2,
+  },
+  themeSwitchBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   adminCard: {
     backgroundColor: Colors.surface,

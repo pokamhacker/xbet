@@ -123,7 +123,7 @@ export default function StudioCreationScreen({ navigation }: any) {
       'Coupon Enregistré !',
       `Coupon ${newCoupon.type} № ${finalId}\nCote: ${newCoupon.totalOdds}\nGains potentiels: ${potentialPayout.toLocaleString(
         'fr-FR'
-      )} F\n\nLe coupon a été ajouté avec succès à votre Historique !`,
+      )} ₣\n\nLe coupon a été ajouté avec succès à votre Historique !`,
       [
         {
           text: 'Voir dans l’Historique',
@@ -394,7 +394,7 @@ export default function StudioCreationScreen({ navigation }: any) {
             />
             <View style={{ flex: 1 }}>
               <Text style={styles.checkboxLabel}>Activer la vente (cashout)</Text>
-              <Text style={styles.helperText}>Affiche un bouton « Vendre pour X F » sur le détail du pari.</Text>
+              <Text style={styles.helperText}>Affiche un bouton « Vendre pour X ₣ » sur le détail du pari.</Text>
             </View>
           </TouchableOpacity>
 
@@ -411,7 +411,7 @@ export default function StudioCreationScreen({ navigation }: any) {
             <View style={styles.statLine}>
               <Text style={styles.statLabel}>Gains potentiels :</Text>
               <Text style={[styles.statVal, { color: Colors.success, fontWeight: '800' }]}>
-                {addedEvents.length > 0 ? `${potentialPayout.toLocaleString('fr-FR')} F` : '-'}
+                {addedEvents.length > 0 ? `${potentialPayout.toLocaleString('fr-FR')} ₣` : '-'}
               </Text>
             </View>
           </View>

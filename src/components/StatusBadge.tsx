@@ -18,12 +18,19 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   const getStatusConfig = () => {
     switch (status) {
       case 'Payé':
-      case 'Gagné':
         return {
           bg: Colors.successSoft,
           color: Colors.success,
           icon: 'checkmark-circle' as const,
-          label: status,
+          label: 'Payé',
+        };
+      case 'Gagné':
+      case 'Gain':
+        return {
+          bg: Colors.successSoft,
+          color: Colors.success,
+          icon: 'checkmark-circle' as const,
+          label: 'Gain',
         };
       case 'Perdu':
         return {
