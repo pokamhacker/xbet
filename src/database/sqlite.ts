@@ -20,8 +20,9 @@ export function getSqliteDb(): Database.Database {
   }
 
   // 1. S'assurer que le dossier parent existe
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
+  const targetDir = path.dirname(DB_PATH);
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
   }
 
   // 2. Ouvrir la base de données SQLite
