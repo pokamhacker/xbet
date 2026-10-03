@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Alert,
   Platform,
   StatusBar,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore, UserAccount } from '../store/authStore';
@@ -24,6 +26,7 @@ export default function AdminDashboardScreen() {
     accounts,
     currentUser,
     logout,
+    fetchRemoteUsers,
     createUser,
     updateUserBalance,
     toggleUserActive,
@@ -32,6 +35,19 @@ export default function AdminDashboardScreen() {
     deleteUser,
     changePassword,
   } = useAuthStore();
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+
+  useEffect(() => {
+    fetchRemoteUsers();
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchRemoteUsers();
+    setRefreshing(false);
+  };
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,16 +146,23 @@ export default function AdminDashboardScreen() {
     setCreateModalVisible(true);
   };
 
-  const handleCreateSubmit = () => {
+  const handleCreateSubmit = async () => {
     setCreateError(null);
     const parsedBalance = parseFloat(newInitialBalance) || 0;
-    const res = createUser(newUsername, newPassword, parsedBalance);
-    if (!res.success) {
-      setCreateError(res.error || 'Erreur lors de la création.');
-      return;
+    setIsCreating(true);
+    try {
+      const res = await createUser(newUsername, newPassword, parsedBalance);
+      if (!res.success) {
+        setCreateError(res.error || 'Erreur lors de la création.');
+        return;
+      }
+      setCreateModalVisible(false);
+      Alert.alert('Succès', `Le compte utilisateur "${newUsername.trim()}" a été créé sur le serveur.`);
+    } catch (err: any) {
+      setCreateError(err.message || 'Erreur lors de la création.');
+    } finally {
+      setIsCreating(false);
     }
-    setCreateModalVisible(false);
-    Alert.alert('Succès', `Le compte utilisateur "${newUsername.trim()}" a été créé.`);
   };
 
   const handleOpenEditBalance = (user: UserAccount) => {
@@ -281,7 +304,18 @@ export default function AdminDashboardScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#38BDF8"
+            colors={['#38BDF8']}
+          />
+        }
+      >
         {/* KPI / Stats Section */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
@@ -585,10 +619,15 @@ export default function AdminDashboardScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.modalConfirmBtn}
+                style={[styles.modalConfirmBtn, isCreating && { opacity: 0.7 }]}
                 onPress={handleCreateSubmit}
+                disabled={isCreating}
               >
-                <Text style={styles.modalConfirmText}>Créer le compte</Text>
+                {isCreating ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>Créer le compte</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
