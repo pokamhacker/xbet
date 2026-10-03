@@ -23,9 +23,9 @@ COPY . .
 RUN mkdir -p /app/src/data
 
 ENV NODE_ENV=production
-ENV PORT=5000
 
-EXPOSE 5000
+# Expose les ports potentiels sans forcer ENV PORT pour laisser Railway injecter sa variable dynamique
+EXPOSE 5000 8080 3000
 
 # Commande de démarrage du serveur avec tsx
 CMD ["npm", "run", "start:server"]

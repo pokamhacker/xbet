@@ -100,4 +100,13 @@ const handleShutdown = () => {
 process.on('SIGTERM', handleShutdown);
 process.on('SIGINT', handleShutdown);
 
+// Protection anti-crash globale (évite que le serveur ne tombe sur une erreur asynchrone)
+process.on('uncaughtException', (err) => {
+  console.error('[Server] Exception non capturée (protégée) :', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Promesse rejetée non gérée (protégée) :', reason);
+});
+
 export { app, server, io };
