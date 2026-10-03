@@ -77,19 +77,25 @@ try {
 
 // 6. Lancement du Serveur HTTP & WebSockets
 const PORT = Number(process.env.PORT) || 5000;
-const HOST = '0.0.0.0';
 
-server.listen(PORT, HOST, () => {
-  console.log(`[Server] Serveur démarré avec succès sur http://${HOST}:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`[Server] Serveur démarré avec succès sur le port ${PORT}`);
   console.log(`[Server] Base SQLite   : Active`);
-  console.log(`[Server] Health Check : http://${HOST}:${PORT}/health`);
-  console.log(`[Server] API Auth     : http://${HOST}:${PORT}/api/auth`);
-  console.log(`[Server] API Admin    : http://${HOST}:${PORT}/api/admin`);
+  console.log(`[Server] Health Check : http://0.0.0.0:${PORT}/health`);
+  console.log(`[Server] API Auth     : http://0.0.0.0:${PORT}/api/auth`);
+  console.log(`[Server] API Admin    : http://0.0.0.0:${PORT}/api/admin`);
 });
 
 // Gestion des arrêts gracieux (SIGTERM / SIGINT)
 const handleShutdown = () => {
   console.log('[Server] Signal d\'arrêt reçu. Fermeture gracieuse en cours...');
+  const forceKillTimer = setTimeout(() => {
+    console.warn('[Server] Délai de grâce dépassé. Arrêt forcé.');
+    closeSqliteDatabase();
+    process.exit(0);
+  }, 4000);
+  forceKillTimer.unref();
+
   server.close(() => {
     console.log('[Server] Serveur HTTP fermé.');
     closeSqliteDatabase();
