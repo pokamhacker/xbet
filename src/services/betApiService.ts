@@ -1,7 +1,7 @@
 import { BetSlip, BetStatus, MatchEvent } from '../types/bet';
 
-// URL du backend déployé (Render, VPS ou local)
-const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+// URL du backend déployé (Railway ou variable d'environnement)
+const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'https://web-production-4a2e0b.up.railway.app';
 const API_BASE_URL = `${BACKEND_URL}/api/bets`;
 
 /**

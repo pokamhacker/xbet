@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
 
-// URL du backend (Render, VPS ou local)
-const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+// URL du backend (Railway ou variable d'environnement)
+const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'https://web-production-4a2e0b.up.railway.app';
 
 let socketInstance: Socket | null = null;
 
