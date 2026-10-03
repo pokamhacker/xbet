@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 
@@ -19,8 +19,8 @@ RUN npm install --legacy-peer-deps
 # Copie du code source complet
 COPY . .
 
-# Dossier pour la base de données SQLite
-RUN mkdir -p /app/src/data
+# Dossier pour la base de données SQLite avec permissions d'écriture complètes
+RUN mkdir -p /app/src/data && chmod -R 777 /app/src/data
 
 ENV NODE_ENV=production
 

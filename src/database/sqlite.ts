@@ -5,11 +5,33 @@ import bcrypt from 'bcryptjs';
 
 // Répertoire et fichier de la base de données SQLite
 const DB_DIR = path.resolve(__dirname, '../data');
-const DB_PATH = process.env.SQLITE_DB_PATH || path.join(DB_DIR, 'xbet.db');
 const SCHEMA_PATH = path.resolve(__dirname, 'schema.sql');
 const LEGACY_JSON_BETS_FILE = path.join(DB_DIR, 'bets_db.json');
 
 let dbInstance: Database.Database | null = null;
+
+function resolveDbFilePath(): string {
+  if (process.env.SQLITE_DB_PATH) {
+    return process.env.SQLITE_DB_PATH;
+  }
+  try {
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
+    }
+    const testFile = path.join(DB_DIR, '.write_test');
+    fs.writeFileSync(testFile, '1');
+    fs.unlinkSync(testFile);
+    return path.join(DB_DIR, 'xbet.db');
+  } catch (err) {
+    console.warn('[SQLite] Impossible d\'écrire dans src/data, repli de sécurité sur /tmp/xbet.db :', err);
+    try {
+      if (fs.existsSync('/tmp')) {
+        return path.join('/tmp', 'xbet.db');
+      }
+    } catch (_) {}
+    return path.join(DB_DIR, 'xbet.db');
+  }
+}
 
 /**
  * Initialise et retourne l'instance unique de la base de données SQLite
@@ -19,32 +41,62 @@ export function getSqliteDb(): Database.Database {
     return dbInstance;
   }
 
-  // 1. S'assurer que le dossier parent existe
-  const targetDir = path.dirname(DB_PATH);
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
+  const dbPath = resolveDbFilePath();
+  console.log(`[SQLite] Initialisation de la base SQLite sur le chemin : ${dbPath}`);
+
+  try {
+    const parentDir = path.dirname(dbPath);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+
+    dbInstance = new Database(dbPath);
+
+    // Pragmas sécurisés : si WAL n'est pas supporté (ex: restriction container sans shared memory), repli sur DELETE
+    try {
+      dbInstance.pragma('journal_mode = WAL');
+    } catch (walErr) {
+      console.warn('[SQLite] Mode WAL non disponible, passage en mode journal DELETE :', walErr);
+      try {
+        dbInstance.pragma('journal_mode = DELETE');
+      } catch (delErr) {
+        console.warn('[SQLite] Avertissement journal_mode :', delErr);
+      }
+    }
+
+    try {
+      dbInstance.pragma('foreign_keys = ON');
+      dbInstance.pragma('synchronous = NORMAL');
+    } catch (pragmaErr) {
+      console.warn('[SQLite] Avertissement pragmas :', pragmaErr);
+    }
+
+    console.log(`[SQLite] Base de données initialisée avec succès : ${dbPath}`);
+
+    // Exécuter le schéma SQL
+    initSchema(dbInstance);
+
+    // Initialiser les utilisateurs par défaut si la table est vide
+    seedDefaultUsers(dbInstance);
+
+    // Migrer les anciens paris depuis bets_db.json si la table bets est vide
+    migrateLegacyBets(dbInstance);
+
+    return dbInstance;
+  } catch (fatalError: any) {
+    console.error('[SQLite] Erreur lors de l’ouverture du fichier SQLite :', fatalError);
+    if (!dbInstance) {
+      console.warn('[SQLite] Repli de sécurité : création d\'une base SQLite en mémoire (:memory:) pour garantir la disponibilité 100% sans crash.');
+      dbInstance = new Database(':memory:');
+      try {
+        initSchema(dbInstance);
+        seedDefaultUsers(dbInstance);
+      } catch (memErr) {
+        console.error('[SQLite] Erreur schéma en mémoire :', memErr);
+      }
+    }
+    return dbInstance;
   }
-
-  // 2. Ouvrir la base de données SQLite
-  dbInstance = new Database(DB_PATH);
-
-  // 3. Configurations PRAGMA pour les performances et l'intégrité
-  dbInstance.pragma('journal_mode = WAL');
-  dbInstance.pragma('foreign_keys = ON');
-  dbInstance.pragma('synchronous = NORMAL');
-
-  console.log(`[SQLite] Base de données initialisée avec succès : ${DB_PATH}`);
-
-  // 4. Exécuter le schéma SQL
-  initSchema(dbInstance);
-
-  // 5. Initialiser les utilisateurs par défaut si la table est vide
-  seedDefaultUsers(dbInstance);
-
-  // 6. Migrer les anciens paris depuis bets_db.json si la table bets est vide
-  migrateLegacyBets(dbInstance);
-
-  return dbInstance;
 }
 
 /**
