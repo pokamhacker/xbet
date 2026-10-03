@@ -15,3 +15,7 @@ web-build/
 *.jfif
 *.jpg
 assets/icons_backup/
+.env
+.env*.local
+*.db*
+scratch/

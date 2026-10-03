@@ -8,12 +8,24 @@ import {
   TextInput,
   SafeAreaView,
   Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
+import { useThemeStore } from '../store/themeStore';
 import { generateCouponId, generateRoundCode, generateShareCode } from '../utils/pokerEngine';
 import { BetSlip, MatchEvent } from '../types/bet';
+import { PokerScheduleModal } from '../components/modals/PokerScheduleModal';
+import { SingleRoundEditModal } from '../components/modals/SingleRoundEditModal';
+import {
+  getCurrentDateString,
+  getCurrentTimeString,
+  generateRoundScheduleSequence,
+  addMinutesToSchedule,
+  parseScheduleString,
+} from '../utils/scheduleHelper';
 
 interface RoundEvent {
   id: string;
@@ -50,16 +62,25 @@ const HANDS = [
 
 export default function StudioTVScreen({ navigation }: any) {
   const { addCoupon } = useBetStore();
+  const { currentTheme, theme: baseTheme } = useThemeStore();
+  const theme = currentTheme || baseTheme;
+  const isDark = theme.isDark;
 
-  const [baseDate, setBaseDate] = useState('03.09.2026 (13:32)');
+  // Configuration de Programmation (Date, Heure, Intervalle)
+  const [startDate, setStartDate] = useState(getCurrentDateString());
+  const [startTime, setStartTime] = useState(getCurrentTimeString());
+  const [interval, setInterval] = useState(3); // 3 minutes standard TVBet
+  const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
+  const [editingRound, setEditingRound] = useState<RoundEvent | null>(null);
+
   const [stake, setStake] = useState('90');
 
-  // Multi-round poker list
+  // Multi-round poker list initialisée avec l'horaire de départ dynamique
   const [events, setEvents] = useState<RoundEvent[]>([
     {
       id: '1',
       roundNumber: 1,
-      timeString: '03.09.2026 (13:32)',
+      timeString: `${getCurrentDateString()} (${getCurrentTimeString()})`,
       marketType: 'combination',
       selectedOption: { name: 'Combinaison gagnante. Carte haute', odd: 1000 },
       roundCode: generateRoundCode(),
@@ -74,22 +95,110 @@ export default function StudioTVScreen({ navigation }: any) {
   const numericStake = parseFloat(stake) || 0;
   const potentialPayout = Math.round(numericStake * totalOdd);
 
+  // Applique la programmation complète (date, heure, intervalle, nombre de manches)
+  const handleApplySchedule = ({
+    startDate: newStartDate,
+    startTime: newStartTime,
+    interval: newInterval,
+    roundsCount: newRoundsCount,
+  }: {
+    startDate: string;
+    startTime: string;
+    interval: number;
+    roundsCount: number;
+  }) => {
+    setStartDate(newStartDate);
+    setStartTime(newStartTime);
+    setInterval(newInterval);
+
+    const sequence = generateRoundScheduleSequence(
+      newStartDate,
+      newStartTime,
+      newInterval,
+      newRoundsCount,
+      1
+    );
+
+    const newEvents: RoundEvent[] = sequence.map((item, idx) => {
+      const existing = events[idx];
+      return {
+        id: existing?.id || String(Date.now() + idx),
+        roundNumber: item.roundNumber,
+        timeString: item.formatted,
+        marketType: existing?.marketType || 'combination',
+        selectedOption: existing?.selectedOption || {
+          name: 'Combinaison gagnante. Carte haute',
+          odd: 1000,
+        },
+        roundCode: existing?.roundCode || generateRoundCode(),
+      };
+    });
+
+    setEvents(newEvents);
+    Alert.alert(
+      'Programmation Appliquée !',
+      `${newRoundsCount} manche(s) programmée(s) dès le ${newStartDate} (${newStartTime}) avec un cadencement de ${newInterval} min.`
+    );
+  };
+
+  // Ajoute une manche en calculant automatiquement l'horaire suivant (+intervalle)
   const addRound = () => {
     const nextRound = events.length + 1;
-    const baseMinutes = 32 + (nextRound - 1) * 3;
-    const hour = 13 + Math.floor(baseMinutes / 60);
-    const minute = baseMinutes % 60;
-    const minuteStr = minute < 10 ? `0${minute}` : `${minute}`;
+    let nextTimeString = '';
+
+    if (events.length > 0) {
+      const lastEvent = events[events.length - 1];
+      const parsed = parseScheduleString(lastEvent.timeString);
+      const nextTime = addMinutesToSchedule(parsed.dateStr, parsed.timeStr, interval);
+      nextTimeString = nextTime.formatted;
+    } else {
+      nextTimeString = `${startDate} (${startTime})`;
+    }
 
     const newEvent: RoundEvent = {
       id: String(Date.now()),
       roundNumber: nextRound,
-      timeString: `03.09.2026 (${hour}:${minuteStr})`,
+      timeString: nextTimeString,
       marketType: 'combination',
       selectedOption: { name: 'Combinaison gagnante. Carte haute', odd: 1000 },
       roundCode: generateRoundCode(),
     };
     setEvents([...events, newEvent]);
+  };
+
+  // Décale tous les horaires de X minutes
+  const handleQuickShift = (minutes: number) => {
+    const updated = events.map((ev) => {
+      const parsed = parseScheduleString(ev.timeString);
+      const res = addMinutesToSchedule(parsed.dateStr, parsed.timeStr, minutes);
+      return { ...ev, timeString: res.formatted };
+    });
+    setEvents(updated);
+    if (updated.length > 0) {
+      const firstParsed = parseScheduleString(updated[0].timeString);
+      setStartDate(firstParsed.dateStr);
+      setStartTime(firstParsed.timeStr);
+    }
+  };
+
+  // Mise à jour individuelle d'une manche
+  const handleUpdateSingleRound = (updated: { timeString: string; roundCode: string }) => {
+    if (!editingRound) return;
+    setEvents(
+      events.map((e) =>
+        e.id === editingRound.id
+          ? { ...e, timeString: updated.timeString, roundCode: updated.roundCode }
+          : e
+      )
+    );
+    setEditingRound(null);
+  };
+
+  // Régénère le code TVBet d'une manche
+  const handleRegenerateRoundCode = (eventId: string) => {
+    setEvents(
+      events.map((e) => (e.id === eventId ? { ...e, roundCode: generateRoundCode() } : e))
+    );
   };
 
   const selectMarket = (eventId: string, type: 'combination' | 'hand') => {
@@ -140,7 +249,7 @@ export default function StudioTVScreen({ navigation }: any) {
 
     const newCoupon: BetSlip = {
       id: ticketId,
-      createdAt: '03.09.2026 (13:30)',
+      createdAt: `${startDate} (${startTime})`,
       type: events.length > 1 ? 'Combiné' : 'Simple',
       eventsCount: events.length,
       completedCount: 0,
@@ -175,6 +284,7 @@ export default function StudioTVScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={Platform.OS === 'android'} />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
@@ -200,48 +310,115 @@ export default function StudioTVScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Programmation */}
-        <Text style={styles.sectionHeader}>Programmation</Text>
-        <TouchableOpacity style={styles.dateSelector}>
-          <View style={styles.dateIconBox}>
-            <Ionicons name="calendar-outline" size={18} color={Colors.primaryAccent} />
+        {/* Panneau de Programmation des Manches */}
+        <View style={styles.scheduleHeaderRow}>
+          <Text style={styles.sectionHeader}>Programmation des manches</Text>
+          <View style={styles.intervalBadge}>
+            <MaterialCommunityIcons name="timer-sand" size={13} color="#2563EB" style={{ marginRight: 4 }} />
+            <Text style={styles.intervalBadgeText}>Espacées de {interval} min (TVBet)</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.dateSub}>Première manche</Text>
-            <Text style={styles.dateValue}>{baseDate}</Text>
+        </View>
+
+        <View style={styles.scheduleCard}>
+          <TouchableOpacity
+            style={styles.dateSelector}
+            activeOpacity={0.8}
+            onPress={() => setIsScheduleModalVisible(true)}
+          >
+            <View style={styles.dateIconBox}>
+              <Ionicons name="calendar-outline" size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dateSub}>Première manche programmée</Text>
+              <Text style={styles.dateValue}>
+                {events[0]?.timeString || `${startDate} (${startTime})`}
+              </Text>
+              <Text style={styles.scheduleDetailText}>
+                {events.length} manche{events.length > 1 ? 's' : ''} • Fin prévue : {events[events.length - 1]?.timeString.split(' ')[1] || ''}
+              </Text>
+            </View>
+            <Ionicons name="create-outline" size={20} color={theme.primary} />
+          </TouchableOpacity>
+
+          {/* Raccourcis Rapides de Décalage */}
+          <View style={styles.quickShiftRow}>
+            <Text style={styles.quickShiftLabel}>Ajustement rapide :</Text>
+            <TouchableOpacity style={styles.quickShiftBtn} onPress={() => handleQuickShift(2)}>
+              <Text style={styles.quickShiftBtnText}>+2 min</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickShiftBtn} onPress={() => handleQuickShift(5)}>
+              <Text style={styles.quickShiftBtnText}>+5 min</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickShiftBtn} onPress={() => handleQuickShift(15)}>
+              <Text style={styles.quickShiftBtnText}>+15 min</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickShiftBtn, { backgroundColor: 'rgba(37,99,235,0.1)' }]}
+              onPress={() => setIsScheduleModalVisible(true)}
+            >
+              <Text style={[styles.quickShiftBtnText, { color: '#2563EB', fontWeight: '800' }]}>
+                ⚙️ Configurer
+              </Text>
+            </TouchableOpacity>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={Colors.textSubtle} />
-        </TouchableOpacity>
-        <Text style={styles.hintText}>Les manches suivantes démarrent automatiquement toutes les 3 minutes.</Text>
+        </View>
 
         {/* Événements Header */}
         <View style={styles.eventsHeader}>
           <View>
-            <Text style={styles.sectionHeader}>Événements</Text>
+            <Text style={styles.sectionHeader}>Manches programmées</Text>
             <Text style={styles.roundCounter}>
-              {events.length} manche{events.length > 1 ? 's' : ''}
+              {events.length} manche{events.length > 1 ? 's' : ''} au total
             </Text>
           </View>
           <TouchableOpacity style={styles.addBtn} onPress={addRound}>
             <Ionicons name="add" size={16} color="#fff" />
-            <Text style={styles.addBtnText}>Ajouter</Text>
+            <Text style={styles.addBtnText}>Ajouter une manche</Text>
           </TouchableOpacity>
         </View>
 
         {/* Liste des Manches */}
         {events.map((ev) => (
           <View key={ev.id} style={styles.eventCard}>
-            {/* Round Title */}
+            {/* Round Title & Horaire */}
             <View style={styles.eventCardHeader}>
               <View style={styles.roundBadge}>
                 <Text style={styles.roundBadgeText}>{ev.roundNumber}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.matchTitle}>TvBet. POKER</Text>
-                <Text style={styles.matchTime}>{ev.timeString}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={styles.matchTitle}>TvBet. POKER</Text>
+                  <View style={styles.pokerLivePill}>
+                    <Text style={styles.pokerLivePillText}>MANCHE #{ev.roundNumber}</Text>
+                  </View>
+                </View>
+
+                {/* Horaire cliquable pour modification individuelle */}
+                <TouchableOpacity
+                  style={styles.timeClickableRow}
+                  activeOpacity={0.7}
+                  onPress={() => setEditingRound(ev)}
+                >
+                  <Ionicons name="time-outline" size={13} color="#2563EB" style={{ marginRight: 4 }} />
+                  <Text style={styles.matchTimeText}>{ev.timeString}</Text>
+                  <Ionicons name="pencil" size={11} color="#64748B" style={{ marginLeft: 5 }} />
+                </TouchableOpacity>
+
+                {/* Code TVBet */}
+                <View style={styles.roundCodeRow}>
+                  <Text style={styles.roundCodeLabel}>Code tirage : </Text>
+                  <Text style={styles.roundCodeValue}>{ev.roundCode}</Text>
+                  <TouchableOpacity
+                    onPress={() => handleRegenerateRoundCode(ev.id)}
+                    style={{ paddingLeft: 6 }}
+                  >
+                    <Ionicons name="refresh" size={12} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
               </View>
+
               {events.length > 1 && (
-                <TouchableOpacity onPress={() => removeRound(ev.id)} style={{ padding: 4 }}>
+                <TouchableOpacity onPress={() => removeRound(ev.id)} style={{ padding: 6 }}>
                   <Ionicons name="trash-outline" size={18} color={Colors.danger} />
                 </TouchableOpacity>
               )}
@@ -310,7 +487,7 @@ export default function StudioTVScreen({ navigation }: any) {
         {/* Mise et résumé */}
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Mise et résumé</Text>
-          <Text style={styles.inputLabel}>Mise (F)</Text>
+          <Text style={styles.inputLabel}>Mise (₣)</Text>
           <TextInput
             style={styles.input}
             value={stake}
@@ -336,6 +513,29 @@ export default function StudioTVScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Modale de Programmation Complète des Manches */}
+      <PokerScheduleModal
+        visible={isScheduleModalVisible}
+        onClose={() => setIsScheduleModalVisible(false)}
+        currentStartDate={startDate}
+        currentStartTime={startTime}
+        currentInterval={interval}
+        currentRoundsCount={events.length}
+        onApplySchedule={handleApplySchedule}
+      />
+
+      {/* Modale d'Édition Individuelle d'une Manche */}
+      {editingRound && (
+        <SingleRoundEditModal
+          visible={!!editingRound}
+          roundNumber={editingRound.roundNumber}
+          initialTimeString={editingRound.timeString}
+          initialRoundCode={editingRound.roundCode}
+          onClose={() => setEditingRound(null)}
+          onSave={handleUpdateSingleRound}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -344,12 +544,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
@@ -364,16 +565,17 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 110,
   },
   infoBanner: {
     flexDirection: 'row',
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 12,
+    padding: 12,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -463,9 +665,9 @@ const styles = StyleSheet.create({
   },
   eventCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -636,5 +838,102 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '800',
+  },
+  scheduleHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  intervalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  intervalBadgeText: {
+    color: '#2563EB',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  scheduleCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  scheduleDetailText: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  quickShiftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    flexWrap: 'wrap',
+  },
+  quickShiftLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  quickShiftBtn: {
+    backgroundColor: Colors.surfaceSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  quickShiftBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  pokerLivePill: {
+    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  pokerLivePillText: {
+    color: '#2563EB',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  timeClickableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+    alignSelf: 'flex-start',
+  },
+  matchTimeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  roundCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  roundCodeLabel: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  roundCodeValue: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textPrimary,
   },
 });

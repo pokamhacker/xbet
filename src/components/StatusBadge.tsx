@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BetStatus } from '../types/bet';
 import { Colors } from '../theme/theme';
+import { useThemeStore } from '../stores/themeStore';
 
 interface StatusBadgeProps {
   status: BetStatus;
@@ -15,56 +16,58 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   style,
   showIcon = true,
 }) => {
+  const { currentTheme } = useThemeStore();
+
   const getStatusConfig = () => {
     switch (status) {
       case 'Payé':
         return {
-          bg: Colors.successSoft,
-          color: Colors.success,
+          bg: currentTheme.isDark ? '#064E3B' : '#DCFCE7',
+          color: currentTheme.status.paye || '#16A34A',
           icon: 'checkmark-circle' as const,
           label: 'Payé',
         };
       case 'Gagné':
       case 'Gain':
         return {
-          bg: Colors.successSoft,
-          color: Colors.success,
+          bg: currentTheme.isDark ? '#064E3B' : '#DCFCE7',
+          color: currentTheme.status.paye || '#16A34A',
           icon: 'checkmark-circle' as const,
           label: 'Gain',
         };
       case 'Perdu':
         return {
-          bg: Colors.dangerSoft,
-          color: Colors.danger,
+          bg: currentTheme.isDark ? '#7F1D1D' : '#FEE2E2',
+          color: currentTheme.status.perdu || '#EF4444',
           icon: 'close-circle' as const,
           label: 'Perdu',
         };
       case 'En cours':
         return {
-          bg: Colors.warningSoft,
-          color: Colors.warning,
+          bg: currentTheme.isDark ? '#78350F' : '#FEF3C7',
+          color: currentTheme.status.accepte || '#F59E0B',
           icon: 'time' as const,
           label: 'En cours',
         };
       case 'Vendu':
         return {
-          bg: '#EDE9FE',
+          bg: currentTheme.isDark ? '#4C1D95' : '#EDE9FE',
           color: '#7C3AED',
           icon: 'pricetag' as const,
           label: 'Vendu (Cashout)',
         };
       case 'Annulé':
         return {
-          bg: '#E2E8F0',
-          color: Colors.textMuted,
+          bg: currentTheme.isDark ? '#334155' : '#E2E8F0',
+          color: currentTheme.textSecondary || Colors.textMuted,
           icon: 'ban' as const,
           label: 'Annulé',
         };
       case 'Accepté':
       default:
         return {
-          bg: Colors.primarySoft,
-          color: Colors.primaryAccent,
+          bg: currentTheme.primarySoft || (currentTheme.isDark ? '#1E293B' : '#EFF6FF'),
+          color: currentTheme.status.accepte || currentTheme.primary,
           icon: 'checkmark-circle' as const,
           label: 'Accepté',
         };

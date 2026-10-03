@@ -13,6 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { BetSlip, BetStatus } from '../types/bet';
 import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
+import { useThemeStore } from '../stores/themeStore';
+import { useResponsive } from '../utils/responsive';
 
 interface ScoreEditorModalProps {
   visible: boolean;
@@ -25,7 +27,9 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   coupon,
   onClose,
 }) => {
+  const { currentTheme } = useThemeStore();
   const { updateEventScore, validateCouponWithResult } = useBetStore();
+  const { isTablet, isDesktop, font, moderateScale, insets } = useResponsive();
 
   if (!coupon) return null;
 
@@ -81,36 +85,54 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-          <View style={styles.handle} />
+      <TouchableOpacity
+        style={[
+          styles.overlay,
+          (isTablet || isDesktop) && styles.overlayTablet,
+        ]}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: currentTheme.modalBackground || currentTheme.cardBackground,
+              borderColor: currentTheme.border,
+              paddingBottom: Math.max(24, insets.bottom + 12),
+            },
+            (isTablet || isDesktop) && styles.sheetTablet,
+          ]}
+          onStartShouldSetResponder={() => true}
+        >
+          <View style={[styles.handle, { backgroundColor: currentTheme.border }]} />
 
           <View style={styles.headerRow}>
-            <View>
-              <Text style={styles.title}>Saisie des scores</Text>
-              <Text style={styles.subtitle}>Coupon № {coupon.id}</Text>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={[styles.title, { color: currentTheme.textPrimary, fontSize: font(17) }]} numberOfLines={1} adjustsFontSizeToFit>Saisie des scores</Text>
+              <Text style={[styles.subtitle, { color: currentTheme.textSecondary, fontSize: font(12) }]}>Coupon № {coupon.id}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color={Colors.textMuted} />
+              <Ionicons name="close" size={moderateScale(22)} color={currentTheme.textSecondary} />
             </TouchableOpacity>
           </View>
 
           {/* Quick 1-Tap actions */}
           <View style={styles.quickActionsRow}>
             <TouchableOpacity
-              style={[styles.quickBtn, styles.quickWinBtn]}
+              style={[styles.quickBtn, styles.quickWinBtn, { backgroundColor: currentTheme.status.paye || '#16A34A' }]}
               onPress={() => handleQuickValidateAll(true)}
             >
-              <Ionicons name="checkmark-circle" size={16} color="#fff" style={{ marginRight: 4 }} />
-              <Text style={styles.quickBtnText}>Tout Valider (Gain)</Text>
+              <Ionicons name="checkmark-circle" size={moderateScale(16)} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={[styles.quickBtnText, { fontSize: font(12) }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Tout Valider (Gain)</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.quickBtn, styles.quickLossBtn]}
+              style={[styles.quickBtn, styles.quickLossBtn, { backgroundColor: currentTheme.status.perdu || '#EF4444' }]}
               onPress={() => handleQuickValidateAll(false)}
             >
-              <Ionicons name="close-circle" size={16} color="#fff" style={{ marginRight: 4 }} />
-              <Text style={styles.quickBtnText}>Tout Marquer (Perdu)</Text>
+              <Ionicons name="close-circle" size={moderateScale(16)} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={[styles.quickBtnText, { fontSize: font(12) }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Tout Marquer (Perdu)</Text>
             </TouchableOpacity>
           </View>
 
@@ -118,34 +140,52 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
             {coupon.events.map((ev, index) => {
               const current = eventStates[ev.id] || { score: '1-0', status: ev.status };
               return (
-                <View key={ev.id} style={styles.eventCard}>
+                <View
+                  key={ev.id}
+                  style={[
+                    styles.eventCard,
+                    {
+                      backgroundColor: currentTheme.isDark ? currentTheme.surface : '#F8FAFC',
+                      borderColor: currentTheme.border,
+                    },
+                  ]}
+                >
                   <View style={styles.eventHeader}>
-                    <Text style={styles.eventIndex}>Match {index + 1}</Text>
-                    <Text style={styles.eventLeague}>{ev.league}</Text>
+                    <Text style={[styles.eventIndex, { color: currentTheme.primary }]}>Match {index + 1}</Text>
+                    <Text style={[styles.eventLeague, { color: currentTheme.textSecondary }]}>{ev.league}</Text>
                   </View>
 
-                  <Text style={styles.eventMatch}>
+                  <Text style={[styles.eventMatch, { color: currentTheme.textPrimary }]}>
                     {ev.homeTeam.name} vs {ev.awayTeam.name}
                   </Text>
-                  <Text style={styles.eventPrediction}>Pronostic : {ev.prediction}</Text>
+                  <Text style={[styles.eventPrediction, { color: currentTheme.textSecondary }]}>Pronostic : {ev.prediction}</Text>
 
                   <View style={styles.inputsRow}>
                     <View style={styles.scoreInputBox}>
-                      <Text style={styles.inputLabel}>Score final :</Text>
+                      <Text style={[styles.inputLabel, { color: currentTheme.textSecondary }]}>Score final :</Text>
                       <TextInput
-                        style={styles.scoreInput}
+                        style={[
+                          styles.scoreInput,
+                          {
+                            backgroundColor: currentTheme.cardBackground,
+                            color: currentTheme.textPrimary,
+                            borderColor: currentTheme.border,
+                          },
+                        ]}
                         value={current.score}
                         onChangeText={(txt) => handleScoreChange(ev.id, txt)}
                         placeholder="Ex: 5-4"
+                        placeholderTextColor={currentTheme.textMuted}
                       />
                     </View>
 
                     <View style={styles.statusPillsBox}>
-                      <Text style={styles.inputLabel}>Résultat :</Text>
+                      <Text style={[styles.inputLabel, { color: currentTheme.textSecondary }]}>Résultat :</Text>
                       <View style={styles.pillsRow}>
                         <TouchableOpacity
                           style={[
                             styles.statusPill,
+                            { borderColor: currentTheme.border },
                             current.status === 'Gain' && styles.statusPillWin,
                           ]}
                           onPress={() => handleStatusChange(ev.id, 'Gain')}
@@ -153,6 +193,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                           <Text
                             style={[
                               styles.statusPillText,
+                              { color: currentTheme.textSecondary },
                               current.status === 'Gain' && styles.statusPillTextActive,
                             ]}
                           >
@@ -163,6 +204,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                         <TouchableOpacity
                           style={[
                             styles.statusPill,
+                            { borderColor: currentTheme.border },
                             current.status === 'Perdu' && styles.statusPillLoss,
                           ]}
                           onPress={() => handleStatusChange(ev.id, 'Perdu')}
@@ -170,6 +212,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                           <Text
                             style={[
                               styles.statusPillText,
+                              { color: currentTheme.textSecondary },
                               current.status === 'Perdu' && styles.statusPillTextActive,
                             ]}
                           >
@@ -180,14 +223,22 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                         <TouchableOpacity
                           style={[
                             styles.statusPill,
-                            current.status === 'Accepté' && styles.statusPillPending,
+                            { borderColor: currentTheme.border },
+                            current.status === 'Accepté' && {
+                              backgroundColor: currentTheme.primary,
+                              borderColor: currentTheme.primary,
+                            },
                           ]}
                           onPress={() => handleStatusChange(ev.id, 'Accepté')}
                         >
                           <Text
                             style={[
                               styles.statusPillText,
-                              current.status === 'Accepté' && styles.statusPillTextActive,
+                              { color: currentTheme.textSecondary },
+                              current.status === 'Accepté' && {
+                                color: currentTheme.colors?.primaryText || '#FFFFFF',
+                                fontWeight: '700',
+                              },
                             ]}
                           >
                             En cours
@@ -201,8 +252,11 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
             })}
           </ScrollView>
 
-          <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
-            <Text style={styles.applyBtnText}>Enregistrer et Recalculer</Text>
+          <TouchableOpacity
+            style={[styles.applyBtn, { backgroundColor: currentTheme.primary }]}
+            onPress={handleApply}
+          >
+            <Text style={[styles.applyBtnText, { color: currentTheme.colors?.primaryText || '#FFFFFF' }]}>Enregistrer et Recalculer</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -216,6 +270,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.darkOverlay,
     justifyContent: 'flex-end',
   },
+  overlayTablet: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
   sheet: {
     backgroundColor: Colors.surface,
     borderTopLeftRadius: 20,
@@ -224,6 +283,19 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 30,
     maxHeight: '85%',
+    width: '100%',
+  },
+  sheetTablet: {
+    maxWidth: 560,
+    borderRadius: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 16,
   },
   handle: {
     width: 36,

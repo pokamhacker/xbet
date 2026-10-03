@@ -8,6 +8,8 @@ import {
   TextInput,
   SafeAreaView,
   Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
@@ -140,6 +142,7 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={Platform.OS === 'android'} />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -344,7 +347,7 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
           ))}
 
           {/* Stake & Financials */}
-          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Mise (F)</Text>
+          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Mise (₣)</Text>
           <TextInput
             style={styles.stakeInput}
             value={stake}
@@ -374,12 +377,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
@@ -394,16 +398,17 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 110,
   },
   mkBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1C1917',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
     gap: 12,
     borderWidth: 1,
     borderColor: '#44403C',
@@ -411,7 +416,7 @@ const styles = StyleSheet.create({
   bannerIconBox: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: 'rgba(220, 38, 38, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -429,9 +434,9 @@ const styles = StyleSheet.create({
   },
   matchupCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 14,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -534,8 +539,8 @@ const styles = StyleSheet.create({
   },
   marketBox: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -576,8 +581,8 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
     borderColor: Colors.border,
     marginTop: 6,

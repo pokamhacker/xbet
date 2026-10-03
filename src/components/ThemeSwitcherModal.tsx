@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore, BrandKey, BRAND_THEMES } from '../store/themeStore';
+import { BrandLogo } from './common/BrandLogo';
 
 interface ThemeSwitcherModalProps {
   visible: boolean;
@@ -19,11 +20,12 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
   visible,
   onClose,
 }) => {
-  const { currentBrand, setBrand, theme } = useThemeStore();
+  const { currentBrand, setBrand, setTheme, theme, currentTheme } = useThemeStore();
 
-  const brandList: BrandKey[] = ['1xbet', 'melbet', 'paripesa'];
+  const brandList: BrandKey[] = ['1xbet', '1xbet-dark', 'melbet', 'melbet-light', 'paripesa'];
 
   const handleSelectBrand = (brand: BrandKey) => {
+    setTheme(brand);
     setBrand(brand);
   };
 
@@ -39,8 +41,8 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
           style={[
             styles.modalCard,
             {
-              backgroundColor: theme.isDark ? '#1E222D' : '#FFFFFF',
-              borderColor: theme.isDark ? '#2A2E39' : '#E2E8F0',
+              backgroundColor: theme.modalBackground || (theme.isDark ? '#243242' : '#FFFFFF'),
+              borderColor: theme.border || (theme.isDark ? '#2C3A4B' : '#E2E8F0'),
             },
           ]}
         >
@@ -95,11 +97,11 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
                   style={[
                     styles.brandCard,
                     {
-                      backgroundColor: theme.isDark ? '#181A20' : '#F8FAFC',
+                      backgroundColor: theme.isDark ? (theme.cardBackground || '#212D3B') : '#F8FAFC',
                       borderColor: isSelected
                         ? b.primary
                         : theme.isDark
-                        ? '#2A2E39'
+                        ? (theme.border || '#2C3A4B')
                         : '#E2E8F0',
                       borderWidth: isSelected ? 2 : 1,
                     },
@@ -109,19 +111,14 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
                 >
                   <View style={styles.brandCardHeader}>
                     <View style={styles.brandTitleRow}>
-                      <View
-                        style={[
-                          styles.brandColorBadge,
-                          { backgroundColor: b.primary },
-                        ]}
-                      />
+                      <BrandLogo brand={brandKey} size={16} variant="header" isDark={b.isDark} />
                       <Text
                         style={[
                           styles.brandName,
-                          { color: theme.isDark ? '#F8FAFC' : '#0F172A' },
+                          { color: theme.isDark ? '#F8FAFC' : '#0F172A', marginLeft: 8 },
                         ]}
                       >
-                        {b.name}
+                        ({b.displayName})
                       </Text>
                       {isSelected && (
                         <View
@@ -258,7 +255,14 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
             activeOpacity={0.85}
             onPress={onClose}
           >
-            <Text style={styles.confirmBtnText}>Appliquer et Fermer</Text>
+            <Text
+              style={[
+                styles.confirmBtnText,
+                { color: theme.name.startsWith('melbet') ? '#000000' : '#FFFFFF' },
+              ]}
+            >
+              Appliquer et Fermer
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

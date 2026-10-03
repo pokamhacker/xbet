@@ -38,13 +38,20 @@ export interface MatchEvent {
   roundCode?: string;
   badge?: string;
   isLive?: boolean;
-  gameCategory?: 'sports' | 'poker' | 'mortalkombat' | 'apple' | 'crash';
+  gameCategory?: 'sports' | 'poker' | 'mortalkombat' | 'apple' | 'crash' | 'esports';
   pokerResult?: PokerRoundResult;
   mkResult?: MKRoundResult;
+  betId?: string;
+  sportCategory?: string;
+  tournamentName?: string;
+  finalScore?: string;
+  eventDate?: string;
 }
 
 export interface BetSlip {
   id: string; // 11 digits starting with 85
+  userId?: string; // ID utilisateur relié (clé étrangère)
+  ticketNumber?: string; // Numéro unique de ticket
   createdAt: string;
   type: BetType;
   eventsCount: number;
@@ -56,9 +63,13 @@ export interface BetSlip {
   status: BetStatus;
   events: MatchEvent[];
   isForSale?: boolean;
+  canSell?: boolean;
   cashoutAmount?: number;
+  sellPrice?: number | string;
   shareCode?: string;
-  gameCategory?: 'sports' | 'poker' | 'mortalkombat' | 'apple' | 'crash';
+  isLive?: boolean;
+  gameCategory?: 'sports' | 'poker' | 'mortalkombat' | 'apple' | 'crash' | 'esports';
+  drawNumber?: string;
 }
 
 export interface CustomLeague {

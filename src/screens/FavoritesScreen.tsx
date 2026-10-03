@@ -6,32 +6,50 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../theme/theme';
+import { useThemeStore } from '../stores/themeStore';
+import { useResponsive } from '../utils/responsive';
+import { BrandLogo } from '../components/common/BrandLogo';
 
 export default function FavoritesScreen({ navigation }: any) {
+  const { currentTheme } = useThemeStore();
+  const { contentContainerStyle, font, moderateScale, insets } = useResponsive();
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Favoris</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
+      <StatusBar
+        barStyle={currentTheme.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={currentTheme.headerBackground || '#FFFFFF'}
+        translucent={Platform.OS === 'android'}
+      />
+      <View style={[styles.header, { backgroundColor: currentTheme.headerBackground, borderBottomColor: currentTheme.border }]}>
+        <View style={[{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 8 }, contentContainerStyle]}>
+          <BrandLogo size={18} variant="compact" />
+          <Text style={[styles.headerTitle, { color: currentTheme.textPrimary, fontSize: font(17) }]}>Favoris</Text>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.emptyCard}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="star-outline" size={44} color={Colors.primaryAccent} />
+      <ScrollView contentContainerStyle={[styles.content, contentContainerStyle, { paddingBottom: 100 + (insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 12 : 0)) }]}>
+        <View style={[styles.emptyCard, { backgroundColor: currentTheme.cardBackground, borderColor: currentTheme.border }]}>
+          <View style={[styles.iconCircle, { backgroundColor: currentTheme.primarySoft, width: moderateScale(72), height: moderateScale(72), borderRadius: moderateScale(36) }]}>
+            <Ionicons name="star-outline" size={moderateScale(44)} color={currentTheme.primary} />
           </View>
-          <Text style={styles.emptyTitle}>Aucun favori enregistré</Text>
-          <Text style={styles.emptySub}>
+          <Text style={[styles.emptyTitle, { color: currentTheme.textPrimary, fontSize: font(16) }]}>Aucun favori enregistré</Text>
+          <Text style={[styles.emptySub, { color: currentTheme.textSecondary, fontSize: font(12) }]}>
             Épingle tes championnats, matchs ou sélections préférés pour y accéder rapidement ici.
           </Text>
 
           <TouchableOpacity
-            style={styles.exploreBtn}
+            style={[styles.exploreBtn, { backgroundColor: currentTheme.primary }]}
             onPress={() => navigation.navigate('Populaire')}
+            activeOpacity={0.8}
           >
-            <Text style={styles.exploreBtnText}>Explorer les studios</Text>
+            <Text style={[styles.exploreBtnText, { color: currentTheme.name.startsWith('melbet') ? '#000000' : '#FFFFFF', fontSize: font(13) }]}>
+              Explorer les studios
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -42,39 +60,34 @@ export default function FavoritesScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   header: {
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: Colors.textPrimary,
   },
   content: {
-    padding: 16,
-    paddingBottom: 88,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 110,
     flex: 1,
     justifyContent: 'center',
   },
   emptyCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 12,
+    padding: 20,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   iconCircle: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -82,24 +95,20 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.textPrimary,
   },
   emptySub: {
     fontSize: 12,
-    color: Colors.textMuted,
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 18,
     marginBottom: 20,
   },
   exploreBtn: {
-    backgroundColor: Colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 10,
   },
   exploreBtnText: {
-    color: '#fff',
     fontSize: 13,
     fontWeight: '700',
   },

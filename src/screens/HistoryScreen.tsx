@@ -1,3 +1,4 @@
-import HistoryListScreen from './HistoryListScreen';
+import BetHistoryScreen, { MainHistoryScreen } from './BetHistoryScreen';
 
-export default HistoryListScreen;
+export { MainHistoryScreen };
+export default BetHistoryScreen;

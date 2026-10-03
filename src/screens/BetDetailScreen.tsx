@@ -1,3 +1,15 @@
-import BetDetailTicketScreen from './BetDetailTicketScreen';
+import BetDetailScreen, {
+  BetEventSelection,
+  BetTicket,
+  Props as BetDetailScreenProps,
+  mapBetSlipToBetTicket,
+} from '../../BetDetailScreen';
 
-export default BetDetailTicketScreen;
+export default BetDetailScreen;
+export {
+  BetDetailScreen,
+  BetEventSelection,
+  BetTicket,
+  BetDetailScreenProps,
+  mapBetSlipToBetTicket,
+};

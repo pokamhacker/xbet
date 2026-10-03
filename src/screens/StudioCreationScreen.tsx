@@ -9,12 +9,22 @@ import {
   Switch,
   SafeAreaView,
   Alert,
+  Image,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
 import { generateCouponId, generateShareCode } from '../utils/pokerEngine';
 import { BetSlip, MatchEvent } from '../types/bet';
+import { SportsPickerModal } from '../components/SportsPickerModal';
+import { SPORTS_CATALOG, resolveTeamLogo, resolveCompetitionLogo } from '../data/sportsCatalog';
+import { TeamLogo } from '../components/common/TeamLogo';
+import { fetchTeamsByLeague } from '../services/sportsApi';
+import { LiveMatchPickerModal } from '../components/modals/LiveMatchPickerModal';
+import { FIFA_LEAGUES_LIST, getFifaLeagueLogo } from '../constants/fifaLeagues';
+import { formatBetDate } from '../utils/dateFormatter';
 
 export default function StudioCreationScreen({ navigation }: any) {
   const { customLeagues, addCoupon } = useBetStore();
@@ -22,42 +32,59 @@ export default function StudioCreationScreen({ navigation }: any) {
   // 1. Identité
   const [customId, setCustomId] = useState('');
   const [hasCustomBadge, setHasCustomBadge] = useState(false);
-  const [isLiveBadge, setIsLiveBadge] = useState(false);
+  const [isLiveBadge, setIsLiveBadge] = useState(true);
+
+  // Heure & Date du match (HH:mm)
+  const getCurrentTimeFormatted = () => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const getCurrentDateFormatted = () => {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    return `${day}.${month}.${year}`;
+  };
+
+  const [matchTime, setMatchTime] = useState(getCurrentTimeFormatted());
+  const [matchDate, setMatchDate] = useState(getCurrentDateFormatted());
 
   // 2. Filtres & Marchés
-  const [sourceType, setSourceType] = useState<'Tout' | 'FIFA' | 'Original'>('Tout');
+  const [sourceType, setSourceType] = useState<'Tout' | 'FIFA' | 'Original'>('FIFA');
   const [champType, setChampType] = useState<'Base' | 'Custo'>('Base');
-  const [selectedLeague, setSelectedLeague] = useState('Vietnam · V-League');
-  const [showLeaguePicker, setShowLeaguePicker] = useState(false);
+
+  // Sélection Visuelle Championnat & Équipes
+  const [selectedLeague, setSelectedLeague] = useState('');
+  const [selectedLeagueLogo, setSelectedLeagueLogo] = useState('');
+  const [selectedLeagueId, setSelectedLeagueId] = useState('');
+
+  const [homeTeam, setHomeTeam] = useState('');
+  const [homeTeamLogo, setHomeTeamLogo] = useState('');
+
+  const [awayTeam, setAwayTeam] = useState('');
+  const [awayTeamLogo, setAwayTeamLogo] = useState('');
+
+  const [isManualEntry, setIsManualEntry] = useState(false);
+  const [pickerModalVisible, setPickerModalVisible] = useState(false);
+  const [liveModalVisible, setLiveModalVisible] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'competition' | 'team'>('competition');
+  const [pickingTarget, setPickingTarget] = useState<'home' | 'away'>('home');
 
   const [marketType, setMarketType] = useState<'Base' | 'Custo'>('Base');
   const [selectedCategory, setSelectedCategory] = useState('Résultat');
-  const [homeTeam, setHomeTeam] = useState('Albany Rush');
-  const [awayTeam, setAwayTeam] = useState('Aksu Pavlodar');
-  const [selectedOptionLabel, setSelectedOptionLabel] = useState(
-    'Le Gardien de but touchera le Ballon pendant la Première minute du Match'
-  );
-  const [odd, setOdd] = useState('1.85');
+  const [selectedOptionLabel, setSelectedOptionLabel] = useState('');
+  const [odd, setOdd] = useState('');
   const [finalScoreSwitch, setFinalScoreSwitch] = useState(false);
 
-  // 3. Événements ajoutés
-  const [addedEvents, setAddedEvents] = useState<MatchEvent[]>([
-    {
-      id: 'ev-init-1',
-      sport: 'Football',
-      league: 'Vietnam · V-League',
-      date: '03.09.2026 (20:00)',
-      homeTeam: { name: 'Albany Rush' },
-      awayTeam: { name: 'Aksu Pavlodar' },
-      prediction: 'Score exact : 5–4',
-      odd: 69,
-      status: 'Accepté',
-      gameCategory: 'sports',
-    },
-  ]);
+  // 3. Événements ajoutés (vide par défaut)
+  const [addedEvents, setAddedEvents] = useState<MatchEvent[]>([]);
 
   // 4. Mise & Résumé
-  const [stake, setStake] = useState('500');
+  const [stake, setStake] = useState('1000');
   const [enableStakeBadge, setEnableStakeBadge] = useState(false);
   const [enableCashout, setEnableCashout] = useState(false);
 
@@ -72,15 +99,26 @@ export default function StudioCreationScreen({ navigation }: any) {
       return;
     }
     const numericOdd = parseFloat(odd) || 1.0;
+    const isFifa =
+      sourceType === 'FIFA' ||
+      selectedLeague.toUpperCase().includes('FIFA') ||
+      selectedLeague.toUpperCase().includes('FC ') ||
+      selectedLeagueId.toLowerCase().includes('fifa') ||
+      selectedLeagueId.toLowerCase().includes('fc2');
+    const finalTime = matchTime.trim() || getCurrentTimeFormatted();
+    const finalDate = matchDate.trim() || getCurrentDateFormatted();
+    const eventTimestamp = formatBetDate(`${finalDate} (${finalTime})`);
+
     const newEv: MatchEvent = {
       id: String(Date.now()),
-      sport: 'Football',
+      sport: isFifa ? 'FIFA' : 'Football',
       league: selectedLeague,
-      date: '03.09.2026 (20:00)',
-      homeTeam: { name: homeTeam },
-      awayTeam: { name: awayTeam },
+      date: eventTimestamp,
+      homeTeam: { name: homeTeam, logo: homeTeamLogo },
+      awayTeam: { name: awayTeam, logo: awayTeamLogo },
       prediction: selectedOptionLabel,
       odd: numericOdd,
+      actualScore: isLiveBadge ? '1-1' : undefined,
       status: 'Accepté',
       isLive: isLiveBadge,
       gameCategory: 'sports',
@@ -99,10 +137,13 @@ export default function StudioCreationScreen({ navigation }: any) {
     }
 
     const finalId = customId.trim() !== '' ? customId.trim() : generateCouponId();
+    const finalTime = matchTime.trim() || getCurrentTimeFormatted();
+    const finalDate = matchDate.trim() || getCurrentDateFormatted();
+    const hasLive = isLiveBadge || addedEvents.some((e) => e.isLive);
 
     const newCoupon: BetSlip = {
       id: finalId,
-      createdAt: '03.09.2026 (20:00)',
+      createdAt: formatBetDate(`${finalDate} (${finalTime})`),
       type: addedEvents.length > 1 ? 'Combiné' : 'Simple',
       eventsCount: addedEvents.length,
       completedCount: 0,
@@ -110,7 +151,12 @@ export default function StudioCreationScreen({ navigation }: any) {
       stake: numericStake,
       potentialPayout: potentialPayout,
       status: 'Accepté',
-      events: addedEvents,
+      isLive: hasLive,
+      events: addedEvents.map((ev) => ({
+        ...ev,
+        status: 'Accepté' as const,
+        isLive: isLiveBadge ? true : ev.isLive,
+      })),
       isForSale: enableCashout,
       cashoutAmount: Math.round(numericStake * 0.95),
       shareCode: generateShareCode(),
@@ -136,6 +182,7 @@ export default function StudioCreationScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={Platform.OS === 'android'} />
       {/* Header Bar */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -196,11 +243,62 @@ export default function StudioCreationScreen({ navigation }: any) {
               <Text style={{ color: Colors.liveRed }}>• </Text>Badge « En direct » sur le match
             </Text>
           </TouchableOpacity>
+
+          {/* Sélection de l'Heure et Date du match */}
+          <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border }}>
+            <Text style={[styles.fieldLabel, { marginBottom: 6 }]}>Horodatage du match</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.helperText, { marginTop: 0, marginBottom: 4 }]}>Heure (HH:mm)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ex: 15:45"
+                  value={matchTime}
+                  onChangeText={setMatchTime}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.helperText, { marginTop: 0, marginBottom: 4 }]}>Date (JJ.MM.AAAA)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ex: 02.10.2026"
+                  value={matchDate}
+                  onChangeText={setMatchDate}
+                />
+              </View>
+            </View>
+            <Text style={styles.helperText}>
+              Pré-rempli avec l'heure actuelle. Affiché sur le ticket : {matchDate || getCurrentDateFormatted()} ({matchTime || getCurrentTimeFormatted()}).
+            </Text>
+          </View>
         </View>
 
         {/* Section 2 : ÉVÉNEMENT */}
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>ÉVÉNEMENT</Text>
+
+          {/* Bouton d'importation directe API-Football */}
+          <TouchableOpacity
+            style={styles.apiFootballCardBtn}
+            activeOpacity={0.8}
+            onPress={() => setLiveModalVisible(true)}
+          >
+            <View style={styles.apiFootballIconWrap}>
+              <MaterialCommunityIcons name="soccer" size={22} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.apiFootballCardTitle}>API-Football Direct & Cotes</Text>
+                <View style={styles.apiFootballLiveTag}>
+                  <Text style={styles.apiFootballLiveTagText}>TEMPS RÉEL</Text>
+                </View>
+              </View>
+              <Text style={styles.apiFootballCardSubtitle}>
+                Importer un match en direct avec logos officiels et cotes en 1 clic
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
+          </TouchableOpacity>
 
           {/* Source Filter */}
           <View style={styles.toggleRow}>
@@ -234,57 +332,192 @@ export default function StudioCreationScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Dropdown Selector for League */}
-          <TouchableOpacity
-            style={styles.dropdownSelector}
-            onPress={() => setShowLeaguePicker(!showLeaguePicker)}
-          >
-            <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
-            <Text style={[styles.dropdownText, selectedLeague ? { color: Colors.textPrimary, fontWeight: '700' } : null]}>
-              {selectedLeague || 'Sélectionner un championnat'}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color={Colors.textMuted} />
-          </TouchableOpacity>
-
-          {/* Inline League Options if Open */}
-          {showLeaguePicker && (
-            <View style={styles.inlineLeaguePicker}>
-              {customLeagues.map((lg) => (
+          {/* Sélecteur Cliquable pour Nom du Championnat */}
+          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Nom du championnat</Text>
+          {isManualEntry ? (
+            <TextInput
+              style={styles.input}
+              value={selectedLeague}
+              onChangeText={setSelectedLeague}
+              placeholder="Ex: UEFA Champions League"
+            />
+          ) : (
+            <TouchableOpacity
+              style={styles.clickableSelector}
+              activeOpacity={0.8}
+              onPress={() => {
+                setPickerMode('competition');
+                setPickerModalVisible(true);
+              }}
+            >
+              {selectedLeagueLogo ? (
+                <Image source={{ uri: selectedLeagueLogo }} style={styles.selectorMiniLogo} resizeMode="contain" />
+              ) : (
+                <View style={styles.selectorPlaceholderIcon}>
+                  <Ionicons name="trophy-outline" size={16} color={Colors.primaryAccent} />
+                </View>
+              )}
+              <Text
+                style={[
+                  styles.selectorText,
+                  !selectedLeague && styles.selectorPlaceholderText,
+                ]}
+                numberOfLines={1}
+              >
+                {selectedLeague || 'Sélectionner un championnat...'}
+              </Text>
+              {selectedLeague ? (
                 <TouchableOpacity
-                  key={lg.id}
-                  style={styles.leagueItem}
-                  onPress={() => {
-                    setSelectedLeague(lg.name);
-                    setShowLeaguePicker(false);
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedLeague('');
+                    setSelectedLeagueLogo('');
+                    setSelectedLeagueId('');
                   }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Text style={styles.leagueItemText}>{lg.name}</Text>
-                  {selectedLeague === lg.name && (
-                    <Ionicons name="checkmark" size={16} color={Colors.primaryAccent} />
-                  )}
+                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
                 </TouchableOpacity>
-              ))}
+              ) : (
+                <Ionicons name="chevron-down" size={18} color="#94A3B8" />
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Championnats FIFA rapides si Source === 'FIFA' */}
+          {sourceType === 'FIFA' && (
+            <View style={{ marginTop: 8 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {FIFA_LEAGUES_LIST.map((fl) => {
+                  const isSelected = selectedLeague === fl.name || selectedLeagueId === fl.id;
+                  const logo = getFifaLeagueLogo(fl.flagType);
+                  return (
+                    <TouchableOpacity
+                      key={fl.id}
+                      style={[
+                        styles.fifaQuickChip,
+                        isSelected && styles.fifaQuickChipActive,
+                      ]}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setSelectedLeague(fl.name);
+                        setSelectedLeagueId(fl.id);
+                        setSelectedLeagueLogo(logo);
+                        fetchTeamsByLeague(fl.name);
+                      }}
+                    >
+                      <Image source={{ uri: logo }} style={styles.fifaChipLogo} resizeMode="contain" />
+                      <Text
+                        style={[
+                          styles.fifaChipText,
+                          isSelected && styles.fifaChipTextActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {fl.name}
+                      </Text>
+                      {fl.isNew && (
+                        <View style={styles.chipNewBadge}>
+                          <Text style={styles.chipNewText}>NEW</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
           )}
 
-          {/* Teams Config */}
+          {/* Configuration des Équipes (Domicile VS Extérieur) */}
           <View style={styles.teamsInputBlock}>
-            <Text style={styles.fieldLabel}>Équipes (Domicile VS Extérieur)</Text>
-            <View style={styles.teamsRowInput}>
-              <TextInput
-                style={[styles.teamInput, { textAlign: 'left' }]}
-                value={homeTeam}
-                onChangeText={setHomeTeam}
-                placeholder="Équipe Domicile"
-              />
-              <Text style={styles.vsBadgeText}>VS</Text>
-              <TextInput
-                style={[styles.teamInput, { textAlign: 'right' }]}
-                value={awayTeam}
-                onChangeText={setAwayTeam}
-                placeholder="Équipe Extérieur"
-              />
+            <View style={styles.teamsHeaderRow}>
+              <Text style={styles.fieldLabel}>Équipes (Domicile VS Extérieur)</Text>
+              <TouchableOpacity
+                onPress={() => setIsManualEntry(!isManualEntry)}
+                style={styles.toggleManualBtn}
+              >
+                <Text style={styles.toggleManualText}>
+                  {isManualEntry ? '📋 Choisir du catalogue' : '✍️ Saisie manuelle'}
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            {isManualEntry ? (
+              <View style={styles.teamsRowInput}>
+                <TextInput
+                  style={[styles.teamInput, { textAlign: 'left' }]}
+                  value={homeTeam}
+                  onChangeText={setHomeTeam}
+                  placeholder="Équipe Domicile"
+                />
+                <Text style={styles.vsBadgeText}>VS</Text>
+                <TextInput
+                  style={[styles.teamInput, { textAlign: 'right' }]}
+                  value={awayTeam}
+                  onChangeText={setAwayTeam}
+                  placeholder="Équipe Extérieur"
+                />
+              </View>
+            ) : (
+              <View style={styles.teamsRowPickers}>
+                {/* Sélecteur Domicile */}
+                <TouchableOpacity
+                  style={[styles.teamPickerCard, styles.teamPickerCardHome]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setPickerMode('team');
+                    setPickingTarget('home');
+                    setPickerModalVisible(true);
+                  }}
+                >
+                  <View style={styles.teamLogoThumbWrap}>
+                    {homeTeam ? (
+                      <TeamLogo teamName={homeTeam} logoUrl={homeTeamLogo} size={30} />
+                    ) : (
+                      <Ionicons name="shield-outline" size={18} color={Colors.primary} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.teamRoleLabel}>Domicile</Text>
+                    <Text style={styles.teamSelectedName} numberOfLines={1}>
+                      {homeTeam || 'Choisir...'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+                </TouchableOpacity>
+
+                {/* Badge Central VS */}
+                <View style={styles.vsCenterBadge}>
+                  <Text style={styles.vsCenterText}>VS</Text>
+                </View>
+
+                {/* Sélecteur Extérieur */}
+                <TouchableOpacity
+                  style={[styles.teamPickerCard, styles.teamPickerCardAway]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setPickerMode('team');
+                    setPickingTarget('away');
+                    setPickerModalVisible(true);
+                  }}
+                >
+                  <View style={styles.teamLogoThumbWrap}>
+                    {awayTeam ? (
+                      <TeamLogo teamName={awayTeam} logoUrl={awayTeamLogo} size={30} />
+                    ) : (
+                      <Ionicons name="shield-outline" size={18} color="#EA580C" />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.teamRoleLabel}>Extérieur</Text>
+                    <Text style={styles.teamSelectedName} numberOfLines={1}>
+                      {awayTeam || 'Choisir...'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Marché Categories Tabs */}
@@ -374,7 +607,7 @@ export default function StudioCreationScreen({ navigation }: any) {
         {/* Section 4 : MISE ET RÉSUMÉ */}
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>MISE ET RÉSUMÉ</Text>
-          <Text style={styles.fieldLabel}>Mise virtuelle (F)</Text>
+          <Text style={styles.fieldLabel}>Mise virtuelle (₣)</Text>
           <TextInput
             style={[styles.input, { fontWeight: '700', fontSize: 16 }]}
             value={stake}
@@ -423,6 +656,71 @@ export default function StudioCreationScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Sélecteur Visuel Modal pour Championnats et Équipes */}
+      <SportsPickerModal
+        visible={pickerModalVisible}
+        mode={pickerMode}
+        initialCategoryTab={sourceType === 'FIFA' ? 'FIFA' : undefined}
+        filterCompetitionId={pickerMode === 'team' ? selectedLeagueId : undefined}
+        selectedId={
+          pickerMode === 'competition'
+            ? selectedLeagueId || selectedLeague
+            : pickingTarget === 'home'
+              ? homeTeam
+              : awayTeam
+        }
+        onSelectCompetition={(comp) => {
+          setSelectedLeague(comp.name);
+          const logo = (comp as any).badge || comp.logo || resolveCompetitionLogo(comp.name) || '';
+          setSelectedLeagueLogo(logo);
+          setSelectedLeagueId(comp.id);
+          // Déclenche l'appel API REST TheSportsDB pour mettre à jour les équipes en temps réel
+          fetchTeamsByLeague(comp.name);
+        }}
+        onSelectTeam={(team, comp) => {
+          const teamLogo = (team as any).badge || team.logo || resolveTeamLogo(team.name) || '';
+          if (pickingTarget === 'home') {
+            setHomeTeam(team.name);
+            setHomeTeamLogo(teamLogo);
+          } else {
+            setAwayTeam(team.name);
+            setAwayTeamLogo(teamLogo);
+          }
+
+          // Auto-complétion de la compétition si non définie ou liée
+          if (comp) {
+            setSelectedLeague(comp.name);
+            const compLogo = (comp as any).badge || comp.logo || resolveCompetitionLogo(comp.name) || '';
+            setSelectedLeagueLogo(compLogo);
+            setSelectedLeagueId(comp.id);
+          }
+        }}
+        onClose={() => setPickerModalVisible(false)}
+      />
+
+      {/* Modale des matchs en direct API-Football */}
+      <LiveMatchPickerModal
+        visible={liveModalVisible}
+        onClose={() => setLiveModalVisible(false)}
+        onSelectMatch={(match) => {
+          setSelectedLeague(match.league);
+          if (match.badge) setSelectedLeagueLogo(match.badge);
+          setHomeTeam(match.homeTeam.name);
+          if (match.homeTeam.logo) setHomeTeamLogo(match.homeTeam.logo);
+          setAwayTeam(match.awayTeam.name);
+          if (match.awayTeam.logo) setAwayTeamLogo(match.awayTeam.logo);
+          setOdd(match.odd.toString());
+          setSelectedOptionLabel(match.prediction);
+          setIsLiveBadge(Boolean(match.isLive));
+          setAddedEvents((prev) => [...prev, match]);
+          setLiveModalVisible(false);
+          Alert.alert(
+            'Match Importé !',
+            `${match.homeTeam.name} vs ${match.awayTeam.name} a été ajouté au coupon.`
+          );
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -431,12 +729,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
@@ -451,16 +750,17 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   scrollArea: {
-    padding: 16,
-    paddingBottom: 50,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 110,
   },
   bannerBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primaryLight,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
     gap: 12,
     borderWidth: 1,
     borderColor: Colors.primarySoft,
@@ -478,6 +778,47 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.primary,
   },
+  apiFootballCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.25)',
+  },
+  apiFootballIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  apiFootballCardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#2563EB',
+  },
+  apiFootballLiveTag: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  apiFootballLiveTagText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  apiFootballCardSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
   bannerSubtitle: {
     fontSize: 11,
     color: Colors.primary,
@@ -485,9 +826,9 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -753,4 +1094,161 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
+  // Nouveaux Styles Sélecteurs Visuels
+  clickableSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    gap: 10,
+  },
+  selectorMiniLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+  },
+  selectorPlaceholderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectorText: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  selectorPlaceholderText: {
+    color: Colors.textMuted,
+    fontWeight: '500',
+  },
+  teamsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  toggleManualBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+  },
+  toggleManualText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primaryAccent,
+  },
+  teamsRowPickers: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  teamPickerCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  teamPickerCardHome: {
+    borderColor: '#BFDBFE',
+    backgroundColor: '#F8FAFC',
+  },
+  teamPickerCardAway: {
+    borderColor: '#FED7AA',
+    backgroundColor: '#F8FAFC',
+  },
+  teamLogoThumbWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  teamThumbImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  teamRoleLabel: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+  },
+  teamSelectedName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  vsCenterBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vsCenterText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+  },
+  fifaQuickChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  fifaQuickChipActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: Colors.primaryAccent,
+  },
+  fifaChipLogo: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+  },
+  fifaChipText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  fifaChipTextActive: {
+    color: Colors.primaryAccent,
+    fontWeight: '700',
+  },
+  chipNewBadge: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  chipNewText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+  },
 });
+

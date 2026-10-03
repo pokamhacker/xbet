@@ -1,10 +1,12 @@
+import { Platform } from 'react-native';
+
 export const Colors = {
-  // Brand Blues (1xBet / Melbet standard)
-  primary: '#1E40AF',
-  primaryAccent: '#2563EB',
-  primaryHover: '#1D4ED8',
-  primarySoft: '#DBEAFE',
-  primaryLight: '#EFF6FF',
+  // Brand Primary (1xBet reference officiel)
+  primary: '#243DB5',
+  primaryAccent: '#243DB5',
+  primaryHover: '#1D329A',
+  primarySoft: '#E0E7FF',
+  primaryLight: '#EEF2FF',
 
   // Status & Wins
   success: '#16A34A',
@@ -22,18 +24,18 @@ export const Colors = {
   liveRed: '#EF4444',
 
   // Surfaces & Backgrounds
-  background: '#F1F5F9',
+  background: '#F5F6FA',
   surface: '#FFFFFF',
   surfaceSecondary: '#F8FAFC',
   divider: '#F1F5F9',
-  border: '#E2E8F0',
+  border: '#E5E7EB',
   borderDark: '#CBD5E1',
 
   // Typography
-  textPrimary: '#1E293B',
-  textSecondary: '#475569',
-  textMuted: '#64748B',
-  textSubtle: '#94A3B8',
+  textPrimary: '#1F2937',
+  textSecondary: '#6B7280',
+  textMuted: '#6B7280',
+  textSubtle: '#9CA3AF',
   textWhite: '#FFFFFF',
 
   // Gaming Special
@@ -52,16 +54,42 @@ export const Spacing = {
 };
 
 export const Typography = {
-  fontHeader: '700',
-  fontBold: '800',
-  fontSemiBold: '600',
-  fontMedium: '500',
-  fontRegular: '400',
+  fontFamily: Platform.select({
+    ios: 'Roboto',
+    android: 'Roboto',
+    default: "'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  }),
+  fontHeader: '700' as const,
+  fontBold: '700' as const,
+  fontSemiBold: '600' as const,
+  fontMedium: '500' as const,
+  fontRegular: '400' as const,
+};
+
+export const DesignTokens = {
+  fontFamilyPrimary: Typography.fontFamily,
+
+  fontSizeXs: 12,
+  fontSizeSm: 14,
+  fontSizeMd: 16,
+  fontSizeLg: 18,
+  fontSizeXl: 22,
+
+  fontWeightRegular: '400' as const,
+  fontWeightMedium: '500' as const,
+  fontWeightBold: '700' as const,
+
+  colorPrimary: Colors.primary,
+  colorTextPrimary: Colors.textPrimary,
+  colorTextSecondary: Colors.textSecondary,
+  colorBackground: Colors.background,
+  colorSurface: Colors.surface,
+  colorBorder: Colors.border,
 };
 
 export const TicketTheme = {
   notchSize: 18,
   notchOffset: -9,
-  notchColor: '#F1F5F9',
-  dashedBorderColor: '#E2E8F0',
+  notchColor: '#F5F6FA',
+  dashedBorderColor: '#E5E7EB',
 };

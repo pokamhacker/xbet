@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="240" height="240" fill="none">
+  <!-- LAYER 3 (Bas) -->
+  <!-- Tranche d'ombre inférieure de l'étage 3 -->
+  <path
+    d="M 2.5 16.6 L 12 22.8 L 21.5 16.6 L 21.5 18.0 L 12 24.2 L 2.5 18.0 Z"
+    fill="#3D5367"
+  />
+  <!-- Face supérieure claire de l'étage 3 -->
+  <path
+    d="M 2.5 14.8 L 12 21.0 L 21.5 14.8 L 21.5 16.6 L 12 22.8 L 2.5 16.6 Z"
+    fill="#EBF1F6"
+  />
+
+  <!-- LAYER 2 (Intermédiaire) -->
+  <!-- Tranche d'ombre inférieure de l'étage 2 -->
+  <path
+    d="M 2.5 12.6 L 12 18.8 L 21.5 12.6 L 21.5 14.0 L 12 20.2 L 2.5 14.0 Z"
+    fill="#3D5367"
+  />
+  <!-- Face supérieure claire de l'étage 2 -->
+  <path
+    d="M 2.5 10.8 L 12 17.0 L 21.5 10.8 L 21.5 12.6 L 12 18.8 L 2.5 12.6 Z"
+    fill="#EBF1F6"
+  />
+
+  <!-- LAYER 1 (Haut) -->
+  <!-- Tranche d'ombre inférieure de l'étage 1 -->
+  <path
+    d="M 2.5 7.6 L 12 13.8 L 21.5 7.6 L 21.5 9.0 L 12 15.2 L 2.5 9.0 Z"
+    fill="#3D5367"
+  />
+  <!-- Face supérieure complète de l'étage 1 (Losange) -->
+  <path
+    d="M 12 1.4 L 21.5 7.6 L 12 13.8 L 2.5 7.6 Z"
+    fill="#56728A"
+  />
+</svg>
