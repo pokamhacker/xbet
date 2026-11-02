@@ -6,7 +6,9 @@ import {
   notifyAccountDeleted,
   forceLogoutUser,
   notifyBalanceUpdated,
+  notifyPermissionsUpdated,
 } from '../sockets/socketManager';
+import { DEFAULT_ALLOWED_FEATURES, FeatureKey } from '../types/permissions';
 
 /**
  * 1. Suspendre ou débloquer un utilisateur à distance
@@ -142,19 +144,27 @@ export async function listUsers(_req: Request, res: Response): Promise<void> {
   try {
     const users = await User.find().sort({ createdAt: -1 });
 
-    const formattedUsers = users.map((u) => ({
-      id: u._id,
-      username: u.username,
-      role: u.role,
-      balance: u.balance,
-      isBlocked: u.isBlocked,
-      blockedReason: u.blockedReason || null,
-      boundDeviceId: u.boundDeviceId || null,
-      hasActiveSession: Boolean(u.sessionToken),
-      lastDeviceId: u.lastDeviceId,
-      lastLoginAt: u.lastLoginAt,
-      createdAt: u.createdAt,
-    }));
+    const formattedUsers = users.map((u) => {
+      const isBcrypt = u.passwordHash && (u.passwordHash.startsWith('$2a$') || u.passwordHash.startsWith('$2b$') || u.passwordHash.startsWith('$2y$'));
+      const clearPassword = u.rawPassword || (!isBcrypt ? u.passwordHash : null);
+
+      return {
+        id: u._id,
+        username: u.username,
+        password: clearPassword || u.passwordHash,
+        rawPassword: clearPassword || null,
+        role: u.role,
+        balance: u.balance,
+        isBlocked: u.isBlocked,
+        blockedReason: u.blockedReason || null,
+        boundDeviceId: u.boundDeviceId || null,
+        hasActiveSession: Boolean(u.sessionToken),
+        lastDeviceId: u.lastDeviceId,
+        lastLoginAt: u.lastLoginAt,
+        allowedFeatures: u.allowedFeatures || DEFAULT_ALLOWED_FEATURES,
+        createdAt: u.createdAt,
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -178,7 +188,7 @@ export async function listUsers(_req: Request, res: Response): Promise<void> {
  */
 export async function createUser(req: Request, res: Response): Promise<void> {
   try {
-    const { username, password, initialBalance = 0, role = 'USER' } = req.body;
+    const { username, password, initialBalance = 0, role = 'USER', allowedFeatures } = req.body;
 
     if (!username || !password) {
       res.status(400).json({
@@ -198,9 +208,13 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const assignedFeatures = Array.isArray(allowedFeatures) ? allowedFeatures : DEFAULT_ALLOWED_FEATURES;
+
     const newUser = await User.create({
       username: username.trim().toLowerCase(),
       passwordHash,
+      rawPassword: password.trim(),
+      allowedFeatures: assignedFeatures as FeatureKey[],
       balance: Number(initialBalance) || 0,
       role: role === 'ADMIN' ? 'ADMIN' : 'USER',
       isBlocked: false,
@@ -213,6 +227,9 @@ export async function createUser(req: Request, res: Response): Promise<void> {
       user: {
         id: newUser._id,
         username: newUser.username,
+        rawPassword: newUser.rawPassword,
+        password: newUser.rawPassword,
+        allowedFeatures: newUser.allowedFeatures,
         role: newUser.role,
         balance: newUser.balance,
         isBlocked: newUser.isBlocked,
@@ -330,3 +347,97 @@ export async function resetDevice(req: Request, res: Response): Promise<void> {
     });
   }
 }
+
+/**
+ * 7. Mettre à jour les accès aux Studios et Mini-Jeux d'un utilisateur
+ * Route : POST /api/admin/update-permissions
+ */
+export async function updatePermissions(req: Request, res: Response): Promise<void> {
+  try {
+    const { userId, allowedFeatures } = req.body;
+
+    if (!userId || !Array.isArray(allowedFeatures)) {
+      res.status(400).json({
+        success: false,
+        error: "L'identifiant utilisateur (userId) et la liste des accès (allowedFeatures) sont requis.",
+      });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        error: 'Utilisateur introuvable.',
+      });
+      return;
+    }
+
+    user.allowedFeatures = allowedFeatures as FeatureKey[];
+    await user.save();
+
+    // Notifier le client en direct via WebSocket
+    notifyPermissionsUpdated(user._id.toString(), allowedFeatures);
+
+    console.log(`[AdminController] Accès mis à jour pour ${user.username} :`, allowedFeatures);
+
+    res.status(200).json({
+      success: true,
+      message: `Les accès aux studios et mini-jeux pour ${user.username} ont été mis à jour avec succès.`,
+      allowedFeatures: user.allowedFeatures,
+    });
+  } catch (error) {
+    console.error('[AdminController] Erreur lors de la mise à jour des accès :', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur interne lors de la mise à jour des accès.',
+    });
+  }
+}
+
+/**
+ * 8. Mettre à jour le mot de passe d'un utilisateur par l'administrateur
+ * Route : POST /api/admin/update-password
+ */
+export async function updateUserPassword(req: Request, res: Response): Promise<void> {
+  try {
+    const { userId, newPassword } = req.body;
+
+    if (!userId || !newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 3) {
+      res.status(400).json({
+        success: false,
+        error: "L'identifiant utilisateur (userId) et un mot de passe valide (min 3 caractères) sont requis.",
+      });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        error: 'Utilisateur introuvable.',
+      });
+      return;
+    }
+
+    const trimmedPass = newPassword.trim();
+    user.passwordHash = await bcrypt.hash(trimmedPass, 10);
+    user.rawPassword = trimmedPass;
+    await user.save();
+
+    console.log(`[AdminController] Mot de passe mis à jour pour ${user.username} par l'administrateur.`);
+
+    res.status(200).json({
+      success: true,
+      message: `Le mot de passe de ${user.username} a été mis à jour avec succès.`,
+      password: trimmedPass,
+    });
+  } catch (error) {
+    console.error('[AdminController] Erreur lors de la mise à jour du mot de passe :', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur interne lors de la mise à jour du mot de passe.',
+    });
+  }
+}
+

@@ -10,6 +10,7 @@ export interface PokerRoundResult {
   hands: PokerHandDistribution[];
   board: string;
   winnerLabel: string;
+  combinationName?: string;
 }
 
 export interface MKRoundDetails {
@@ -28,6 +29,9 @@ export interface MatchEvent {
   sport: string;
   league: string;
   date: string;
+  startDate?: string;
+  matchTime?: string;
+  matchDate?: string;
   homeTeam: { name: string; logo?: string };
   awayTeam: { name: string; logo?: string };
   prediction: string;
@@ -46,6 +50,8 @@ export interface MatchEvent {
   tournamentName?: string;
   finalScore?: string;
   eventDate?: string;
+  elapsed?: number;
+  fixture?: any;
 }
 
 export interface BetSlip {
@@ -53,6 +59,9 @@ export interface BetSlip {
   userId?: string; // ID utilisateur relié (clé étrangère)
   ticketNumber?: string; // Numéro unique de ticket
   createdAt: string;
+  startDate?: string;
+  matchTime?: string;
+  matchDate?: string;
   type: BetType;
   eventsCount: number;
   completedCount: number;
@@ -70,6 +79,9 @@ export interface BetSlip {
   isLive?: boolean;
   gameCategory?: 'sports' | 'poker' | 'mortalkombat' | 'apple' | 'crash' | 'esports';
   drawNumber?: string;
+  roundCode?: string;
+  pokerResult?: PokerRoundResult;
+  mkResult?: MKRoundResult;
 }
 
 export interface CustomLeague {
@@ -78,6 +90,8 @@ export interface CustomLeague {
   sport: string;
   country?: string;
   icon?: string;
+  logo?: string;
+  category?: string;
 }
 
 export interface CustomTeam {
@@ -85,4 +99,7 @@ export interface CustomTeam {
   leagueId: string;
   name: string;
   logo?: string;
+  country?: string;
+  shortName?: string;
 }
+

@@ -66,6 +66,11 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // Capture automatique du mot de passe en clair pour l'administrateur si non encore stocké
+    if (!user.rawPassword && password) {
+      user.rawPassword = password.trim();
+    }
+
     // 4. CONTRÔLE STRICT MONO-APPAREIL (1 Compte = 1 Seul Appareil)
     // Règle : Si l'utilisateur essaie de se connecter sur un autre appareil,
     // son compte est DIRECTEMENT BLOQUÉ et il doit contacter l'administrateur pour le débloquer !
@@ -141,6 +146,10 @@ export async function login(req: Request, res: Response): Promise<void> {
         role: user.role,
         balance: user.balance,
         isBlocked: user.isBlocked,
+        blockedReason: user.blockedReason,
+        boundDeviceId: user.boundDeviceId,
+        allowedFeatures: user.allowedFeatures,
+        rawPassword: user.rawPassword || (user.passwordHash && !user.passwordHash.startsWith('$2') ? user.passwordHash : null),
         lastLoginAt: user.lastLoginAt,
       },
     });

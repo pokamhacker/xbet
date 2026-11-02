@@ -285,13 +285,7 @@ class ApiFootballService {
 
       // Vérifier les erreurs renvoyées par API-Football (ex: quota dépassé)
       if (json.errors) {
-        const errorEntries = Object.entries(json.errors);
-        if (errorEntries.length > 0) {
-          const firstErr = Array.isArray(json.errors) ? json.errors.join(', ') : Object.values(json.errors).join(', ');
-          if (firstErr) {
-            console.warn('[API-Football] Notification API :', firstErr);
-          }
-        }
+        // Notification silencieuse
       }
 
       const data = json.response || [];
@@ -301,7 +295,6 @@ class ApiFootballService {
 
       return data;
     } catch (error: any) {
-      console.warn(`[API-Football] Échec de requête vers ${endpoint} :`, error.message);
       throw error;
     }
   }

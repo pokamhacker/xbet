@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
     bound_device_id TEXT DEFAULT NULL,
     last_device_id TEXT DEFAULT NULL,
     session_token TEXT DEFAULT NULL,
-    last_login_at TEXT DEFAULT NULL,
+    raw_password TEXT DEFAULT NULL,
+    allowed_features TEXT DEFAULT NULL,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );

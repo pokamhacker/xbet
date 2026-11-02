@@ -346,8 +346,8 @@ export async function fetchAllLeagues(): Promise<SportsLeague[]> {
         }
       }
     }
-  } catch (err) {
-    console.warn('[sportsApi] fetchAllLeagues non-fatal error:', err);
+  } catch {
+    // Récupération des ligues silencieuse en cas d'indisponibilité réseau
   }
 
   // 3. Convertir en tableau et trier
@@ -427,8 +427,8 @@ export async function fetchTeamsByLeague(leagueName: string): Promise<SportsTeam
         return teams;
       }
     }
-  } catch (err) {
-    console.warn(`[sportsApi] fetchTeamsByLeague non-fatal error for ${leagueName}:`, err);
+  } catch {
+    // Récupération des équipes silencieuse en cas d'erreur
   }
 
   // Fallback si la recherche exacte échoue : essayer avec le nom original ou les alias

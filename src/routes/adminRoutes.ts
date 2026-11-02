@@ -6,6 +6,8 @@ import {
   createUser,
   updateBalance,
   resetDevice,
+  updatePermissions,
+  updateUserPassword,
 } from '../controllers/adminController';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware';
 
@@ -23,5 +25,7 @@ router.post('/delete-user', deleteUser);
 router.delete('/delete-user', deleteUser);
 router.post('/update-balance', updateBalance);
 router.post('/reset-device', resetDevice);
+router.post('/update-permissions', updatePermissions);
+router.post('/update-password', updateUserPassword);
 
 export default router;

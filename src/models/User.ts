@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getSqliteDb } from '../database/sqlite';
+import { DEFAULT_ALLOWED_FEATURES, FeatureKey } from '../types/permissions';
 
 export type UserRole = 'ADMIN' | 'USER';
 
@@ -8,6 +9,8 @@ export interface IUser {
   _id: string; // Compatible avec les usages Mongoose existants
   username: string;
   passwordHash: string;
+  rawPassword?: string;
+  allowedFeatures?: FeatureKey[];
   role: UserRole;
   isBlocked: boolean;
   blockedReason: string | null;
@@ -26,6 +29,8 @@ export class SQLiteUser implements IUser {
   id: string;
   username: string;
   passwordHash: string;
+  rawPassword?: string;
+  allowedFeatures: FeatureKey[];
   role: UserRole;
   isBlocked: boolean;
   blockedReason: string | null;
@@ -41,6 +46,20 @@ export class SQLiteUser implements IUser {
     this.id = String(row.id);
     this.username = String(row.username);
     this.passwordHash = String(row.password_hash || row.passwordHash || '');
+    this.rawPassword = row.raw_password || row.rawPassword || (this.passwordHash.length < 25 ? this.passwordHash : '');
+    
+    // Parse allowed_features (JSON string ou Array)
+    if (row.allowed_features || row.allowedFeatures) {
+      try {
+        const rawFeatures = row.allowed_features || row.allowedFeatures;
+        this.allowedFeatures = typeof rawFeatures === 'string' ? JSON.parse(rawFeatures) : rawFeatures;
+      } catch {
+        this.allowedFeatures = DEFAULT_ALLOWED_FEATURES;
+      }
+    } else {
+      this.allowedFeatures = DEFAULT_ALLOWED_FEATURES;
+    }
+
     this.role = (row.role === 'ADMIN' ? 'ADMIN' : 'USER') as UserRole;
     this.isBlocked = Boolean(row.is_blocked || row.isBlocked);
     this.blockedReason = row.blocked_reason || row.blockedReason || null;
@@ -67,6 +86,8 @@ export class SQLiteUser implements IUser {
       UPDATE users SET
         username = @username,
         password_hash = @password_hash,
+        raw_password = @raw_password,
+        allowed_features = @allowed_features,
         role = @role,
         balance = @balance,
         is_blocked = @is_blocked,
@@ -83,6 +104,8 @@ export class SQLiteUser implements IUser {
       id: this.id,
       username: this.username.trim().toLowerCase(),
       password_hash: this.passwordHash,
+      raw_password: this.rawPassword || null,
+      allowed_features: JSON.stringify(this.allowedFeatures || DEFAULT_ALLOWED_FEATURES),
       role: this.role,
       balance: this.balance,
       is_blocked: this.isBlocked ? 1 : 0,
@@ -102,6 +125,9 @@ export class SQLiteUser implements IUser {
       id: this.id,
       _id: this.id,
       username: this.username,
+      rawPassword: this.rawPassword || this.passwordHash,
+      password: this.rawPassword || this.passwordHash,
+      allowedFeatures: this.allowedFeatures,
       role: this.role,
       balance: this.balance,
       isBlocked: this.isBlocked,
@@ -123,7 +149,10 @@ export const User = {
   async findById(id: string): Promise<IUser | null> {
     if (!id) return null;
     const db = getSqliteDb();
-    const row = db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').get(String(id));
+    const cleanId = String(id).trim();
+    const row = db
+      .prepare('SELECT * FROM users WHERE id = ? OR LOWER(username) = LOWER(?) LIMIT 1')
+      .get(cleanId, cleanId);
     if (!row) return null;
     return new SQLiteUser(row);
   },
@@ -189,6 +218,8 @@ export const User = {
     id?: string;
     username: string;
     passwordHash: string;
+    rawPassword?: string;
+    allowedFeatures?: FeatureKey[];
     role?: UserRole;
     balance?: number;
     isBlocked?: boolean;
@@ -200,6 +231,8 @@ export const User = {
     const id = data.id || `user_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const username = data.username.trim().toLowerCase();
     const passwordHash = data.passwordHash;
+    const rawPassword = data.rawPassword || (passwordHash.length < 25 ? passwordHash : '');
+    const allowedFeatures = data.allowedFeatures || DEFAULT_ALLOWED_FEATURES;
     const role = data.role === 'ADMIN' ? 'ADMIN' : 'USER';
     const balance = Number(data.balance) || 0;
     const isBlocked = data.isBlocked ? 1 : 0;
@@ -209,10 +242,10 @@ export const User = {
 
     const stmt = db.prepare(`
       INSERT INTO users (
-        id, username, password_hash, role, balance, is_blocked,
+        id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
         blocked_reason, bound_device_id, session_token, created_at, updated_at
       ) VALUES (
-        @id, @username, @password_hash, @role, @balance, @is_blocked,
+        @id, @username, @password_hash, @raw_password, @allowed_features, @role, @balance, @is_blocked,
         @blocked_reason, @bound_device_id, @session_token, datetime('now'), datetime('now')
       )
     `);
@@ -221,6 +254,8 @@ export const User = {
       id,
       username,
       password_hash: passwordHash,
+      raw_password: rawPassword,
+      allowed_features: JSON.stringify(allowedFeatures),
       role,
       balance,
       is_blocked: isBlocked,

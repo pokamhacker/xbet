@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
 
-// URL du backend (Railway ou variable d'environnement)
-const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'https://web-production-4a2e0b.up.railway.app';
+// URL du backend unifié (Render.com ou variable d'environnement)
+const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'https://xbet-backend.onrender.com';
 
 let socketInstance: Socket | null = null;
 
@@ -20,8 +20,11 @@ export function getSocketClient(): Socket {
       reconnectionDelay: 2000,
     });
 
+    socketInstance.on('connect_error', () => {
+      // Ignorer silencieusement les erreurs de connexion WebSocket lorsque le serveur distant est en veille
+    });
+
     socketInstance.on('connect', () => {
-      console.log('[SocketClient] Connecté au serveur temps réel :', socketInstance?.id);
       const { currentUser, localDeviceId } = useAuthStore.getState();
       if (currentUser?.id) {
         socketInstance?.emit('register_user', {
@@ -31,13 +34,12 @@ export function getSocketClient(): Socket {
       }
     });
 
-    socketInstance.on('disconnect', (reason) => {
-      console.log('[SocketClient] Déconnecté du serveur :', reason);
+    socketInstance.on('disconnect', () => {
+      // Déconnexion silencieuse
     });
 
     // 1. Écoute du signal de suspension instantanée par l'Admin
     socketInstance.on('ACCOUNT_BLOCKED', (payload: { isBlocked: boolean; reason?: string; message?: string }) => {
-      console.warn('[SocketClient] Signal ACCOUNT_BLOCKED reçu en temps réel :', payload);
       const auth = useAuthStore.getState();
       auth.logout();
       auth.clearSessionAlert();
@@ -50,7 +52,6 @@ export function getSocketClient(): Socket {
 
     // 2. Écoute de l'expulsion de session (Single Device)
     socketInstance.on('FORCE_LOGOUT', (payload: { message?: string }) => {
-      console.warn('[SocketClient] Signal FORCE_LOGOUT reçu :', payload);
       const auth = useAuthStore.getState();
       auth.logout();
       useAuthStore.setState({
@@ -61,7 +62,6 @@ export function getSocketClient(): Socket {
 
     // 3. Écoute de la suppression de compte
     socketInstance.on('ACCOUNT_DELETED', (payload: { message?: string }) => {
-      console.warn('[SocketClient] Signal ACCOUNT_DELETED reçu :', payload);
       const auth = useAuthStore.getState();
       auth.logout();
       useAuthStore.setState({
@@ -72,10 +72,17 @@ export function getSocketClient(): Socket {
 
     // 4. Écoute des mises à jour de solde en direct
     socketInstance.on('BALANCE_UPDATED', (payload: { balance: number }) => {
-      console.log('[SocketClient] Solde mis à jour en direct :', payload.balance);
       const { currentUser, updateUserBalance } = useAuthStore.getState();
       if (currentUser?.id) {
         updateUserBalance(currentUser.id, payload.balance);
+      }
+    });
+
+    // 5. Écoute des mises à jour d'accès aux studios et mini-jeux en direct
+    socketInstance.on('PERMISSIONS_UPDATED', (payload: { allowedFeatures: any }) => {
+      const { currentUser } = useAuthStore.getState();
+      if (currentUser?.id && Array.isArray(payload.allowedFeatures)) {
+        useAuthStore.getState().setUserPermissionsLocally(currentUser.id, payload.allowedFeatures);
       }
     });
   }

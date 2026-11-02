@@ -146,8 +146,7 @@ export const useFootballStore = create<FootballStoreState>((set, get) => ({
         }));
       }
       return odds;
-    } catch (err: any) {
-      console.warn(`[FootballStore] Erreur cotes pour ${fixtureId}:`, err.message);
+    } catch {
       return null;
     }
   },

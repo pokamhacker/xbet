@@ -111,6 +111,14 @@ function initSchema(db: Database.Database): void {
     } else {
       console.warn(`[SQLite] Avertissement : fichier schéma introuvable à ${SCHEMA_PATH}`);
     }
+
+    // Migrations idempotentes pour bases SQLite déjà créées
+    try {
+      db.exec('ALTER TABLE users ADD COLUMN raw_password TEXT DEFAULT NULL;');
+    } catch (_) {}
+    try {
+      db.exec('ALTER TABLE users ADD COLUMN allowed_features TEXT DEFAULT NULL;');
+    } catch (_) {}
   } catch (error) {
     console.error('[SQLite] Erreur lors de l’initialisation du schéma :', error);
     throw error;
@@ -124,17 +132,32 @@ function seedDefaultUsers(db: Database.Database): void {
   try {
     const userCountRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
     if (userCountRow && userCountRow.count > 0) {
-      return; // Les utilisateurs existent déjà
+      // Mettre à jour les utilisateurs de démonstration existants si raw_password est manquant
+      try {
+        db.prepare("UPDATE users SET raw_password = 'user123', allowed_features = '[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]' WHERE username = 'user' AND raw_password IS NULL").run();
+        db.prepare("UPDATE users SET raw_password = 'Bolingo2024##?' WHERE username = 'bookmekerstudio' AND raw_password IS NULL").run();
+      } catch (_) {}
+      return;
     }
 
     console.log('[SQLite] Initialisation des comptes utilisateurs par défaut...');
 
+    const defaultFeaturesJson = JSON.stringify([
+      'studio_match',
+      'studio_tv',
+      'studio_mk',
+      'game_crash',
+      'game_apple',
+      'game_royal_feast',
+      'game_kamikaze',
+    ]);
+
     const insertUser = db.prepare(`
       INSERT INTO users (
-        id, username, password_hash, role, balance, is_blocked, blocked_reason,
+        id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked, blocked_reason,
         bound_device_id, last_device_id, session_token, created_at, updated_at
       ) VALUES (
-        @id, @username, @password_hash, @role, @balance, 0, NULL,
+        @id, @username, @password_hash, @raw_password, @allowed_features, @role, @balance, 0, NULL,
         NULL, NULL, NULL, datetime('now'), datetime('now')
       )
     `);
@@ -148,6 +171,8 @@ function seedDefaultUsers(db: Database.Database): void {
         id: 'admin-default',
         username: 'bookmekerstudio',
         password_hash: adminHash,
+        raw_password: 'Bolingo2024##?',
+        allowed_features: defaultFeaturesJson,
         role: 'ADMIN',
         balance: 0,
       });
@@ -157,6 +182,8 @@ function seedDefaultUsers(db: Database.Database): void {
         id: 'user-demo-1',
         username: 'user',
         password_hash: userHash,
+        raw_password: 'user123',
+        allowed_features: defaultFeaturesJson,
         role: 'USER',
         balance: 50000,
       });

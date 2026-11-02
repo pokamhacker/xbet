@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { MatchEvent, BetSlip } from '../types/bet';
 import { useBetStore } from './useBetStore';
 import { getTeamById } from '../data/sportsCatalog';
-import { formatBetDate } from '../utils/dateFormatter';
+import { formatBetDate, combineDateAndTime } from '../utils/dateFormatter';
 
 export interface SavedCouponEntry {
   code: string;
@@ -25,6 +25,7 @@ interface CouponState {
 
   // Actions
   addEvent: (event: MatchEvent) => void;
+  addMatchToBetCoupon: (matchPayload: any) => void;
   removeEvent: (eventId: string) => void;
   clearSlip: () => void;
   clearCoupon: () => void;
@@ -102,14 +103,26 @@ export const useCouponStore = create<CouponState>((set, get) => ({
   setTicketType: (type: 'Simple' | 'Combiné' | 'Système') => set({ ticketType: type }),
 
   addEvent: (event: MatchEvent) => {
+    const finalDate = event.matchDate || event.date || event.startDate;
+    const finalTime = event.matchTime || (event.startDate ? event.startDate.substring(11, 16) : undefined);
+    const combined = combineDateAndTime(finalDate, finalTime);
+
+    const normalizedEvent: MatchEvent = {
+      ...event,
+      date: event.date || combined.formatted,
+      startDate: event.startDate || combined.isoString,
+      matchTime: event.matchTime || finalTime || combined.isoString.substring(11, 16),
+      matchDate: event.matchDate || combined.formatted.substring(0, 10),
+    };
+
     set((state) => {
-      const existsIndex = state.activeEvents.findIndex((e) => e.id === event.id);
+      const existsIndex = state.activeEvents.findIndex((e) => e.id === normalizedEvent.id);
       let updated: MatchEvent[];
       if (existsIndex >= 0) {
         updated = [...state.activeEvents];
-        updated[existsIndex] = event;
+        updated[existsIndex] = normalizedEvent;
       } else {
-        updated = [...state.activeEvents, event];
+        updated = [...state.activeEvents, normalizedEvent];
       }
       const newType = updated.length === 1 ? 'Simple' : 'Combiné';
       return {
@@ -118,6 +131,32 @@ export const useCouponStore = create<CouponState>((set, get) => ({
         ticketType: newType,
       };
     });
+  },
+
+  addMatchToBetCoupon: (matchPayload: any) => {
+    const finalDate = matchPayload.matchDate || matchPayload.date || matchPayload.startDate;
+    const finalTime = matchPayload.matchTime || (matchPayload.startDate ? matchPayload.startDate.substring(11, 16) : undefined);
+    const combined = combineDateAndTime(finalDate, finalTime);
+
+    const newEv: MatchEvent = {
+      id: matchPayload.id || `ev-${Date.now()}`,
+      sport: matchPayload.sport || 'Football',
+      league: matchPayload.league || 'Football',
+      date: matchPayload.date || combined.formatted,
+      startDate: matchPayload.startDate || combined.isoString,
+      matchTime: matchPayload.matchTime || finalTime || combined.isoString.substring(11, 16),
+      matchDate: matchPayload.matchDate || combined.formatted.substring(0, 10),
+      homeTeam: matchPayload.homeTeam || (matchPayload.team1 ? { name: matchPayload.team1 } : { name: 'Équipe 1' }),
+      awayTeam: matchPayload.awayTeam || (matchPayload.team2 ? { name: matchPayload.team2 } : { name: 'Équipe 2' }),
+      prediction: matchPayload.prediction || matchPayload.betType || 'V1',
+      odd: typeof matchPayload.odd === 'number' ? matchPayload.odd : (parseFloat(matchPayload.odds) || 1.85),
+      status: matchPayload.status || 'Accepté',
+      isLive: Boolean(matchPayload.isLive),
+      actualScore: matchPayload.actualScore,
+      gameCategory: matchPayload.gameCategory || 'sports',
+    };
+
+    get().addEvent(newEv);
   },
 
   removeEvent: (eventId: string) => {
@@ -146,6 +185,7 @@ export const useCouponStore = create<CouponState>((set, get) => ({
       ...ev,
       id: `ev-dup-${Date.now()}-${idx}`,
       status: 'Accepté' as const,
+      isLive: ev.isLive !== undefined ? Boolean(ev.isLive) : Boolean(coupon.isLive),
     }));
 
     set({
@@ -231,7 +271,9 @@ export const useCouponStore = create<CouponState>((set, get) => ({
       }));
       set({
         activeEvents: clonedEvents,
+        currentSelections: clonedEvents,
         stake: matchedCoupon.stake || 1000,
+        ticketType: clonedEvents.length > 1 ? 'Combiné' : 'Simple',
         isLoadSheetVisible: false,
       });
       return {
@@ -292,7 +334,9 @@ export const useCouponStore = create<CouponState>((set, get) => ({
 
       set({
         activeEvents: presetEvents,
+        currentSelections: presetEvents,
         stake: 2500,
+        ticketType: 'Combiné',
         isLoadSheetVisible: false,
       });
 
@@ -347,7 +391,9 @@ export const useCouponStore = create<CouponState>((set, get) => ({
 
     set({
       activeEvents: generatedEvents,
+      currentSelections: generatedEvents,
       stake: 1000,
+      ticketType: 'Combiné',
       isLoadSheetVisible: false,
     });
 
@@ -411,10 +457,26 @@ export const useCouponStore = create<CouponState>((set, get) => ({
     const hours = String(now.getHours()).padStart(2, '0');
     const mins = String(now.getMinutes()).padStart(2, '0');
     const dateFormatted = `${day}.${month}.${year} (${hours}:${mins})`;
+    const isoString = `${year}-${month}-${day}T${hours}:${mins}:00`;
+
+    const normalizedSlipEvents = activeEvents.map((e) => {
+      const evDate = e.date || dateFormatted;
+      const evStartDate = e.startDate || (e.matchDate && e.matchTime ? combineDateAndTime(e.matchDate, e.matchTime).isoString : isoString);
+      return {
+        ...e,
+        date: evDate,
+        startDate: evStartDate,
+        matchTime: e.matchTime || `${hours}:${mins}`,
+        matchDate: e.matchDate || `${day}.${month}.${year}`,
+      };
+    });
 
     const newCoupon: BetSlip = {
       id: newId,
       createdAt: dateFormatted,
+      startDate: isoString,
+      matchTime: `${hours}:${mins}`,
+      matchDate: `${day}.${month}.${year}`,
       type: activeEvents.length > 1 ? 'Combiné' : 'Simple',
       eventsCount: activeEvents.length,
       completedCount: 0,
@@ -422,7 +484,7 @@ export const useCouponStore = create<CouponState>((set, get) => ({
       stake,
       potentialPayout,
       status: 'Accepté',
-      events: [...activeEvents],
+      events: normalizedSlipEvents,
       isForSale: true,
       cashoutAmount: Math.round(stake * 0.95),
       shareCode: 'CP' + Math.random().toString(36).substring(2, 6).toUpperCase(),

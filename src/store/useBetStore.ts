@@ -3,7 +3,9 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BetSlip, BetStatus, CustomLeague, CustomTeam, MatchEvent } from '../types/bet';
 import { generateRealisticPokerDraw, generateShareCode } from '../utils/pokerEngine';
+import { adaptEventResultToPrediction } from '../utils/scoreAdapter';
 import { betApiService } from '../services/betApiService';
+import { combineDateAndTime, formatBetDate } from '../utils/dateFormatter';
 
 interface BetState {
   balance: number;
@@ -14,8 +16,9 @@ interface BetState {
 
   // Actions
   addCoupon: (coupon: BetSlip, userId?: string) => void;
+  addMatchToBetCoupon: (matchPayload: any) => void;
   updateCouponStatus: (couponId: string, status: BetStatus) => void;
-  validateCouponWithResult: (couponId: string, isWon: boolean) => void;
+  validateCouponWithResult: (couponId: string, isWon: boolean, customScores?: { [eventId: string]: string }) => void;
   updateEventScore: (couponId: string, eventId: string, score: string, status: BetStatus) => void;
   toggleCashout: (couponId: string, amount?: number) => void;
   executeCashout: (couponId: string) => void;
@@ -25,12 +28,465 @@ interface BetState {
   deposit: (amount: number) => void;
   withdraw: (amount: number) => void;
   addCustomLeague: (league: CustomLeague) => void;
+  removeCustomLeague: (leagueId: string) => void;
   addCustomTeam: (team: CustomTeam) => void;
+  removeCustomTeam: (teamId: string) => void;
   syncUserBets: (userId: string) => Promise<void>;
   getCouponsForUser: (userId?: string) => BetSlip[];
 }
 
 const INITIAL_COUPONS: BetSlip[] = [
+  {
+    id: '89694250971',
+    createdAt: '28.10.2026 (07:34 PM)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 0,
+    totalOdds: 1.345,
+    stake: 90,
+    potentialPayout: 121.05,
+    status: 'Accepté',
+    isLive: true,
+    gameCategory: 'esports',
+    shareCode: 'FF8969',
+    isForSale: true,
+    canSell: true,
+    sellPrice: '102.09',
+    cashoutAmount: 102.09,
+    events: [
+      {
+        id: 'ev-fifa-bayern-napoli-8969',
+        sport: 'FIFA',
+        league: 'FC 26. 5x5 Rush. Superligue',
+        date: '28.10.2026 (07:30 PM)',
+        homeTeam: {
+          name: 'Bayern Munich',
+          logo: 'generic-player',
+        },
+        awayTeam: {
+          name: 'Napoli',
+          logo: 'https://media.api-sports.io/football/teams/492.png',
+        },
+        prediction: '1X2. V1',
+        odd: 1.345,
+        status: 'Accepté',
+        isLive: true,
+        actualScore: '3:1',
+        halftimeScore: '3:1 (3:1)',
+        elapsed: 223,
+        gameCategory: 'esports',
+      },
+    ],
+  },
+  {
+    id: '88909739359',
+    createdAt: '16.10.2026 (09:59 AM)',
+    type: 'Combiné',
+    eventsCount: 2,
+    completedCount: 2,
+    totalOdds: 2.734,
+    stake: 500000,
+    potentialPayout: 1367400,
+    actualPayout: 1367400,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'ML8890',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-frankfurt-cologne-8890',
+        sport: 'Football',
+        league: 'Allemagne. Bundesliga',
+        date: '16.10.2026 (07:30 PM)',
+        homeTeam: {
+          name: 'Eintracht Frankfurt',
+          logo: 'jersey:stripes:#111111:#E11D48:DE',
+        },
+        awayTeam: {
+          name: 'Cologne',
+          logo: 'jersey:solid:#FFFFFF:#CBD5E1:DE',
+        },
+        prediction: 'Total. (4) Moins de',
+        odd: 1.59,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '1:0',
+        halftimeScore: '(0:0,1:0)',
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-deportivo-levante-8890',
+        sport: 'Football',
+        league: 'Espagne. La Liga',
+        date: '16.10.2026 (08:00 PM)',
+        homeTeam: {
+          name: 'Deportivo de A Coruna',
+          logo: 'https://media.api-sports.io/football/teams/544.png',
+        },
+        awayTeam: {
+          name: 'Levante UD',
+          logo: 'https://media.api-sports.io/football/teams/539.png',
+        },
+        prediction: 'Deux équipes vont marquer. Oui',
+        odd: 1.72,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '1:1',
+        halftimeScore: '(0:0,1:1)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89680022549',
+    createdAt: '28.10.2026 (03:50 PM)',
+    type: 'Combiné',
+    eventsCount: 2,
+    completedCount: 0,
+    totalOdds: 2.334,
+    stake: 1000,
+    potentialPayout: 2334.48,
+    status: 'Accepté',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'ML8968',
+    isForSale: true,
+    canSell: true,
+    sellPrice: 750,
+    cashoutAmount: 750,
+    events: [
+      {
+        id: 'ev-venise-inter-8968',
+        sport: 'Football',
+        league: 'Italie. Série A',
+        date: '28.10.2026 (06:30 PM)',
+        roundCode: 'Tour 9',
+        homeTeam: {
+          name: 'Venise FC',
+          logo: 'https://media.api-sports.io/football/teams/517.png',
+        },
+        awayTeam: {
+          name: 'Inter Milan',
+          logo: 'https://media.api-sports.io/football/teams/505.png',
+        },
+        prediction: '1X2. V2',
+        odd: 1.37,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-milan-bologna-8968',
+        sport: 'Football',
+        league: 'Italie. Série A',
+        date: '28.10.2026 (06:30 PM)',
+        roundCode: 'Tour 9',
+        homeTeam: {
+          name: 'Milan',
+          logo: 'https://media.api-sports.io/football/teams/489.png',
+        },
+        awayTeam: {
+          name: 'Bologna1909',
+          logo: 'https://media.api-sports.io/football/teams/500.png',
+        },
+        prediction: '1X2. V1',
+        odd: 1.704,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '88964599389',
+    createdAt: '17.10.2026 (11:20 AM)',
+    type: 'Combiné',
+    eventsCount: 2,
+    completedCount: 2,
+    totalOdds: 3.021,
+    stake: 500000,
+    potentialPayout: 1510760,
+    actualPayout: 1510760,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'ML8896',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-bayern-leipzig-8896',
+        sport: 'Football',
+        league: 'Allemagne. Bundesliga',
+        date: '17.10.2026 (05:30 PM)',
+        homeTeam: {
+          name: 'Bayern Munich',
+          logo: 'https://media.api-sports.io/football/teams/157.png',
+        },
+        awayTeam: {
+          name: 'RasenBallsport Leipzig',
+          logo: 'https://media.api-sports.io/football/teams/173.png',
+        },
+        prediction: 'Total. (4.5) Plus de',
+        odd: 1.79,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '6:1',
+        halftimeScore: '(3:0,3:1)',
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-espanyol-atletico-8896',
+        sport: 'Football',
+        league: 'Espagne. La Liga',
+        date: '17.10.2026 (01:00 PM)',
+        homeTeam: {
+          name: 'Espanyol',
+          logo: 'https://media.api-sports.io/football/teams/540.png',
+        },
+        awayTeam: {
+          name: 'Atlético de Madrid',
+          logo: 'https://media.api-sports.io/football/teams/530.png',
+        },
+        prediction: '1X2. V2',
+        odd: 1.688,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '0:1',
+        halftimeScore: '(0:0,0:1)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89736180539',
+    createdAt: '29.10.2026 (03:55 PM)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 5.8,
+    stake: 90,
+    potentialPayout: 522,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'poker',
+    shareCode: 'CP8973618',
+    isForSale: false,
+    pokerResult: {
+      board: 'A♣, 3♠, 2♠, 9♦, K♣',
+      hands: [
+        { id: 1, cards: '9♣, 8♣' },
+        { id: 2, cards: 'J♣, 5♣' },
+        { id: 3, cards: '3♣, 6♦' },
+        { id: 4, cards: '2♥, J♥' },
+        { id: 5, cards: 'A♣, 10♣' },
+        { id: 6, cards: 'Q♣, 4♥' },
+      ],
+      winnerLabel: '5 (Paire)',
+      combinationName: 'Combinaison gagnante. Une Paire',
+    },
+    events: [
+      {
+        id: 'ev-poker-89736180539-1',
+        sport: 'TvBet. POKER',
+        league: 'TvBet. POKER',
+        date: '29.10.2026 (03:55 PM)',
+        homeTeam: { name: 'TvBet. POKER' },
+        awayTeam: { name: 'TvBet' },
+        prediction: 'Combinaison gagnante. Une Paire',
+        odd: 5.8,
+        status: 'Gain',
+        isLive: false,
+        gameCategory: 'poker',
+        roundCode: 'PB232803',
+      },
+    ],
+  },
+  {
+    id: '89193928697',
+    createdAt: '20.10.2026 (17:14)',
+    type: 'Combiné',
+    eventsCount: 2,
+    completedCount: 0,
+    totalOdds: 33.64,
+    stake: 500,
+    potentialPayout: 16820,
+    status: 'Accepté',
+    isLive: true,
+    gameCategory: 'poker',
+    shareCode: 'CP8919',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-poker-8919-1',
+        sport: 'TvBet. POKER',
+        league: 'TvBet. POKER',
+        date: '20.10.2026 (17:22)',
+        homeTeam: { name: 'TvBet. POKER' },
+        awayTeam: { name: 'TvBet' },
+        prediction: 'Combinaison gagnante. Une Paire',
+        odd: 5.8,
+        status: 'Accepté',
+        isLive: true,
+        gameCategory: 'poker',
+        roundCode: 'PB227671',
+      },
+      {
+        id: 'ev-poker-8919-2',
+        sport: 'TvBet. POKER',
+        league: 'TvBet. POKER',
+        date: '20.10.2026 (17:20)',
+        homeTeam: { name: 'TvBet. POKER' },
+        awayTeam: { name: 'TvBet' },
+        prediction: 'Combinaison gagnante. Une Paire',
+        odd: 5.8,
+        status: 'Accepté',
+        isLive: true,
+        gameCategory: 'poker',
+        roundCode: 'PB227670',
+      },
+    ],
+  },
+  {
+    id: '89193515741',
+    createdAt: '20.10.2026 (17:09)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 0,
+    totalOdds: 5.2,
+    stake: 90,
+    potentialPayout: 468,
+    status: 'Accepté',
+    isLive: true,
+    gameCategory: 'poker',
+    shareCode: 'CP8919-2',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-poker-8919-simple-1',
+        sport: 'TvBet. POKER',
+        league: 'TvBet. POKER',
+        date: '20.10.2026 (17:09)',
+        homeTeam: { name: 'TvBet. POKER' },
+        awayTeam: { name: 'TvBet' },
+        prediction: 'Combinaison gagnante. Une Paire',
+        odd: 5.2,
+        status: 'Accepté',
+        isLive: true,
+        gameCategory: 'poker',
+        roundCode: 'PB227668',
+      },
+    ],
+  },
+  {
+    id: '89193508467',
+    createdAt: '20.10.2026 (17:09)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 0,
+    totalOdds: 1000,
+    stake: 90,
+    potentialPayout: 90000,
+    status: 'Accepté',
+    isLive: true,
+    gameCategory: 'poker',
+    shareCode: 'CP8919-3',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-poker-8919-simple-2',
+        sport: 'TvBet. POKER',
+        league: 'TvBet. POKER',
+        date: '20.10.2026 (17:09)',
+        homeTeam: { name: 'TvBet. POKER' },
+        awayTeam: { name: 'TvBet' },
+        prediction: 'Quinte Flush Royale',
+        odd: 1000,
+        status: 'Accepté',
+        isLive: true,
+        gameCategory: 'poker',
+        roundCode: 'PB227667',
+      },
+    ],
+  },
+  {
+    id: '89147610641',
+    createdAt: '19.10.2026 (21:42)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 2.325,
+    stake: 100000,
+    potentialPayout: 232500,
+    actualPayout: 232500,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'CP8914',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-tottenham-8914',
+        sport: 'Football',
+        league: 'Angleterre. Premier League',
+        date: '19.10.2026 (20:00)',
+        homeTeam: {
+          name: 'Tottenham Hotspur',
+          logo: 'https://media.api-sports.io/football/teams/47.png',
+        },
+        awayTeam: {
+          name: 'Coventry City',
+          logo: 'https://media.api-sports.io/football/teams/1346.png',
+        },
+        prediction: 'Total. (3.5) Plus de',
+        odd: 2.325,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '3-1',
+        halftimeScore: '3:1 (1:0, 2:1)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '85801058016',
+    createdAt: '07.10.2026 (16:11)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 100,
+    stake: 1000,
+    potentialPayout: 100000,
+    actualPayout: 100000,
+    status: 'Payé',
+    isLive: true,
+    gameCategory: 'sports',
+    shareCode: 'CP8580',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-nextgen-8580',
+        sport: 'Football',
+        league: 'NextGen Trophy U17',
+        date: '07.10.2026 (16:11)',
+        homeTeam: {
+          name: 'Red Bull Salzburg U17',
+          logo: 'https://media.api-sports.io/football/teams/571.png',
+        },
+        awayTeam: {
+          name: 'Ajax U17',
+          logo: 'https://media.api-sports.io/football/teams/194.png',
+        },
+        prediction: 'Vainqueur : Red Bull Salzburg U17',
+        odd: 100,
+        status: 'Gain',
+        isLive: true,
+        actualScore: '1-1',
+        halftimeScore: '1:1 (0:0, 1:1)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
   {
     id: '86037893293',
     createdAt: '27.09.2026 (08:30)',
@@ -441,6 +897,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     potentialPayout: 390000,
     actualPayout: 390000,
     status: 'Payé',
+    isLive: true,
     gameCategory: 'poker',
     drawNumber: 'PB286750',
     shareCode: 'PK600',
@@ -456,6 +913,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         prediction: 'Combinaison gagnante. Quinte flush',
         odd: 600,
         status: 'Gain',
+        isLive: true,
         roundCode: 'PB286750',
         badge: 'POKE',
         gameCategory: 'poker',
@@ -488,7 +946,6 @@ const INITIAL_COUPONS: BetSlip[] = [
         prediction: 'V1 (Temps Réglementaire)',
         odd: 2.15,
         status: 'Accepté',
-        actualScore: '1-1',
         gameCategory: 'sports',
       },
       {
@@ -502,7 +959,6 @@ const INITIAL_COUPONS: BetSlip[] = [
         prediction: 'Total plus de (2.5)',
         odd: 1.85,
         status: 'Accepté',
-        actualScore: '0-0',
         gameCategory: 'sports',
       },
     ],
@@ -650,6 +1106,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     stake: 90,
     potentialPayout: 90000000,
     status: 'Accepté',
+    isLive: true,
     gameCategory: 'poker',
     drawNumber: 'PB286750',
     shareCode: 'PK89X',
@@ -666,6 +1123,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         prediction: 'Combinaison gagnante. Carte haute',
         odd: 1000,
         status: 'Accepté',
+        isLive: true,
         roundCode: 'PB840645',
         badge: 'POKE',
         gameCategory: 'poker',
@@ -680,6 +1138,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         prediction: 'Combinaison gagnante. Carte haute',
         odd: 1000,
         status: 'Accepté',
+        isLive: true,
         roundCode: 'PB653039',
         badge: 'POKE',
         gameCategory: 'poker',
@@ -732,22 +1191,44 @@ const INITIAL_COUPONS: BetSlip[] = [
 ];
 
 const INITIAL_LEAGUES: CustomLeague[] = [
-  { id: '1', name: 'Vietnam · V-League', sport: 'Football', country: 'Vietnam' },
-  { id: '2', name: 'UEFA Champions League', sport: 'Football', country: 'Europe' },
-  { id: '3', name: 'Premier League', sport: 'Football', country: 'Angleterre' },
-  { id: '4', name: 'Mortal Kombat Cyber League', sport: 'Cyber-Sport', country: 'Global' },
-  { id: '5', name: 'TvBet Live Games', sport: 'Live Casino', country: 'Global' },
+  {
+    id: 'custo-1',
+    name: 'Tournoi des Champions Studio',
+    sport: 'Football',
+    country: 'International',
+    icon: 'trophy',
+    logo: 'https://media.api-sports.io/football/leagues/2.png',
+    category: 'custom',
+  },
+  {
+    id: 'custo-2',
+    name: 'Super Ligue des Quartiers',
+    sport: 'Football',
+    country: 'France',
+    icon: 'shield',
+    logo: 'https://media.api-sports.io/football/leagues/61.png',
+    category: 'custom',
+  },
+  {
+    id: 'custo-3',
+    name: 'E-Soccer Cyber Cup 2026',
+    sport: 'Cyber-Sport',
+    country: 'Global',
+    icon: 'game-controller',
+    logo: 'https://media.api-sports.io/football/leagues/1.png',
+    category: 'custom',
+  },
 ];
 
 const INITIAL_TEAMS: CustomTeam[] = [
-  { id: 't1', leagueId: '1', name: 'Albany Rush' },
-  { id: 't2', leagueId: '1', name: 'Aksu Pavlodar' },
-  { id: 't3', leagueId: '1', name: 'Aberdeen Fc' },
-  { id: 't4', leagueId: '1', name: 'Aarau' },
-  { id: 't5', leagueId: '4', name: 'Scorpion' },
-  { id: 't6', leagueId: '4', name: 'Sub-Zero' },
-  { id: 't7', leagueId: '4', name: 'Raiden' },
-  { id: 't8', leagueId: '4', name: 'Liu Kang' },
+  { id: 'ct1', leagueId: 'custo-1', name: 'FC Stars Studio', shortName: 'FCS', country: 'France', logo: 'https://media.api-sports.io/football/teams/85.png' },
+  { id: 'ct2', leagueId: 'custo-1', name: 'Olympique Galactique', shortName: 'OLG', country: 'France', logo: 'https://media.api-sports.io/football/teams/541.png' },
+  { id: 'ct3', leagueId: 'custo-1', name: 'Athletic Red Bulls', shortName: 'ARB', country: 'Espagne', logo: 'https://media.api-sports.io/football/teams/173.png' },
+  { id: 'ct4', leagueId: 'custo-1', name: 'Inter Cyber Stars', shortName: 'ICS', country: 'Italie', logo: 'https://media.api-sports.io/football/teams/505.png' },
+  { id: 'ct5', leagueId: 'custo-2', name: 'AS Belleville', shortName: 'BEL', country: 'France', logo: 'https://media.api-sports.io/football/teams/116.png' },
+  { id: 'ct6', leagueId: 'custo-2', name: 'Étoile de Montmartre', shortName: 'EDM', country: 'France', logo: 'https://media.api-sports.io/football/teams/111.png' },
+  { id: 'ct7', leagueId: 'custo-3', name: 'Cyber Titans', shortName: 'CYB', country: 'Global', logo: 'https://media.api-sports.io/football/teams/50.png' },
+  { id: 'ct8', leagueId: 'custo-3', name: 'Neo Warriors', shortName: 'NEO', country: 'Global', logo: 'https://media.api-sports.io/football/teams/529.png' },
 ];
 
 export const useBetStore = create<BetState>()(
@@ -764,6 +1245,31 @@ export const useBetStore = create<BetState>()(
       customTeams: INITIAL_TEAMS,
 
       addCoupon: (coupon: BetSlip, userId?: string) => {
+        // Exclure formellement les mini-jeux (crash, kamikaze, apple, etc.) de l'historique des paris sportifs
+        const gCat = (coupon.gameCategory || '').toLowerCase();
+        const firstEvCat = (coupon.events?.[0]?.gameCategory || '').toLowerCase();
+        const firstEvSport = (coupon.events?.[0]?.sport || '').toLowerCase();
+        const firstEvLeague = (coupon.events?.[0]?.league || '').toLowerCase();
+        const firstEvBadge = (coupon.events?.[0]?.badge || '').toLowerCase();
+
+        const isMiniGame =
+          ['crash', 'apple', 'kamikaze', 'royal_feast', 'minigame', 'arcade', '1xgames'].includes(gCat) ||
+          ['crash', 'apple', 'kamikaze', 'royal_feast', 'minigame', 'arcade', '1xgames'].includes(firstEvCat) ||
+          firstEvBadge === 'crash' ||
+          firstEvBadge === 'apple' ||
+          firstEvBadge === 'kamikaze' ||
+          firstEvSport.includes('mini-jeu') ||
+          firstEvSport.includes('mini-game') ||
+          firstEvLeague.includes('crash') ||
+          firstEvLeague.includes('apple of fortune') ||
+          firstEvLeague.includes('kamikaze') ||
+          firstEvLeague.includes('1xgames');
+
+        if (isMiniGame) {
+          // Les mini-jeux gèrent directement le solde et ne doivent pas apparaître dans l'historique des paris
+          return;
+        }
+
         let targetUserId = userId || coupon.userId;
         if (!targetUserId) {
           try {
@@ -773,10 +1279,36 @@ export const useBetStore = create<BetState>()(
         }
         targetUserId = targetUserId || 'user-demo-1';
 
+        // Horodatage strict : combine date et heure sans décalage
+        const combined = combineDateAndTime(
+          coupon.matchDate || coupon.startDate || coupon.createdAt,
+          coupon.matchTime
+        );
+
+        // Normalisation de chaque événement avec conservation stricte de son heure de début
+        const normalizedEvents = (coupon.events || []).map((ev) => {
+          const evTime = ev.matchTime || coupon.matchTime || combined.isoString.substring(11, 16);
+          const evDate = ev.matchDate || coupon.matchDate;
+          const evCombined = combineDateAndTime(ev.startDate || ev.date || evDate, evTime);
+
+          return {
+            ...ev,
+            date: ev.date || evCombined.formatted,
+            startDate: ev.startDate || evCombined.isoString,
+            matchTime: ev.matchTime || evTime,
+            matchDate: ev.matchDate || evDate || combined.formatted.substring(0, 10),
+          };
+        });
+
         const couponWithUser: BetSlip = {
           ...coupon,
           userId: targetUserId,
           ticketNumber: coupon.ticketNumber || coupon.id,
+          createdAt: coupon.createdAt || combined.formatted,
+          startDate: coupon.startDate || combined.isoString,
+          matchTime: coupon.matchTime || combined.isoString.substring(11, 16),
+          matchDate: coupon.matchDate || combined.formatted.substring(0, 10),
+          events: normalizedEvents,
         };
 
         set((state) => ({
@@ -788,16 +1320,53 @@ export const useBetStore = create<BetState>()(
         betApiService.saveBetToBackend(couponWithUser, targetUserId);
       },
 
+      addMatchToBetCoupon: (matchPayload: any) => {
+        const finalDate = matchPayload.matchDate || matchPayload.date || matchPayload.startDate;
+        const finalTime = matchPayload.matchTime || (matchPayload.startDate ? matchPayload.startDate.substring(11, 16) : undefined);
+        const combined = combineDateAndTime(finalDate, finalTime);
+
+        const newEv: MatchEvent = {
+          id: matchPayload.id || `ev-${Date.now()}`,
+          sport: matchPayload.sport || 'Football',
+          league: matchPayload.league || 'Football',
+          date: matchPayload.date || combined.formatted,
+          startDate: matchPayload.startDate || combined.isoString,
+          matchTime: matchPayload.matchTime || finalTime || combined.isoString.substring(11, 16),
+          matchDate: matchPayload.matchDate || combined.formatted.substring(0, 10),
+          homeTeam: matchPayload.homeTeam || (matchPayload.team1 ? { name: matchPayload.team1 } : { name: 'Équipe 1' }),
+          awayTeam: matchPayload.awayTeam || (matchPayload.team2 ? { name: matchPayload.team2 } : { name: 'Équipe 2' }),
+          prediction: matchPayload.prediction || matchPayload.betType || 'V1',
+          odd: typeof matchPayload.odd === 'number' ? matchPayload.odd : (parseFloat(matchPayload.odds) || 1.85),
+          status: matchPayload.status || 'Accepté',
+          isLive: Boolean(matchPayload.isLive),
+          actualScore: matchPayload.actualScore,
+          gameCategory: matchPayload.gameCategory || 'sports',
+        };
+
+        set((state) => ({
+          activeSlip: [...state.activeSlip, newEv],
+        }));
+
+        // Synchroniser également avec couponStore si initialisé
+        try {
+          const { useCouponStore } = require('./couponStore');
+          useCouponStore.getState().addEvent(newEv);
+        } catch (e) {}
+      },
+
       updateCouponStatus: (couponId: string, status: BetStatus) => {
         let actualPayout = 0;
         set((state) => ({
           coupons: state.coupons.map((c) => {
             if (c.id !== couponId) return c;
             const isWinning = status === 'Payé' || status === 'Gagné' || status === 'Gain';
+            const isSettled = isWinning || status === 'Perdu' || status === 'Annulé';
             actualPayout = isWinning ? (c.potentialPayout || c.actualPayout || 0) : 0;
             return {
               ...c,
               status,
+              isLive: isSettled ? false : c.isLive,
+              events: isSettled && c.events ? c.events.map((ev) => ({ ...ev, isLive: false })) : c.events,
               completedCount: isWinning || status === 'Perdu' ? c.eventsCount : c.completedCount,
               actualPayout,
             };
@@ -806,7 +1375,7 @@ export const useBetStore = create<BetState>()(
         betApiService.updateBetStatusOnBackend(couponId, status, actualPayout);
       },
 
-      validateCouponWithResult: (couponId: string, isWon: boolean) => {
+      validateCouponWithResult: (couponId: string, isWon: boolean, customScores?: { [eventId: string]: string }) => {
         let finalStatus: BetStatus = isWon ? 'Payé' : 'Perdu';
         let payout = 0;
         set((state) => {
@@ -815,28 +1384,17 @@ export const useBetStore = create<BetState>()(
             if (coupon.id !== couponId) return coupon;
 
             const updatedEvents = coupon.events.map((event) => {
-              let pResult = event.pokerResult;
-              if (event.gameCategory === 'poker' && !pResult) {
-                pResult = generateRealisticPokerDraw(1, 'Carte haute');
-              }
-
-              let mkRes = event.mkResult;
-              if (event.gameCategory === 'mortalkombat' && !mkRes) {
-                mkRes = {
-                  rounds: [
-                    { roundNum: 1, winner: event.homeTeam.name, victoryType: 'Brutality' },
-                    { roundNum: 2, winner: event.awayTeam.name, victoryType: 'Normal' },
-                    { roundNum: 3, winner: event.homeTeam.name, victoryType: 'Fatality' },
-                  ],
-                  finalWinner: event.homeTeam.name,
-                };
-              }
+              const adapted = adaptEventResultToPrediction(event, isWon);
+              const customScore = customScores?.[event.id];
 
               return {
                 ...event,
                 status: (isWon ? 'Gain' : 'Perdu') as BetStatus,
-                pokerResult: pResult,
-                mkResult: mkRes,
+                isLive: false,
+                actualScore: customScore || adapted.actualScore,
+                halftimeScore: adapted.halftimeScore || event.halftimeScore,
+                pokerResult: adapted.pokerResult || event.pokerResult,
+                mkResult: adapted.mkResult || event.mkResult,
               };
             });
 
@@ -850,6 +1408,7 @@ export const useBetStore = create<BetState>()(
             return {
               ...coupon,
               status: newStatus,
+              isLive: false,
               completedCount: coupon.eventsCount,
               actualPayout: isWon ? coupon.potentialPayout : 0,
               events: updatedEvents,
@@ -870,10 +1429,19 @@ export const useBetStore = create<BetState>()(
         set((state) => ({
           coupons: state.coupons.map((c) => {
             if (c.id !== couponId) return c;
-            const newEvents = c.events.map((e) =>
-              e.id === eventId ? { ...e, actualScore: score, status } : e
-            );
-            const allCompleted = newEvents.every((e) => e.status !== 'Accepté' && e.status !== 'En cours');
+            const newEvents = c.events.map((e) => {
+              if (e.id !== eventId) return e;
+              let half = e.halftimeScore;
+              if (!half && score && score.includes('-')) {
+                const parts = score.split(/[-:]/).map((s) => parseInt(s.trim(), 10) || 0);
+                half = `(${Math.floor(parts[0] / 2)}:${Math.floor(parts[1] / 2)})`;
+              }
+              return { ...e, actualScore: score, status, halftimeScore: half };
+            });
+            const completedEventsCount = newEvents.filter(
+              (e) => e.status !== 'Accepté' && e.status !== 'En cours'
+            ).length;
+            const allCompleted = completedEventsCount === newEvents.length;
             const allWon = newEvents.every((e) => e.status === 'Gain' || e.status === 'Payé');
             const anyLost = newEvents.some((e) => e.status === 'Perdu');
 
@@ -886,7 +1454,8 @@ export const useBetStore = create<BetState>()(
               ...c,
               events: newEvents,
               status: newCouponStatus,
-              completedCount: allCompleted ? c.eventsCount : c.completedCount,
+              completedCount: completedEventsCount,
+              actualPayout: allWon ? c.potentialPayout : (anyLost ? 0 : c.actualPayout),
             };
           }),
         }));
@@ -963,9 +1532,22 @@ export const useBetStore = create<BetState>()(
         }));
       },
 
+      removeCustomLeague: (leagueId: string) => {
+        set((state) => ({
+          customLeagues: state.customLeagues.filter((l) => l.id !== leagueId),
+          customTeams: state.customTeams.filter((t) => t.leagueId !== leagueId),
+        }));
+      },
+
       addCustomTeam: (team: CustomTeam) => {
         set((state) => ({
           customTeams: [...state.customTeams, team],
+        }));
+      },
+
+      removeCustomTeam: (teamId: string) => {
+        set((state) => ({
+          customTeams: state.customTeams.filter((t) => t.id !== teamId),
         }));
       },
 
@@ -975,12 +1557,34 @@ export const useBetStore = create<BetState>()(
           const remoteBets = await betApiService.fetchUserBets(userId);
           if (remoteBets && remoteBets.length > 0) {
             set((state) => {
-              const remoteIds = new Set(remoteBets.map((b) => b.id));
-              const localOtherUsers = state.coupons.filter(
-                (c) => c.userId && c.userId !== userId && !remoteIds.has(c.id)
-              );
+              const map = new Map<string, BetSlip>();
+              // 1. D'abord les coupons distants
+              for (const r of remoteBets) {
+                map.set(String(r.id), r);
+              }
+              // 2. Fusionner avec les coupons locaux pour préserver les enrichissements
+              for (const loc of state.coupons) {
+                const existing = map.get(String(loc.id));
+                if (existing) {
+                  // Conserver les détails locaux essentiels (pokerResult, événements enrichis, matchTime)
+                  map.set(String(loc.id), {
+                    ...existing,
+                    ...loc,
+                    status: existing.status || loc.status,
+                    gameCategory: loc.gameCategory || existing.gameCategory,
+                    events: (loc.events && loc.events.length > 0) ? loc.events : existing.events,
+                    pokerResult: loc.pokerResult || existing.pokerResult,
+                    drawNumber: loc.drawNumber || existing.drawNumber,
+                    matchTime: loc.matchTime || existing.matchTime,
+                    matchDate: loc.matchDate || existing.matchDate,
+                  });
+                } else {
+                  // Garder les coupons locaux non encore enregistrés sur le serveur
+                  map.set(String(loc.id), loc);
+                }
+              }
               return {
-                coupons: [...remoteBets, ...localOtherUsers],
+                coupons: Array.from(map.values()),
               };
             });
           } else {
@@ -1005,6 +1609,15 @@ export const useBetStore = create<BetState>()(
     {
       name: 'xbet_user_bets_storage',
       storage: createJSONStorage(() => AsyncStorage),
+      merge: (persistedState: any, currentState) => {
+        const merged = { ...currentState, ...(persistedState || {}) };
+        if (Array.isArray(persistedState?.coupons)) {
+          const existingIds = new Set(persistedState.coupons.map((c: BetSlip) => String(c.id)));
+          const missingDefaults = INITIAL_COUPONS.filter((c) => !existingIds.has(String(c.id)));
+          merged.coupons = [...missingDefaults, ...persistedState.coupons];
+        }
+        return merged;
+      },
     }
   )
 );

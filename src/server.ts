@@ -9,6 +9,7 @@ import authRoutes from './routes/authRoutes';
 import adminRoutes from './routes/adminRoutes';
 import betRoutes from './routes/betRoutes';
 import footballRoutes from './routes/footballRoutes';
+import { getAdminWebHtml } from './views/adminWebPanel';
 
 dotenv.config();
 
@@ -57,13 +58,21 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// 4.2 Interface Web Admin Centrale Unifiée (contrôle de bet & xbet)
+app.get('/admin', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send(getAdminWebHtml());
+});
+
 app.get('/', (_req, res) => {
   res.status(200).json({
-    name: 'Bookmaker Studio API & WebSocket Server',
-    version: '1.0.0',
-    database: 'SQLite',
+    name: 'Bookmaker Studio API & WebSocket Server (Unified bet & xbet)',
+    version: '2.3.6',
+    projects: ['bet', 'xbet'],
+    database: 'SQLite Unified',
     status: 'running',
     health: '/health',
+    adminDashboard: '/admin',
   });
 });
 

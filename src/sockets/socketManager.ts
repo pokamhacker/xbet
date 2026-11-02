@@ -137,3 +137,14 @@ export function notifyBalanceUpdated(userId: string, newBalance: number): void {
     timestamp: new Date().toISOString(),
   });
 }
+
+/**
+ * Notification de mise à jour des accès studios et mini-jeux
+ */
+export function notifyPermissionsUpdated(userId: string, allowedFeatures: string[]): void {
+  sendToUser(userId, 'PERMISSIONS_UPDATED', {
+    allowedFeatures,
+    message: 'Vos accès aux studios et mini-jeux ont été mis à jour par l’administrateur.',
+    timestamp: new Date().toISOString(),
+  });
+}
