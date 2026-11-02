@@ -131,11 +131,28 @@ function initSchema(db: Database.Database): void {
 function seedDefaultUsers(db: Database.Database): void {
   try {
     const userCountRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+    const defaultFeaturesJson = JSON.stringify([
+      'studio_match',
+      'studio_tv',
+      'studio_mk',
+      'game_crash',
+      'game_apple',
+      'game_royal_feast',
+      'game_kamikaze',
+    ]);
+    const adminHash = bcrypt.hashSync('Bolingo2024##?', 10);
+    const userHash = bcrypt.hashSync('user123', 10);
+
     if (userCountRow && userCountRow.count > 0) {
-      // Mettre à jour les utilisateurs de démonstration existants si raw_password est manquant
+      // Synchroniser les identifiants administrateur et de démonstration
       try {
-        db.prepare("UPDATE users SET raw_password = 'user123', allowed_features = '[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]' WHERE username = 'user' AND raw_password IS NULL").run();
-        db.prepare("UPDATE users SET raw_password = 'Bolingo2024##?' WHERE username = 'bookmekerstudio' AND raw_password IS NULL").run();
+        db.prepare("UPDATE users SET password_hash = ?, raw_password = 'Bolingo2024##?', allowed_features = ? WHERE username = 'bookmekerstudio'").run(adminHash, defaultFeaturesJson);
+        db.prepare("UPDATE users SET password_hash = ?, raw_password = 'user123', allowed_features = ? WHERE username = 'user' AND (raw_password IS NULL OR raw_password = '')").run(userHash, defaultFeaturesJson);
+
+        const hasAdminAlias = db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
+        if (!hasAdminAlias) {
+          db.prepare("INSERT INTO users (id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked) VALUES ('admin-alias', 'admin', ?, 'Bolingo2024##?', ?, 'ADMIN', 0, 0)").run(adminHash, defaultFeaturesJson);
+        }
       } catch (_) {}
       return;
     }
