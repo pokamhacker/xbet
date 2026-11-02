@@ -159,16 +159,6 @@ function seedDefaultUsers(db: Database.Database): void {
 
     console.log('[SQLite] Initialisation des comptes utilisateurs par défaut...');
 
-    const defaultFeaturesJson = JSON.stringify([
-      'studio_match',
-      'studio_tv',
-      'studio_mk',
-      'game_crash',
-      'game_apple',
-      'game_royal_feast',
-      'game_kamikaze',
-    ]);
-
     const insertUser = db.prepare(`
       INSERT INTO users (
         id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked, blocked_reason,
@@ -178,9 +168,6 @@ function seedDefaultUsers(db: Database.Database): void {
         NULL, NULL, NULL, datetime('now'), datetime('now')
       )
     `);
-
-    const adminHash = bcrypt.hashSync('Bolingo2024##?', 10);
-    const userHash = bcrypt.hashSync('user123', 10);
 
     const transaction = db.transaction(() => {
       // 1. Administrateur principal
