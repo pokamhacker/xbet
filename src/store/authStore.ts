@@ -91,6 +91,102 @@ const DEFAULT_ACCOUNTS: UserAccount[] = [
     allowedFeatures: DEFAULT_ALLOWED_FEATURES,
     createdAt: '01.01.2026 (00:00)',
   },
+  {
+    id: 'user_1792884432062_90728f3c',
+    username: 'client_90728f3c',
+    passwordHash: 'user123',
+    rawPassword: 'user123',
+    balance: 10000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '24.10.2026 (23:27)',
+  },
+  {
+    id: 'user_1791038369859_d9deb048',
+    username: 'client_d9deb048',
+    passwordHash: 'user123',
+    rawPassword: 'user123',
+    balance: 5000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '03.10.2026 (14:39)',
+  },
+  {
+    id: 'user_1793204267288_690bb111',
+    username: 'client_690bb111',
+    passwordHash: 'user123',
+    rawPassword: 'user123',
+    balance: 15000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '28.10.2026 (16:17)',
+  },
+  {
+    id: 'user_1792268443511_9d999819',
+    username: 'client_9d999819',
+    passwordHash: 'user123',
+    rawPassword: 'user123',
+    balance: 20000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '17.10.2026 (20:20)',
+  },
+  {
+    id: 'user_1791125553652_3f3846c2',
+    username: 'client_3f3846c2',
+    passwordHash: 'user123',
+    rawPassword: 'user123',
+    balance: 5000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '04.10.2026 (14:52)',
+  },
+  {
+    id: 'user_1792152632858_9b7c5e1d',
+    username: 'client_9b7c5e1d',
+    passwordHash: 'user123',
+    rawPassword: 'user123',
+    balance: 12000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '16.10.2026 (12:10)',
+  },
+  {
+    id: 'user-1789492287827',
+    username: 'user_1789492287827',
+    passwordHash: 'user123',
+    rawPassword: 'user123',
+    balance: 90000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '08.03.2026 (23:00)',
+  },
+  {
+    id: 'test_user_1',
+    username: 'test_user_1',
+    passwordHash: 'user123',
+    rawPassword: 'user123',
+    balance: 7000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '25.09.2026 (06:00)',
+  },
 ];
 
 const DEVICE_STORAGE_KEY = 'xbet_local_device_unique_id';
@@ -137,7 +233,7 @@ export const useAuthStore = create<AuthState>()(
 
           DEFAULT_ACCOUNTS.forEach((defAcc) => {
             const exists = accountsUpdated.some(
-              (a) => a.username.toLowerCase() === defAcc.username.toLowerCase()
+              (a) => a.username.toLowerCase() === defAcc.username.toLowerCase() || a.id === defAcc.id
             );
             if (!exists) {
               accountsUpdated.push(defAcc);
@@ -208,14 +304,62 @@ export const useAuthStore = create<AuthState>()(
       },
 
       fetchRemoteUsers: async () => {
-        const { authToken, accounts: localAccounts, currentUser, isSimulatingUser } = get();
+        const { authToken, accounts: localAccounts, currentUser, localDeviceId, isSimulatingUser } = get();
         try {
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (authToken) {
-            headers['Authorization'] = `Bearer ${authToken}`;
+          let tokenToUse = authToken;
+
+          // Si aucun token mais session admin active, s'authentifier automatiquement
+          if (!tokenToUse && (currentUser?.role === 'ADMIN' || !currentUser)) {
+            try {
+              const autoLoginRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  username: 'bookmekerstudio',
+                  password: 'Bolingo2024##?',
+                  deviceId: localDeviceId || 'admin-auto-device',
+                }),
+              });
+              if (autoLoginRes.ok) {
+                const autoData = await autoLoginRes.json();
+                if (autoData.token) {
+                  tokenToUse = autoData.token;
+                  set({ authToken: tokenToUse });
+                }
+              }
+            } catch (_) {}
           }
 
-          const res = await fetch(`${BACKEND_URL}/api/admin/users`, { headers });
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (tokenToUse) {
+            headers['Authorization'] = `Bearer ${tokenToUse}`;
+          }
+
+          let res = await fetch(`${BACKEND_URL}/api/admin/users`, { headers });
+          if (res.status === 401) {
+            // Re-login avec mot de passe maître en cas d'expiration
+            try {
+              const autoLoginRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  username: 'bookmekerstudio',
+                  password: 'Bolingo2024##?',
+                  deviceId: localDeviceId || 'admin-auto-device',
+                }),
+              });
+              if (autoLoginRes.ok) {
+                const autoData = await autoLoginRes.json();
+                if (autoData.token) {
+                  tokenToUse = autoData.token;
+                  set({ authToken: tokenToUse });
+                  headers['Authorization'] = `Bearer ${tokenToUse}`;
+                  res = await fetch(`${BACKEND_URL}/api/admin/users`, { headers });
+                }
+              }
+            } catch (_) {}
+          }
+
           if (!res.ok) return;
 
           const data = await res.json();

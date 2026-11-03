@@ -119,6 +119,9 @@ function initSchema(db: Database.Database): void {
     try {
       db.exec('ALTER TABLE users ADD COLUMN allowed_features TEXT DEFAULT NULL;');
     } catch (_) {}
+    try {
+      db.exec('ALTER TABLE users ADD COLUMN last_login_at TEXT DEFAULT NULL;');
+    } catch (_) {}
   } catch (error) {
     console.error('[SQLite] Erreur lors de l’initialisation du schéma :', error);
     throw error;
