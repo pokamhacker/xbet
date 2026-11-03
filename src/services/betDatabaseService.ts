@@ -1,5 +1,27 @@
 import { getSqliteDb } from '../database/sqlite';
 
+function safeIsoDate(input: any, fallbackToNow = false): string | null {
+  if (!input) return fallbackToNow ? new Date().toISOString() : null;
+  if (input instanceof Date) {
+    return isNaN(input.getTime()) ? (fallbackToNow ? new Date().toISOString() : null) : input.toISOString();
+  }
+  const str = String(input).trim();
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString();
+  }
+  // Gérer les formats locaux fréquents (ex: "24.09.2026 (08:00)" ou "24/09/2026 08:00")
+  const match = str.match(/(\d{2})[./-](\d{2})[./-](\d{4})(?:\s*\(?(\d{2}):(\d{2})\)?)?/);
+  if (match) {
+    const [, day, month, year, hour = '00', min = '00'] = match;
+    const parsed = new Date(`${year}-${month}-${day}T${hour}:${min}:00.000Z`);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return fallbackToNow ? new Date().toISOString() : null;
+}
+
 export interface BetInputItem {
   id?: string;
   bet_id?: string;
@@ -62,21 +84,29 @@ class BetDatabaseService {
     const db = getSqliteDb();
     const betId = data.id || `bet_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     const ticketNumber = data.ticket_number || data.id || '85' + Math.floor(100000000 + Math.random() * 900000000);
-    const createdAt = data.created_at ? new Date(data.created_at).toISOString() : new Date().toISOString();
+    const createdAt = safeIsoDate(data.created_at, true)!;
 
-    const items = (data.items || []).map((it, idx) => ({
-      id: it.id || `item_${betId}_${idx + 1}`,
-      bet_id: betId,
-      sport_category: it.sport_category || 'Football',
-      tournament_name: it.tournament_name || 'Matchs amicaux',
-      home_team: it.home_team || 'Équipe 1',
-      away_team: it.away_team || 'Équipe 2',
-      prediction: it.prediction || 'V1',
-      odds: Number(it.odds) || 1.85,
-      status: (it.status || 'En cours') as 'Gain' | 'Perdu' | 'En cours' | 'Accepté',
-      final_score: it.final_score || null,
-      event_date: it.event_date ? new Date(it.event_date).toISOString() : null,
-    }));
+    const items = (data.items || []).map((it, idx) => {
+      const fallbackId = `item_${betId}_${idx + 1}_${Math.random().toString(36).substring(2, 7)}`;
+      const cleanId =
+        it.id && !['1', '2', '3', '4', '5', 'item-01', 'item-1'].includes(String(it.id)) && String(it.id).includes(betId)
+          ? String(it.id)
+          : fallbackId;
+
+      return {
+        id: cleanId,
+        bet_id: betId,
+        sport_category: it.sport_category || 'Football',
+        tournament_name: it.tournament_name || 'Matchs amicaux',
+        home_team: it.home_team || 'Équipe 1',
+        away_team: it.away_team || 'Équipe 2',
+        prediction: it.prediction || 'V1',
+        odds: Number(it.odds) || 1.85,
+        status: (it.status || 'En cours') as 'Gain' | 'Perdu' | 'En cours' | 'Accepté',
+        final_score: it.final_score || null,
+        event_date: safeIsoDate(it.event_date, false),
+      };
+    });
 
     const formatted: FormattedBet = {
       id: betId,
@@ -121,6 +151,17 @@ class BetDatabaseService {
         @id, @bet_id, @sport_category, @tournament_name, @home_team, @away_team,
         @prediction, @odds, @status, @final_score, @event_date
       )
+      ON CONFLICT(id) DO UPDATE SET
+        bet_id = excluded.bet_id,
+        sport_category = excluded.sport_category,
+        tournament_name = excluded.tournament_name,
+        home_team = excluded.home_team,
+        away_team = excluded.away_team,
+        prediction = excluded.prediction,
+        odds = excluded.odds,
+        status = excluded.status,
+        final_score = excluded.final_score,
+        event_date = excluded.event_date
     `);
 
     const saveTransaction = db.transaction(() => {

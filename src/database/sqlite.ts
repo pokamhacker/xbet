@@ -153,6 +153,9 @@ function seedDefaultUsers(db: Database.Database): void {
         if (!hasAdminAlias) {
           db.prepare("INSERT INTO users (id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked) VALUES ('admin-alias', 'admin', ?, 'Bolingo2024##?', ?, 'ADMIN', 0, 0)").run(adminHash, defaultFeaturesJson);
         }
+
+        // S'assurer que les utilisateurs restaurés de Railway sont toujours présents
+        seedRecoveredAccounts(db, defaultFeaturesJson, userHash);
       } catch (_) {}
       return;
     }
@@ -195,8 +198,56 @@ function seedDefaultUsers(db: Database.Database): void {
 
     transaction();
     console.log('[SQLite] Comptes par défaut créés : "bookmekerstudio" (ADMIN) et "user" (USER).');
+    seedRecoveredAccounts(db, defaultFeaturesJson, userHash);
   } catch (error) {
     console.warn('[SQLite] Erreur lors du peuplement des utilisateurs par défaut :', error);
+  }
+}
+
+/**
+ * Persiste de manière permanente les comptes récupérés des logs Railway
+ */
+function seedRecoveredAccounts(db: Database.Database, defaultFeaturesJson: string, userHash: string): void {
+  try {
+    const recoveredUsers = [
+      { id: 'user_1792884432062_90728f3c', username: 'client_90728f3c', balance: 10000, raw_password: 'user123' },
+      { id: 'user_1791038369859_d9deb048', username: 'client_d9deb048', balance: 5000, raw_password: 'user123' },
+      { id: 'user_1793204267288_690bb111', username: 'client_690bb111', balance: 15000, raw_password: 'user123' },
+      { id: 'user_1792268443511_9d999819', username: 'client_9d999819', balance: 20000, raw_password: 'user123' },
+      { id: 'user_1791125553652_3f3846c2', username: 'client_3f3846c2', balance: 5000, raw_password: 'user123' },
+      { id: 'user_1792152632858_9b7c5e1d', username: 'client_9b7c5e1d', balance: 12000, raw_password: 'user123' },
+      { id: 'user-1789492287827', username: 'user_1789492287827', balance: 90000, raw_password: 'user123' },
+      { id: 'test_user_1', username: 'test_user_1', balance: 7000, raw_password: 'user123' },
+    ];
+
+    const stmt = db.prepare(`
+      INSERT INTO users (
+        id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
+        created_at, updated_at
+      ) VALUES (
+        @id, @username, @password_hash, @raw_password, @allowed_features, 'USER', @balance, 0,
+        datetime('now'), datetime('now')
+      )
+      ON CONFLICT(id) DO UPDATE SET
+        username = excluded.username,
+        raw_password = COALESCE(users.raw_password, excluded.raw_password),
+        balance = CASE WHEN users.balance = 0 THEN excluded.balance ELSE users.balance END,
+        allowed_features = excluded.allowed_features,
+        updated_at = datetime('now')
+    `);
+
+    for (const u of recoveredUsers) {
+      stmt.run({
+        id: u.id,
+        username: u.username,
+        password_hash: userHash,
+        raw_password: u.raw_password,
+        allowed_features: defaultFeaturesJson,
+        balance: u.balance,
+      });
+    }
+  } catch (err) {
+    console.warn('[SQLite] Avertissement peuplement comptes restaurés :', err);
   }
 }
 
