@@ -85,20 +85,32 @@ export async function login(req: Request, res: Response): Promise<void> {
       user.rawPassword = password.trim();
     }
 
-    // 4. CONTRÔLE STRICT MONO-APPAREIL (1 Compte = 1 Seul Appareil)
-    // Règle : Si l'utilisateur essaie de se connecter sur un autre appareil,
-    // son compte est DIRECTEMENT BLOQUÉ et il doit contacter l'administrateur pour le débloquer !
+    // 4. CONTRÔLE STRICT MONO-APPAREIL (1 Compte = 1 et 1 Seul Appareil : Web et Mobile)
+    // Règle :
+    // - Un identifiant d'appareil (deviceId) est STRICTEMENT OBLIGATOIRE.
+    // - À la première connexion, le compte est verrouillé de façon définitive sur cet appareil.
+    // - Toute tentative ultérieure depuis un autre téléphone, tablette, navigateur ou ordinateur
+    //   provoque le BLOCAGE IMMÉDIAT du compte.
     if (user.role === 'USER') {
       const incomingDeviceId = deviceId ? String(deviceId).trim() : null;
       const registeredDeviceId = user.boundDeviceId ? String(user.boundDeviceId).trim() : null;
 
-      if (registeredDeviceId && incomingDeviceId && registeredDeviceId !== incomingDeviceId) {
+      if (!incomingDeviceId) {
+        res.status(400).json({
+          success: false,
+          code: 'DEVICE_ID_REQUIRED',
+          error: "Sécurité stricte : L'identifiant de votre appareil (deviceId) est obligatoire pour vous connecter.",
+        });
+        return;
+      }
+
+      if (registeredDeviceId && registeredDeviceId !== incomingDeviceId) {
         console.warn(
           `[AuthController] Sécurité : Tentative de connexion de "${user.username}" sur un appareil non autorisé (${incomingDeviceId} au lieu de ${registeredDeviceId}). Blocage immédiat du compte.`
         );
 
         user.isBlocked = true;
-        user.blockedReason = 'Tentative de connexion sur un autre appareil non autorisé';
+        user.blockedReason = 'Tentative de connexion sur un autre appareil non autorisé (Règle stricte 1 Compte = 1 Seul Appareil)';
         user.sessionToken = null;
         await user.save();
 
@@ -109,15 +121,15 @@ export async function login(req: Request, res: Response): Promise<void> {
           success: false,
           code: 'DEVICE_MISMATCH_BLOCKED',
           error:
-            "Sécurité : Ce compte est lié à un autre appareil. Votre compte a été automatiquement BLOQUÉ suite à cette tentative. Veuillez contacter l'administrateur pour débloquer votre compte.",
+            "Sécurité stricte : Ce compte est lié exclusivement à un autre appareil physique. Votre compte a été automatiquement BLOQUÉ. Veuillez contacter l'administrateur pour réinitialiser votre appareil.",
         });
         return;
       }
 
-      // Si le compte n'a pas encore d'appareil lié (1ère connexion ou après réinitialisation par l'admin)
-      if (!user.boundDeviceId && incomingDeviceId) {
+      // Si le compte n'a pas encore d'appareil lié (1ère connexion du nouveau compte créé par l'admin)
+      if (!user.boundDeviceId) {
         user.boundDeviceId = incomingDeviceId;
-        console.log(`[AuthController] Appareil ${incomingDeviceId} lié avec succès au compte "${user.username}".`);
+        console.log(`[AuthController] Appareil ${incomingDeviceId} lié exclusivement au compte "${user.username}".`);
       }
     }
 

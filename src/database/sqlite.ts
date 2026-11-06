@@ -73,10 +73,13 @@ export function getSqliteDb(): Database.Database {
 
     console.log(`[SQLite] Base de données initialisée avec succès : ${dbPath}`);
 
-    // Exécuter le schéma SQL
+    // 1. Schéma des tables et index synchronisé
     initSchema(dbInstance);
 
-    // Initialiser les utilisateurs par défaut si la table est vide
+    // 2. Nettoyage de sécurité : suppression définitive de tout ancien compte Railway ou démo
+    purgeLegacyRailwayAccounts(dbInstance);
+
+    // 3. Initialiser les accès administrateur s'ils n'existent pas
     seedDefaultUsers(dbInstance);
 
     // Migrer les anciens paris depuis bets_db.json si la table bets est vide
@@ -129,11 +132,37 @@ function initSchema(db: Database.Database): void {
 }
 
 /**
- * Insère les comptes admin et utilisateur initiaux s'ils n'existent pas
+ * Supprime définitivement tous les anciens comptes Railway et démo
+ * pour forcer l'usage exclusif de NOUVEAUX identifiants créés par l'admin
+ */
+function purgeLegacyRailwayAccounts(db: Database.Database): void {
+  try {
+    const result = db.prepare(`
+      DELETE FROM users WHERE id IN (
+        'user_1792884432062_90728f3c',
+        'user_1791038369859_d9deb048',
+        'user_1793204267288_690bb111',
+        'user_1792268443511_9d999819',
+        'user_1791125553652_3f3846c2',
+        'user_1792152632858_9b7c5e1d',
+        'user-1789492287827',
+        'test_user_1',
+        'user-demo-1'
+      ) OR username LIKE 'client_%' OR username = 'user';
+    `).run();
+    if (result.changes > 0) {
+      console.log(`[SQLite] Purge de sécurité : ${result.changes} ancien(s) compte(s) Railway supprimé(s).`);
+    }
+  } catch (err) {
+    console.warn('[SQLite] Avertissement lors de la purge des anciens comptes :', err);
+  }
+}
+
+/**
+ * Maintient exclusivement les accès de l'administrateur
  */
 function seedDefaultUsers(db: Database.Database): void {
   try {
-    const userCountRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
     const defaultFeaturesJson = JSON.stringify([
       'studio_match',
       'studio_tv',
@@ -144,113 +173,39 @@ function seedDefaultUsers(db: Database.Database): void {
       'game_kamikaze',
     ]);
     const adminHash = bcrypt.hashSync('Bolingo2024##?', 10);
-    const userHash = bcrypt.hashSync('user123', 10);
 
-    if (userCountRow && userCountRow.count > 0) {
-      // Synchroniser les identifiants administrateur et de démonstration
-      try {
-        db.prepare("UPDATE users SET password_hash = ?, raw_password = 'Bolingo2024##?', allowed_features = ? WHERE username = 'bookmekerstudio'").run(adminHash, defaultFeaturesJson);
-        db.prepare("UPDATE users SET password_hash = ?, raw_password = 'user123', allowed_features = ? WHERE username = 'user' AND (raw_password IS NULL OR raw_password = '')").run(userHash, defaultFeaturesJson);
-
-        const hasAdminAlias = db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
-        if (!hasAdminAlias) {
-          db.prepare("INSERT INTO users (id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked) VALUES ('admin-alias', 'admin', ?, 'Bolingo2024##?', ?, 'ADMIN', 0, 0)").run(adminHash, defaultFeaturesJson);
-        }
-
-        // S'assurer que les utilisateurs restaurés de Railway sont toujours présents
-        seedRecoveredAccounts(db, defaultFeaturesJson, userHash);
-      } catch (_) {}
-      return;
+    const hasAdmin = db.prepare("SELECT id FROM users WHERE username = 'bookmekerstudio' LIMIT 1").get();
+    if (!hasAdmin) {
+      db.prepare(`
+        INSERT INTO users (
+          id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
+          created_at, updated_at
+        ) VALUES (
+          'admin-default', 'bookmekerstudio', ?, 'Bolingo2024##?', ?, 'ADMIN', 0, 0,
+          datetime('now'), datetime('now')
+        )
+      `).run(adminHash, defaultFeaturesJson);
+      console.log('[SQLite] Compte Administrateur "bookmekerstudio" initialisé.');
+    } else {
+      db.prepare("UPDATE users SET password_hash = ?, raw_password = 'Bolingo2024##?', role = 'ADMIN' WHERE username = 'bookmekerstudio'").run(adminHash);
     }
 
-    console.log('[SQLite] Initialisation des comptes utilisateurs par défaut...');
-
-    const insertUser = db.prepare(`
-      INSERT INTO users (
-        id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked, blocked_reason,
-        bound_device_id, last_device_id, session_token, created_at, updated_at
-      ) VALUES (
-        @id, @username, @password_hash, @raw_password, @allowed_features, @role, @balance, 0, NULL,
-        NULL, NULL, NULL, datetime('now'), datetime('now')
-      )
-    `);
-
-    const transaction = db.transaction(() => {
-      // 1. Administrateur principal
-      insertUser.run({
-        id: 'admin-default',
-        username: 'bookmekerstudio',
-        password_hash: adminHash,
-        raw_password: 'Bolingo2024##?',
-        allowed_features: defaultFeaturesJson,
-        role: 'ADMIN',
-        balance: 0,
-      });
-
-      // 2. Utilisateur standard de démonstration
-      insertUser.run({
-        id: 'user-demo-1',
-        username: 'user',
-        password_hash: userHash,
-        raw_password: 'user123',
-        allowed_features: defaultFeaturesJson,
-        role: 'USER',
-        balance: 50000,
-      });
-    });
-
-    transaction();
-    console.log('[SQLite] Comptes par défaut créés : "bookmekerstudio" (ADMIN) et "user" (USER).');
-    seedRecoveredAccounts(db, defaultFeaturesJson, userHash);
+    const hasAdminAlias = db.prepare("SELECT id FROM users WHERE username = 'admin' LIMIT 1").get();
+    if (!hasAdminAlias) {
+      db.prepare(`
+        INSERT INTO users (
+          id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
+          created_at, updated_at
+        ) VALUES (
+          'admin-alias', 'admin', ?, 'Bolingo2024##?', ?, 'ADMIN', 0, 0,
+          datetime('now'), datetime('now')
+        )
+      `).run(adminHash, defaultFeaturesJson);
+    } else {
+      db.prepare("UPDATE users SET password_hash = ?, raw_password = 'Bolingo2024##?', role = 'ADMIN' WHERE username = 'admin'").run(adminHash);
+    }
   } catch (error) {
-    console.warn('[SQLite] Erreur lors du peuplement des utilisateurs par défaut :', error);
-  }
-}
-
-/**
- * Persiste de manière permanente les comptes récupérés des logs Railway
- */
-function seedRecoveredAccounts(db: Database.Database, defaultFeaturesJson: string, userHash: string): void {
-  try {
-    const recoveredUsers = [
-      { id: 'user_1792884432062_90728f3c', username: 'client_90728f3c', balance: 10000, raw_password: 'user123' },
-      { id: 'user_1791038369859_d9deb048', username: 'client_d9deb048', balance: 5000, raw_password: 'user123' },
-      { id: 'user_1793204267288_690bb111', username: 'client_690bb111', balance: 15000, raw_password: 'user123' },
-      { id: 'user_1792268443511_9d999819', username: 'client_9d999819', balance: 20000, raw_password: 'user123' },
-      { id: 'user_1791125553652_3f3846c2', username: 'client_3f3846c2', balance: 5000, raw_password: 'user123' },
-      { id: 'user_1792152632858_9b7c5e1d', username: 'client_9b7c5e1d', balance: 12000, raw_password: 'user123' },
-      { id: 'user-1789492287827', username: 'user_1789492287827', balance: 90000, raw_password: 'user123' },
-      { id: 'test_user_1', username: 'test_user_1', balance: 7000, raw_password: 'user123' },
-    ];
-
-    const stmt = db.prepare(`
-      INSERT INTO users (
-        id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
-        created_at, updated_at
-      ) VALUES (
-        @id, @username, @password_hash, @raw_password, @allowed_features, 'USER', @balance, 0,
-        datetime('now'), datetime('now')
-      )
-      ON CONFLICT(id) DO UPDATE SET
-        username = excluded.username,
-        raw_password = COALESCE(users.raw_password, excluded.raw_password),
-        balance = CASE WHEN users.balance = 0 THEN excluded.balance ELSE users.balance END,
-        allowed_features = excluded.allowed_features,
-        updated_at = datetime('now')
-    `);
-
-    for (const u of recoveredUsers) {
-      stmt.run({
-        id: u.id,
-        username: u.username,
-        password_hash: userHash,
-        raw_password: u.raw_password,
-        allowed_features: defaultFeaturesJson,
-        balance: u.balance,
-      });
-    }
-  } catch (err) {
-    console.warn('[SQLite] Avertissement peuplement comptes restaurés :', err);
+    console.warn('[SQLite] Erreur lors de l’initialisation de l’administrateur :', error);
   }
 }
 

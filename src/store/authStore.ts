@@ -79,114 +79,6 @@ const DEFAULT_ACCOUNTS: UserAccount[] = [
     allowedFeatures: DEFAULT_ALLOWED_FEATURES,
     createdAt: '01.01.2026 (00:00)',
   },
-  {
-    id: 'user-demo-1',
-    username: 'user',
-    passwordHash: 'user123',
-    rawPassword: 'user123',
-    balance: 50000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '01.01.2026 (00:00)',
-  },
-  {
-    id: 'user_1792884432062_90728f3c',
-    username: 'client_90728f3c',
-    passwordHash: 'user123',
-    rawPassword: 'user123',
-    balance: 10000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '24.10.2026 (23:27)',
-  },
-  {
-    id: 'user_1791038369859_d9deb048',
-    username: 'client_d9deb048',
-    passwordHash: 'user123',
-    rawPassword: 'user123',
-    balance: 5000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '03.10.2026 (14:39)',
-  },
-  {
-    id: 'user_1793204267288_690bb111',
-    username: 'client_690bb111',
-    passwordHash: 'user123',
-    rawPassword: 'user123',
-    balance: 15000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '28.10.2026 (16:17)',
-  },
-  {
-    id: 'user_1792268443511_9d999819',
-    username: 'client_9d999819',
-    passwordHash: 'user123',
-    rawPassword: 'user123',
-    balance: 20000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '17.10.2026 (20:20)',
-  },
-  {
-    id: 'user_1791125553652_3f3846c2',
-    username: 'client_3f3846c2',
-    passwordHash: 'user123',
-    rawPassword: 'user123',
-    balance: 5000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '04.10.2026 (14:52)',
-  },
-  {
-    id: 'user_1792152632858_9b7c5e1d',
-    username: 'client_9b7c5e1d',
-    passwordHash: 'user123',
-    rawPassword: 'user123',
-    balance: 12000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '16.10.2026 (12:10)',
-  },
-  {
-    id: 'user-1789492287827',
-    username: 'user_1789492287827',
-    passwordHash: 'user123',
-    rawPassword: 'user123',
-    balance: 90000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '08.03.2026 (23:00)',
-  },
-  {
-    id: 'test_user_1',
-    username: 'test_user_1',
-    passwordHash: 'user123',
-    rawPassword: 'user123',
-    balance: 7000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '25.09.2026 (06:00)',
-  },
 ];
 
 const DEVICE_STORAGE_KEY = 'xbet_local_device_unique_id';
@@ -231,6 +123,18 @@ export const useAuthStore = create<AuthState>()(
             accountsUpdated.push(DEFAULT_ACCOUNTS[0]);
           }
 
+          // Purge stricte : suppression définitive de tout ancien compte Railway et démonstration
+          accountsUpdated = accountsUpdated.filter(
+            (a) =>
+              a.role === 'ADMIN' ||
+              (!a.id.startsWith('user_179') &&
+                !a.username.toLowerCase().startsWith('client_') &&
+                a.id !== 'user-demo-1' &&
+                a.id !== 'test_user_1' &&
+                a.id !== 'user-1789492287827' &&
+                a.username.toLowerCase() !== 'user')
+          );
+
           DEFAULT_ACCOUNTS.forEach((defAcc) => {
             const exists = accountsUpdated.some(
               (a) => a.username.toLowerCase() === defAcc.username.toLowerCase() || a.id === defAcc.id
@@ -242,12 +146,27 @@ export const useAuthStore = create<AuthState>()(
 
           const { currentUser, authToken } = get();
           let updatedCurrentUser = currentUser;
-          if (currentUser && (currentUser.role === 'ADMIN' || currentUser.id === 'admin-default' || currentUser.username.toLowerCase() === 'admin')) {
+          if (
+            currentUser &&
+            (currentUser.role === 'ADMIN' || currentUser.id === 'admin-default' || currentUser.username.toLowerCase() === 'admin')
+          ) {
             updatedCurrentUser = {
               ...currentUser,
               username: 'BookmekerStudio',
               passwordHash: 'Bolingo2024##?',
             };
+          } else if (
+            currentUser &&
+            currentUser.role !== 'ADMIN' &&
+            (currentUser.id.startsWith('user_179') ||
+              currentUser.username.toLowerCase().startsWith('client_') ||
+              currentUser.id === 'user-demo-1' ||
+              currentUser.id === 'test_user_1' ||
+              currentUser.id === 'user-1789492287827' ||
+              currentUser.username.toLowerCase() === 'user')
+          ) {
+            // Déconnexion immédiate de toute ancienne session Railway
+            updatedCurrentUser = null;
           }
 
           set({
@@ -461,6 +380,21 @@ export const useAuthStore = create<AuthState>()(
           return { success: false, error: 'Veuillez saisir votre identifiant et mot de passe.' };
         }
 
+        // Garantir un deviceId persistant unique (Web et Mobile)
+        let targetDeviceId = localDeviceId;
+        if (!targetDeviceId) {
+          try {
+            targetDeviceId = (await AsyncStorage.getItem(DEVICE_STORAGE_KEY)) || '';
+          } catch (_) {}
+          if (!targetDeviceId) {
+            targetDeviceId = `dev_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            try {
+              await AsyncStorage.setItem(DEVICE_STORAGE_KEY, targetDeviceId);
+            } catch (_) {}
+          }
+          set({ localDeviceId: targetDeviceId });
+        }
+
         // 1. Connexion en direct sur le serveur distant
         try {
           const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
@@ -469,7 +403,7 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify({
               username: trimmedUser,
               password: trimmedPass,
-              deviceId: localDeviceId,
+              deviceId: targetDeviceId,
             }),
           });
 
