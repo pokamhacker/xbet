@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,22 +12,194 @@ import {
   Image,
   Platform,
   StatusBar,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { BackArrowIcon } from '../components/common/BackArrowIcon';
 import { Colors } from '../theme/theme';
+import { useThemeStore } from '../stores/themeStore';
 import { useBetStore } from '../store/useBetStore';
+import { useAuthStore } from '../store/authStore';
 import { generateCouponId, generateShareCode } from '../utils/pokerEngine';
 import { BetSlip, MatchEvent } from '../types/bet';
 import { SportsPickerModal } from '../components/SportsPickerModal';
-import { SPORTS_CATALOG, resolveTeamLogo, resolveCompetitionLogo } from '../data/sportsCatalog';
+import {
+  SPORTS_CATALOG,
+  getCompetitionById,
+  resolveTeamLogo,
+  resolveCompetitionLogo,
+} from '../data/sportsCatalog';
 import { TeamLogo } from '../components/common/TeamLogo';
-import { fetchTeamsByLeague } from '../services/sportsApi';
+import { fetchTeamsByLeague, SportsTeam } from '../services/sportsApi';
 import { LiveMatchPickerModal } from '../components/modals/LiveMatchPickerModal';
-import { FIFA_LEAGUES_LIST, getFifaLeagueLogo } from '../constants/fifaLeagues';
-import { formatBetDate } from '../utils/dateFormatter';
+import { FIFA_LEAGUES_LIST, getFifaLeagueLogo, FIFA_DEFAULT_TEAMS } from '../constants/fifaLeagues';
+import { formatBetDate, combineDateAndTime } from '../utils/dateFormatter';
+import { formatCleanOdds } from '../utils/oddsFormatter';
+
+// Championnats majeurs de football réel
+const TOP_REAL_LEAGUES = [
+  {
+    id: 'uefa-champions-league',
+    name: 'UEFA Champions League',
+    country: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/2.png',
+  },
+  {
+    id: 'premier-league',
+    name: 'Premier League',
+    country: 'Angleterre',
+    logo: 'https://media.api-sports.io/football/leagues/39.png',
+  },
+  {
+    id: 'la-liga',
+    name: 'La Liga',
+    country: 'Espagne',
+    logo: 'https://media.api-sports.io/football/leagues/140.png',
+  },
+  {
+    id: 'ligue-1',
+    name: 'Ligue 1',
+    country: 'France',
+    logo: 'https://media.api-sports.io/football/leagues/61.png',
+  },
+  {
+    id: 'serie-a',
+    name: 'Serie A',
+    country: 'Italie',
+    logo: 'https://media.api-sports.io/football/leagues/135.png',
+  },
+  {
+    id: 'bundesliga',
+    name: 'Bundesliga',
+    country: 'Allemagne',
+    logo: 'https://media.api-sports.io/football/leagues/78.png',
+  },
+  {
+    id: 'uefa-europa-league',
+    name: 'UEFA Europa League',
+    country: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/3.png',
+  },
+  {
+    id: 'saudi-pro-league',
+    name: 'Saudi Pro League',
+    country: 'Arabie Saoudite',
+    logo: 'https://media.api-sports.io/football/leagues/307.png',
+  },
+];
+
+// Championnats Afrique & Sélections Internationales
+const AFRICA_AND_REGIONS_LEAGUES = [
+  {
+    id: 'can-coupe-dafrique-des-nations',
+    name: "Coupe d'Afrique des Nations (CAN)",
+    country: 'Afrique',
+    logo: 'https://media.api-sports.io/football/leagues/6.png',
+  },
+  {
+    id: 'coupe-du-monde',
+    name: 'Coupe du Monde FIFA',
+    country: 'International',
+    logo: 'https://media.api-sports.io/football/leagues/1.png',
+  },
+  {
+    id: 'euro-uefa',
+    name: 'UEFA Euro',
+    country: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/4.png',
+  },
+  {
+    id: 'botola-pro',
+    name: 'Botola Pro Maroc',
+    country: 'Maroc',
+    logo: 'https://media.api-sports.io/football/leagues/200.png',
+  },
+  {
+    id: 'mtn-elite-1-cameroun',
+    name: 'MTN Elite 1 Cameroun',
+    country: 'Cameroun',
+    logo: 'https://media.api-sports.io/football/leagues/210.png',
+  },
+  {
+    id: 'npfl-nigeria',
+    name: 'NPFL Nigéria',
+    country: 'Nigéria',
+    logo: 'https://media.api-sports.io/football/leagues/207.png',
+  },
+  {
+    id: 'ligue-1-pro-tunisie',
+    name: 'Ligue 1 Pro Tunisie',
+    country: 'Tunisie',
+    logo: 'https://media.api-sports.io/football/leagues/202.png',
+  },
+  {
+    id: 'copa-america',
+    name: 'Copa America',
+    country: 'Amérique du Sud',
+    logo: 'https://media.api-sports.io/football/leagues/9.png',
+  },
+];
+
+// Helper pour générer un avatar de blason réaliste
+const makeAvatarLogo = (name: string, bg: string = '243DB5', fg: string = 'FFFFFF') =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'Club')}&background=${bg}&color=${fg}&size=128&bold=true&rounded=true`;
+
+// Cotes de référence pour le marché « Score exact » (clé = "buts domicile-buts extérieur")
+const EXACT_SCORE_ODDS: Record<string, number> = {
+  '1-0': 6.5, '2-0': 8.0, '2-1': 8.5, '3-0': 13.0, '3-1': 13.0, '3-2': 23.0, '4-0': 26.0, '4-1': 26.0,
+  '0-0': 9.0, '1-1': 6.0, '2-2': 13.0, '3-3': 51.0,
+  '0-1': 9.5, '0-2': 15.0, '1-2': 11.0, '0-3': 29.0, '1-3': 23.0, '2-3': 29.0, '0-4': 51.0, '1-4': 51.0,
+};
+
+// Estimation de cote pour n'importe quel score (table de référence, sinon formule progressive)
+const estimateExactScoreOdd = (h: number, a: number): string => {
+  const known = EXACT_SCORE_ODDS[`${h}-${a}`];
+  if (known) return formatCleanOdds(known);
+  const total = h + a;
+  const diff = Math.abs(h - a);
+  const est = 6 * Math.pow(1.55, Math.max(0, total - 1)) * (1 + diff * 0.15);
+  return formatCleanOdds(Math.min(501, Math.round(est * 2) / 2));
+};
+
+// Scores fréquents groupés par issue : 1 (Domicile), X (Nul), 2 (Extérieur)
+const EXACT_SCORE_GROUPS: Array<{ key: '1' | 'X' | '2'; color: string; bg: string; scores: Array<[number, number]> }> = [
+  { key: '1', color: '#2563EB', bg: '#EFF6FF', scores: [[1, 0], [2, 0], [2, 1], [3, 0], [3, 1], [3, 2], [4, 0], [4, 1]] },
+  { key: 'X', color: '#64748B', bg: '#F1F5F9', scores: [[0, 0], [1, 1], [2, 2], [3, 3]] },
+  { key: '2', color: '#EA580C', bg: '#FFF7ED', scores: [[0, 1], [0, 2], [1, 2], [0, 3], [1, 3], [2, 3], [0, 4], [1, 4]] },
+];
+
+interface TeamItem {
+  id: string;
+  name: string;
+  logo?: string;
+  shortName?: string;
+}
 
 export default function StudioCreationScreen({ navigation }: any) {
-  const { customLeagues, addCoupon } = useBetStore();
+  const { currentTheme } = useThemeStore();
+  const isDark = Boolean(currentTheme?.isDark);
+  const hasAccess = useAuthStore((s) => s.hasAccessToFeature('studio_match'));
+
+  useEffect(() => {
+    if (!hasAccess) {
+      Alert.alert(
+        'Accès restreint',
+        "Vous n'avez pas l'autorisation d'accéder au Studio Match & FIFA. Veuillez contacter votre administrateur.",
+        [{ text: 'Compris', onPress: () => navigation.goBack() }]
+      );
+    }
+  }, [hasAccess, navigation]);
+
+  const {
+    customLeagues,
+    customTeams,
+    addCustomLeague,
+    addCustomTeam,
+    removeCustomLeague,
+    removeCustomTeam,
+    addCoupon,
+  } = useBetStore();
 
   // 1. Identité
   const [customId, setCustomId] = useState('');
@@ -50,80 +222,587 @@ export default function StudioCreationScreen({ navigation }: any) {
     return `${day}.${month}.${year}`;
   };
 
+  const [placedTime, setPlacedTime] = useState(getCurrentTimeFormatted());
+  const [placedDate, setPlacedDate] = useState(getCurrentDateFormatted());
   const [matchTime, setMatchTime] = useState(getCurrentTimeFormatted());
   const [matchDate, setMatchDate] = useState(getCurrentDateFormatted());
 
-  // 2. Filtres & Marchés
-  const [sourceType, setSourceType] = useState<'Tout' | 'FIFA' | 'Original'>('FIFA');
-  const [champType, setChampType] = useState<'Base' | 'Custo'>('Base');
+  // 2. Structuration des Championnats
+  const [leagueCategory, setLeagueCategory] = useState<'real' | 'fifa' | 'regions' | 'custom'>('real');
 
-  // Sélection Visuelle Championnat & Équipes
+  // Championnat Sélectionné
   const [selectedLeague, setSelectedLeague] = useState('');
   const [selectedLeagueLogo, setSelectedLeagueLogo] = useState('');
   const [selectedLeagueId, setSelectedLeagueId] = useState('');
+  const [selectedLeagueCountry, setSelectedLeagueCountry] = useState('');
 
+  // Équipes Sélectionnées (vides par défaut)
   const [homeTeam, setHomeTeam] = useState('');
   const [homeTeamLogo, setHomeTeamLogo] = useState('');
 
   const [awayTeam, setAwayTeam] = useState('');
   const [awayTeamLogo, setAwayTeamLogo] = useState('');
 
+  // Cible d'attribution active : 'home' ou 'away'
+  const [activeSlot, setActiveSlot] = useState<'home' | 'away'>('home');
   const [isManualEntry, setIsManualEntry] = useState(false);
+
+  // Équipes chargées dynamiquement
+  const [dynamicLeagueTeams, setDynamicLeagueTeams] = useState<TeamItem[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+
+  // Modales
   const [pickerModalVisible, setPickerModalVisible] = useState(false);
   const [liveModalVisible, setLiveModalVisible] = useState(false);
   const [pickerMode, setPickerMode] = useState<'competition' | 'team'>('competition');
   const [pickingTarget, setPickingTarget] = useState<'home' | 'away'>('home');
 
-  const [marketType, setMarketType] = useState<'Base' | 'Custo'>('Base');
+  // Modales de Création Custom
+  const [createLeagueModalVisible, setCreateLeagueModalVisible] = useState(false);
+  const [newLeagueName, setNewLeagueName] = useState('');
+  const [newLeagueCountry, setNewLeagueCountry] = useState('');
+  const [newLeagueSport, setNewLeagueSport] = useState('Football');
+
+  const [createTeamModalVisible, setCreateTeamModalVisible] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamShort, setNewTeamShort] = useState('');
+  const [newTeamLogo, setNewTeamLogo] = useState('');
+
+  // Marché & Cotes
   const [selectedCategory, setSelectedCategory] = useState('Résultat');
   const [selectedOptionLabel, setSelectedOptionLabel] = useState('');
   const [odd, setOdd] = useState('');
   const [finalScoreSwitch, setFinalScoreSwitch] = useState(false);
+  // Clé du pronostic rapide actif ('1', 'X', '2', etc. ou 'custom') pour adapter dynamiquement l'intitulé
+  const [selectedPredKey, setSelectedPredKey] = useState<string>('1');
 
-  // 3. Événements ajoutés (vide par défaut)
+  // 3. Événements ajoutés
   const [addedEvents, setAddedEvents] = useState<MatchEvent[]>([]);
 
   // 4. Mise & Résumé
   const [stake, setStake] = useState('1000');
-  const [enableStakeBadge, setEnableStakeBadge] = useState(false);
   const [enableCashout, setEnableCashout] = useState(false);
 
-  // Calculs dynamiques
+  // Charger les équipes dès que la ligue sélectionnée change
+  useEffect(() => {
+    if (selectedLeague) {
+      setLoadingTeams(true);
+      fetchTeamsByLeague(selectedLeague)
+        .then((teams) => {
+          if (teams && teams.length > 0) {
+            setDynamicLeagueTeams(
+              teams.map((t) => ({
+                id: t.id,
+                name: t.name,
+                logo: t.badge || t.logo,
+                shortName: t.shortName,
+              }))
+            );
+          } else {
+            setDynamicLeagueTeams([]);
+          }
+        })
+        .catch(() => {
+          setDynamicLeagueTeams([]);
+        })
+        .finally(() => {
+          setLoadingTeams(false);
+        });
+    } else {
+      setDynamicLeagueTeams([]);
+    }
+  }, [selectedLeague]);
+
+  // Regroupe les équipes structurées pour le championnat actif
+  const availableLeagueTeams = useMemo(() => {
+    if (!selectedLeague && !selectedLeagueId) return [];
+    const results: TeamItem[] = [];
+    const seen = new Set<string>();
+
+    // 1. Équipes custom du store appartenant à cette ligue
+    const matchedCustom = customTeams.filter(
+      (ct) => ct.leagueId === selectedLeagueId || ct.leagueId === selectedLeague
+    );
+    for (const ct of matchedCustom) {
+      if (!seen.has(ct.name.toLowerCase())) {
+        seen.add(ct.name.toLowerCase());
+        results.push({
+          id: ct.id,
+          name: ct.name,
+          shortName: ct.shortName,
+          logo: ct.logo || makeAvatarLogo(ct.name),
+        });
+      }
+    }
+
+    // 2. Équipes FIFA si championnat FIFA
+    const cleanUpper = (selectedLeague || '').toUpperCase();
+    if (
+      cleanUpper.includes('FIFA') ||
+      cleanUpper.includes('FC ') ||
+      (selectedLeagueId && selectedLeagueId.toLowerCase().includes('fc2'))
+    ) {
+      const matchedFifa = FIFA_LEAGUES_LIST.find(
+        (fl) => fl.id === selectedLeagueId || fl.name === selectedLeague
+      );
+      let flagType = matchedFifa?.flagType;
+      if (!flagType) {
+        if (cleanUpper.includes('ANGLETERRE') || cleanUpper.includes('ENGLAND')) flagType = 'england';
+        else if (cleanUpper.includes('SPAIN') || cleanUpper.includes('ESPAGNE')) flagType = 'spain';
+        else if (cleanUpper.includes('ITAL')) flagType = 'italy';
+        else if (cleanUpper.includes('GERMAN') || cleanUpper.includes('ALLEMAGNE')) flagType = 'germany';
+        else if (
+          cleanUpper.includes('CHAMPION') ||
+          cleanUpper.includes('EUROPE') ||
+          cleanUpper.includes('RUSH') ||
+          cleanUpper.includes('SUPERLIGUE') ||
+          cleanUpper.includes('CONFÉRENCE') ||
+          cleanUpper.includes('CONFERENCE') ||
+          cleanUpper.includes('EUROPA')
+        ) {
+          flagType = 'europe';
+        } else {
+          flagType = 'globe';
+        }
+      }
+      const fifaTeams = FIFA_DEFAULT_TEAMS[flagType] || FIFA_DEFAULT_TEAMS['europe'] || [];
+      for (const ft of fifaTeams) {
+        if (!seen.has(ft.name.toLowerCase())) {
+          seen.add(ft.name.toLowerCase());
+          results.push({
+            id: ft.id,
+            name: ft.name,
+            shortName: ft.shortName,
+            logo: ft.logo,
+          });
+        }
+      }
+    }
+
+    // 3. Équipes du catalogue local
+    const cleanLeagueLower = (selectedLeague || '').trim().toLowerCase();
+    const cleanIdLower = (selectedLeagueId || '').trim().toLowerCase();
+    const isLaLigaSelected =
+      !cleanLeagueLower.includes('fifa') &&
+      !cleanLeagueLower.includes('fc ') &&
+      (cleanIdLower === 'la-liga' ||
+        cleanIdLower === 'laliga' ||
+        cleanIdLower === '140' ||
+        cleanIdLower === '4335' ||
+        cleanLeagueLower === 'la liga' ||
+        cleanLeagueLower === 'spanish la liga' ||
+        cleanLeagueLower.includes('la liga ea') ||
+        cleanLeagueLower.includes('laliga ea'));
+
+    const catalogComp =
+      (isLaLigaSelected
+        ? SPORTS_CATALOG.find((c) => c.id === 'la-liga' && c.sport === 'Football')
+        : undefined) ||
+      SPORTS_CATALOG.find(
+        (c) =>
+          c.id === selectedLeagueId ||
+          c.name.toLowerCase() === cleanLeagueLower
+      ) ||
+      getCompetitionById(selectedLeagueId) ||
+      getCompetitionById(selectedLeague);
+
+    if (catalogComp && catalogComp.teams) {
+      for (const t of catalogComp.teams) {
+        if (!seen.has(t.name.toLowerCase())) {
+          seen.add(t.name.toLowerCase());
+          results.push({
+            id: t.id,
+            name: t.name,
+            shortName: t.shortName,
+            logo: t.logo,
+          });
+        }
+      }
+    }
+
+    // 4. Équipes de l'API dynamique TheSportsDB / API-Football
+    for (const dt of dynamicLeagueTeams) {
+      if (!seen.has(dt.name.toLowerCase())) {
+        seen.add(dt.name.toLowerCase());
+        results.push(dt);
+      }
+    }
+
+    return results;
+  }, [selectedLeague, selectedLeagueId, customTeams, dynamicLeagueTeams]);
+
+  // Filtre des suggestions rapides (Tous, Score exact, 1X2, Total pair, Total, Handicap, etc.)
+  const [quickPredFilter, setQuickPredFilter] = useState<
+    'Tous' | '1X2' | 'Double chance' | 'Total pair' | 'Total' | 'Buts' | 'Handicap' | 'Score'
+  >('Tous');
+
+  // Helper pour calculer les détails d'un pronostic rapide selon les équipes actuelles
+  const getQuickPredictionDetails = (
+    key: string,
+    hTeam: string,
+    aTeam: string,
+    eHome: number,
+    eAway: number
+  ): { label: string; odd: string; category: string } => {
+    const h = hTeam || 'Domicile';
+    const a = aTeam || 'Extérieur';
+
+    if (key === '1') return { label: `Vainqueur : ${h}`, odd: '1.85', category: '1X2' };
+    if (key === 'X') return { label: 'Match nul (X)', odd: '3.40', category: '1X2' };
+    if (key === '2') return { label: `Vainqueur : ${a}`, odd: '3.90', category: '1X2' };
+    if (key === '1x2-v1') return { label: '1X2. V1', odd: '2.167', category: '1X2' };
+    if (key === '1x2-x') return { label: '1X2. X', odd: '3.92', category: '1X2' };
+    if (key === '1x2-v2') return { label: '1X2. V2', odd: '3.075', category: '1X2' };
+    if (key === '1X') return { label: `1X (${h} ou Nul)`, odd: '1.25', category: 'Double chance' };
+    if (key === '12') return { label: `12 (${h} ou ${a})`, odd: '1.30', category: 'Double chance' };
+    if (key === 'X2') return { label: `X2 (Nul ou ${a})`, odd: '1.85', category: 'Double chance' };
+    if (key === '+2.5') return { label: 'Plus de 2.5 buts', odd: '1.75', category: 'Total' };
+    if (key === '-2.5') return { label: 'Moins de 2.5 buts', odd: '2.05', category: 'Total' };
+    if (key === 'BTTS') return { label: 'Les deux équipes marquent', odd: '1.68', category: 'Buts' };
+    if (key.startsWith('cs-')) {
+      const parts = key.replace('cs-', '').split('-');
+      const scoreH = parseInt(parts[0], 10) || 0;
+      const scoreA = parseInt(parts[1], 10) || 0;
+      return {
+        label: `Score exact : ${scoreH}–${scoreA}`,
+        odd: estimateExactScoreOdd(scoreH, scoreA),
+        category: 'Score',
+      };
+    }
+    if (key === 'exact-custom') {
+      return {
+        label: `Score exact : ${eHome}–${eAway}`,
+        odd: estimateExactScoreOdd(eHome, eAway),
+        category: 'Score',
+      };
+    }
+    return { label: `Vainqueur : ${h}`, odd: '1.85', category: '1X2' };
+  };
+
+  // Liste exhaustive de toutes les suggestions rapides issues des options de pronostique&cote.mp4
+  const allSmartPredictions = useMemo(() => {
+    if (!homeTeam || !awayTeam) return [];
+    return [
+      // Total pair (FIFA & Football)
+      { label: 'Total pair. Oui', odd: '1.92', key: 'tp-oui', category: 'Total pair' as const, badge: 'Oui' },
+      { label: 'Total pair. Non', odd: '1.92', key: 'tp-non', category: 'Total pair' as const, badge: 'Non' },
+      { label: 'Individuel Total 1 Pair. Oui', odd: '1.91', key: 'it1p-oui', category: 'Total pair' as const },
+      { label: 'Individuel Total 1 Pair. Non', odd: '1.9', key: 'it1p-non', category: 'Total pair' as const },
+      { label: 'Individuel Total 2 Pair. Oui', odd: '1.93', key: 'it2p-oui', category: 'Total pair' as const },
+      { label: 'Individuel Total 2 Pair. Non', odd: '1.88', key: 'it2p-non', category: 'Total pair' as const },
+
+      // 1X2 & 1X2 (2UP)
+      { label: `Vainqueur : ${homeTeam}`, odd: '1.85', key: '1', category: '1X2' as const, badge: '1' },
+      { label: 'Match nul (X)', odd: '3.40', key: 'X', category: '1X2' as const, badge: 'X' },
+      { label: `Vainqueur : ${awayTeam}`, odd: '3.90', key: '2', category: '1X2' as const, badge: '2' },
+      { label: '1X2. V1', odd: '1.565', key: 'fifa-1x2-v1', category: '1X2' as const, badge: 'V1' },
+      { label: '1X2. X', odd: '9.05', key: 'fifa-1x2-x', category: '1X2' as const, badge: 'X' },
+      { label: '1X2. V2', odd: '3.015', key: 'fifa-1x2-v2', category: '1X2' as const, badge: 'V2' },
+      { label: 'Temps réglementaire, 1X2: V1', odd: '3.075', key: 'tr-1x2-v1', category: '1X2' as const },
+      { label: 'Temps réglementaire, 1X2: X', odd: '3.92', key: 'tr-1x2-x', category: '1X2' as const },
+      { label: 'Temps réglementaire, 1X2: V2', odd: '2.167', key: 'tr-1x2-v2', category: '1X2' as const },
+      { label: '1X2 (2UP). V1', odd: '3.03', key: '2up-v1', category: '1X2' as const },
+      { label: '1X2 (2UP). Match nul', odd: '3.92', key: '2up-x', category: '1X2' as const },
+      { label: '1X2 (2UP). V2', odd: '2.137', key: '2up-v2', category: '1X2' as const },
+
+      // Double chance
+      { label: `1X (${homeTeam} ou Nul)`, odd: '1.25', key: '1X', category: 'Double chance' as const, badge: '1X' },
+      { label: `12 (${homeTeam} ou ${awayTeam})`, odd: '1.30', key: '12', category: 'Double chance' as const, badge: '12' },
+      { label: `X2 (Nul ou ${awayTeam})`, odd: '1.85', key: 'X2', category: 'Double chance' as const, badge: 'X2' },
+      { label: 'Double chance. 1X', odd: '1.38', key: 'dc-1x', category: 'Double chance' as const },
+      { label: 'Double chance. 12', odd: '1.08', key: 'dc-12', category: 'Double chance' as const },
+      { label: 'Double chance. 2X', odd: '2.501', key: 'dc-2x', category: 'Double chance' as const },
+      { label: 'Double Chance + Les deux équipes vont marquer. 1X et Oui', odd: '2.31', key: 'dc-btts-1x-o', category: 'Double chance' as const },
+      { label: 'Double Chance + Les deux équipes vont marquer. 12 et Oui', odd: '1.87', key: 'dc-btts-12-o', category: 'Double chance' as const },
+      { label: 'Double Chance + Les deux équipes vont marquer. 2X et Oui', odd: '1.96', key: 'dc-btts-2x-o', category: 'Double chance' as const },
+
+      // Total (Football & FIFA)
+      { label: 'Total. Plus de (1.5)', odd: '1.153', key: 'tot-o-1.5', category: 'Total' as const },
+      { label: 'Total. Moins de (1.5)', odd: '5.35', key: 'tot-u-1.5', category: 'Total' as const },
+      { label: 'Total. Plus de (2.5)', odd: '1.522', key: 'tot-o-2.5', category: 'Total' as const },
+      { label: 'Total. Moins de (2.5)', odd: '2.536', key: 'tot-u-2.5', category: 'Total' as const },
+      { label: 'Total. Plus de (3.5)', odd: '2.288', key: 'tot-o-3.5', category: 'Total' as const },
+      { label: 'Total. Moins de (3.5)', odd: '1.625', key: 'tot-u-3.5', category: 'Total' as const },
+      { label: 'Total. Plus de (4.5)', odd: '3.83', key: 'tot-o-4.5', category: 'Total' as const },
+      { label: 'Total. Moins de (4.5)', odd: '1.265', key: 'tot-u-4.5', category: 'Total' as const },
+      { label: 'Total. Plus de (8.5)', odd: '1.31', key: 'fifa-tot-o-8.5', category: 'Total' as const },
+      { label: 'Total. Moins de (8.5)', odd: '3.25', key: 'fifa-tot-u-8.5', category: 'Total' as const },
+      { label: 'Total. Plus de (9.5)', odd: '1.56', key: 'fifa-tot-o-9.5', category: 'Total' as const },
+      { label: 'Total. Moins de (9.5)', odd: '2.31', key: 'fifa-tot-u-9.5', category: 'Total' as const },
+      { label: 'Total. Plus de (10.5)', odd: '1.9', key: 'fifa-tot-o-10.5', category: 'Total' as const },
+      { label: 'Total. Moins de (10.5)', odd: '1.83', key: 'fifa-tot-u-10.5', category: 'Total' as const },
+      { label: 'Total. Plus de (11.5)', odd: '2.45', key: 'fifa-tot-o-11.5', category: 'Total' as const },
+      { label: 'Total. Moins de (11.5)', odd: '1.5', key: 'fifa-tot-u-11.5', category: 'Total' as const },
+      { label: 'Total 1. Plus de (1.5)', odd: '2.24', key: 't1-o-1.5', category: 'Total' as const },
+      { label: 'Total 1. Moins de (1.5)', odd: '1.65', key: 't1-u-1.5', category: 'Total' as const },
+      { label: 'Total 2. Plus de (1.5)', odd: '1.8', key: 't2-o-1.5', category: 'Total' as const },
+      { label: 'Total 2. Moins de (1.5)', odd: '2.01', key: 't2-u-1.5', category: 'Total' as const },
+      { label: 'Total Asiatique. Plus de (2.75)', odd: '1.66', key: 'ta-o-2.75', category: 'Total' as const },
+      { label: 'Total Asiatique. Moins de (2.75)', odd: '2.215', key: 'ta-u-2.75', category: 'Total' as const },
+
+      // Buts, BTTS, Résultat + Total, Mi-temps
+      { label: 'Deux équipes vont marquer - Oui', odd: '1.46', key: 'btts-oui', category: 'Buts' as const },
+      { label: 'Deux équipes vont marquer - Non', odd: '2.578', key: 'btts-non', category: 'Buts' as const },
+      { label: 'Chaque Equipe va marquer (2) Ou Plus - Oui', odd: '3.98', key: 'btts2-oui', category: 'Buts' as const },
+      { label: 'Chaque Equipe va marquer (2) Ou Plus - Non', odd: '1.22', key: 'btts2-non', category: 'Buts' as const },
+      { label: '1X2 + Chaque équipe va marquer. V1 et Oui', odd: '4.85', key: '1x2-btts-v1-o', category: 'Buts' as const },
+      { label: '1X2 + Chaque équipe va marquer. V2 et Oui', odd: '3.6', key: '1x2-btts-v2-o', category: 'Buts' as const },
+      { label: '1, Résultat + Total. V1 et TPlus de (2.5) - Oui', odd: '4.1', key: 'r1t-2.5-o', category: 'Buts' as const },
+      { label: '2, Résultat + Total. V2 et TPlus de (2.5) - Oui', odd: '2.91', key: 'r2t-2.5-o', category: 'Buts' as const },
+      { label: 'Prochain but. Equipe 1 (1)', odd: '2.11', key: 'nb-1-e1', category: 'Buts' as const },
+      { label: 'Prochain but. Equipe 2 (1)', odd: '1.77', key: 'nb-1-e2', category: 'Buts' as const },
+      { label: 'Comment le but sera marqué. But (1) Coup de pied', odd: '1.45', key: 'hgs-1', category: 'Buts' as const },
+      { label: 'Comment le but sera marqué. But (1) Tête', odd: '5.5', key: 'hgs-2', category: 'Buts' as const },
+      { label: 'But dans chaque mi-temps - Oui', odd: '1.49', key: 'gih-oui', category: 'Buts' as const },
+      { label: 'Score dans chaque mi-temps. 1>2', odd: '3.15', key: 'seh-12', category: 'Buts' as const },
+      { label: 'Score dans chaque mi-temps. 1<2', odd: '2.04', key: 'seh-21', category: 'Buts' as const },
+      { label: 'MT-Fin. V1V1', odd: '4.9', key: 'htft-11', category: 'Buts' as const },
+      { label: 'MT-Fin. V2V2', odd: '3.34', key: 'htft-22', category: 'Buts' as const },
+
+      // Handicap
+      { label: 'Handicap 1 (0)', odd: '2.312', key: 'hc-1-0', category: 'Handicap' as const },
+      { label: 'Handicap 2 (0)', odd: '1.615', key: 'hc-2-0', category: 'Handicap' as const },
+      { label: 'Handicap 1 (-1.5)', odd: '5.72', key: 'hc-1--1.5', category: 'Handicap' as const },
+      { label: 'Handicap 2 (+1.5)', odd: '1.142', key: 'hc-2-+1.5', category: 'Handicap' as const },
+      { label: 'Handicap 1 (+1.5)', odd: '1.318', key: 'hc-1-+1.5', category: 'Handicap' as const },
+      { label: 'Handicap 2 (-1.5)', odd: '3.44', key: 'hc-2--1.5', category: 'Handicap' as const },
+      { label: 'Handicap Européen. (0:1) V1', odd: '6.05', key: 'eh-01-v1', category: 'Handicap' as const },
+      { label: 'Handicap Européen. (1:0) V2', odd: '3.68', key: 'eh-10-v2', category: 'Handicap' as const },
+
+      // Score Exact directement dans les pronostics rapides !
+      { label: `Score exact : 1–0`, odd: '6.50', key: 'cs-1-0', category: 'Score' as const, scoreHome: 1, scoreAway: 0 },
+      { label: `Score exact : 2–0`, odd: '8.00', key: 'cs-2-0', category: 'Score' as const, scoreHome: 2, scoreAway: 0 },
+      { label: `Score exact : 2–1`, odd: '8.50', key: 'cs-2-1', category: 'Score' as const, scoreHome: 2, scoreAway: 1 },
+      { label: `Score exact : 3–0`, odd: '13.00', key: 'cs-3-0', category: 'Score' as const, scoreHome: 3, scoreAway: 0 },
+      { label: `Score exact : 3–1`, odd: '13.00', key: 'cs-3-1', category: 'Score' as const, scoreHome: 3, scoreAway: 1 },
+      { label: `Score exact : 1–1`, odd: '6.00', key: 'cs-1-1', category: 'Score' as const, scoreHome: 1, scoreAway: 1 },
+      { label: `Score exact : 0–0`, odd: '9.00', key: 'cs-0-0', category: 'Score' as const, scoreHome: 0, scoreAway: 0 },
+      { label: `Score exact : 2–2`, odd: '13.00', key: 'cs-2-2', category: 'Score' as const, scoreHome: 2, scoreAway: 2 },
+      { label: `Score exact : 0–1`, odd: '9.50', key: 'cs-0-1', category: 'Score' as const, scoreHome: 0, scoreAway: 1 },
+      { label: `Score exact : 0–2`, odd: '15.00', key: 'cs-0-2', category: 'Score' as const, scoreHome: 0, scoreAway: 2 },
+      { label: `Score exact : 1–2`, odd: '11.00', key: 'cs-1-2', category: 'Score' as const, scoreHome: 1, scoreAway: 2 },
+      { label: `Score exact : 1–3`, odd: '23.00', key: 'cs-1-3', category: 'Score' as const, scoreHome: 1, scoreAway: 3 },
+    ];
+  }, [homeTeam, awayTeam]);
+
+  // Suggestions filtrées selon l'onglet actif
+  const smartPredictions = useMemo(() => {
+    if (quickPredFilter === 'Tous') return allSmartPredictions;
+    return allSmartPredictions.filter((item) => item.category === quickPredFilter);
+  }, [allSmartPredictions, quickPredFilter]);
+
+  // Score exact : sélecteur personnalisé (buts Domicile / Extérieur)
+  const [exactHome, setExactHome] = useState(0);
+  const [exactAway, setExactAway] = useState(0);
+
+  const exactScoreLabel = (h: number, a: number) => `Score exact : ${h}–${a}`;
+
+  const applyExactScore = (h: number, a: number) => {
+    setExactHome(h);
+    setExactAway(a);
+    setSelectedCategory('Score');
+    const chipKey = `cs-${h}-${a}`;
+    setSelectedPredKey(chipKey);
+    setSelectedOptionLabel(exactScoreLabel(h, a));
+    setOdd(estimateExactScoreOdd(h, a));
+  };
+
+  const handleSelectQuickPrediction = (pred: {
+    key: string;
+    label: string;
+    odd: string;
+    category: string;
+    scoreHome?: number;
+    scoreAway?: number;
+  }) => {
+    setSelectedPredKey(pred.key);
+    setSelectedOptionLabel(pred.label);
+    setOdd(pred.odd);
+    setSelectedCategory(pred.category === 'Score' ? 'Score' : 'Résultat');
+    if (pred.scoreHome !== undefined && pred.scoreAway !== undefined) {
+      setExactHome(pred.scoreHome);
+      setExactAway(pred.scoreAway);
+    }
+  };
+
+  // Synchronise et adapte l'intitulé du pronostic personnalisé et la cote
+  // automatiquement avec le pronostic rapide suggéré quand les équipes changent
+  useEffect(() => {
+    if (!homeTeam) return;
+
+    if (selectedPredKey && selectedPredKey !== 'custom') {
+      const details = getQuickPredictionDetails(
+        selectedPredKey,
+        homeTeam,
+        awayTeam,
+        exactHome,
+        exactAway
+      );
+      if (details.label !== selectedOptionLabel) {
+        setSelectedOptionLabel(details.label);
+      }
+      if (details.odd && (!odd || ['1', '2', '1X', '12', 'X2'].includes(selectedPredKey))) {
+        setOdd(details.odd);
+      }
+    } else if (!selectedOptionLabel) {
+      // Si aucun pronostic n'est saisi, adapter au premier pronostic suggéré (Vainqueur Domicile)
+      setSelectedPredKey('1');
+      setSelectedOptionLabel(`Vainqueur : ${homeTeam}`);
+      setOdd('1.85');
+    }
+  }, [homeTeam, awayTeam, selectedPredKey, exactHome, exactAway]);
+
+  // Calculs dynamiques de cotes
   const totalOdds = addedEvents.reduce((acc, ev) => acc * (ev.odd || 1), 1);
   const numericStake = parseFloat(stake) || 0;
   const potentialPayout = addedEvents.length > 0 ? Math.round(numericStake * totalOdds) : 0;
+
+  // Sélection d'un championnat
+  const handleSelectLeague = (item: { id: string; name: string; logo?: string; country?: string }) => {
+    setSelectedLeague(item.name);
+    setSelectedLeagueId(item.id);
+    setSelectedLeagueLogo(item.logo || resolveCompetitionLogo(item.name) || '');
+    if (item.country) setSelectedLeagueCountry(item.country);
+    const upper = (item.name || '').toUpperCase();
+    const idLower = (item.id || '').toLowerCase();
+    if (
+      leagueCategory === 'fifa' ||
+      upper.includes('FIFA') ||
+      upper.includes('FC ') ||
+      idLower.includes('fifa') ||
+      idLower.includes('fc2')
+    ) {
+      setIsLiveBadge(true);
+    }
+  };
+
+  // Attribution d'une équipe en 1 tap
+  const handleAssignTeam = (team: TeamItem) => {
+    const logo = team.logo || resolveTeamLogo(team.name) || makeAvatarLogo(team.name);
+    if (activeSlot === 'home') {
+      setHomeTeam(team.name);
+      setHomeTeamLogo(logo);
+      setActiveSlot('away'); // Passe automatiquement au slot Extérieur
+    } else {
+      setAwayTeam(team.name);
+      setAwayTeamLogo(logo);
+    }
+  };
+
+  // Inverser Domicile et Extérieur en 1 tap
+  const handleSwapTeams = () => {
+    const tempName = homeTeam;
+    const tempLogo = homeTeamLogo;
+    setHomeTeam(awayTeam);
+    setHomeTeamLogo(awayTeamLogo);
+    setAwayTeam(tempName);
+    setAwayTeamLogo(tempLogo);
+  };
+
+  // Création d'un championnat personnalisé
+  const handleSaveCustomLeague = () => {
+    if (!newLeagueName.trim()) {
+      Alert.alert('Nom requis', 'Veuillez saisir le nom du championnat.');
+      return;
+    }
+    const newId = `custo-${Date.now()}`;
+    const newLeague = {
+      id: newId,
+      name: newLeagueName.trim(),
+      sport: newLeagueSport || 'Football',
+      country: newLeagueCountry.trim() || 'Personnalisé',
+      icon: 'trophy',
+      logo: makeAvatarLogo(newLeagueName.trim(), '1E293B', '38BDF8'),
+      category: 'custom',
+    };
+    addCustomLeague(newLeague);
+    setSelectedLeague(newLeague.name);
+    setSelectedLeagueId(newLeague.id);
+    setSelectedLeagueLogo(newLeague.logo);
+    setSelectedLeagueCountry(newLeague.country);
+    setLeagueCategory('custom');
+    setCreateLeagueModalVisible(false);
+    setNewLeagueName('');
+    setNewLeagueCountry('');
+    Alert.alert('Championnat Créé', `"${newLeague.name}" est maintenant actif dans le Studio.`);
+  };
+
+  // Création d'une équipe personnalisée dans le championnat actif
+  const handleSaveCustomTeam = () => {
+    if (!selectedLeague) {
+      Alert.alert('Championnat requis', 'Sélectionnez d’abord un championnat pour y rattacher l’équipe.');
+      return;
+    }
+    if (!newTeamName.trim()) {
+      Alert.alert('Nom requis', 'Veuillez saisir le nom de l’équipe.');
+      return;
+    }
+    const newId = `team-custo-${Date.now()}`;
+    const logo = newTeamLogo.trim() || makeAvatarLogo(newTeamName.trim(), '243DB5', 'FFFFFF');
+    const newTeam = {
+      id: newId,
+      leagueId: selectedLeagueId || selectedLeague,
+      name: newTeamName.trim(),
+      shortName: newTeamShort.trim().toUpperCase() || undefined,
+      logo,
+      country: selectedLeagueCountry || 'Personnalisé',
+    };
+    addCustomTeam(newTeam);
+    // Attribuer automatiquement au slot actif
+    if (activeSlot === 'home') {
+      setHomeTeam(newTeam.name);
+      setHomeTeamLogo(logo);
+      setActiveSlot('away');
+    } else {
+      setAwayTeam(newTeam.name);
+      setAwayTeamLogo(logo);
+    }
+    setCreateTeamModalVisible(false);
+    setNewTeamName('');
+    setNewTeamShort('');
+    setNewTeamLogo('');
+  };
 
   const handleAddEvent = () => {
     if (!selectedLeague) {
       Alert.alert('Championnat requis', 'Veuillez sélectionner un championnat avant d’ajouter.');
       return;
     }
-    const numericOdd = parseFloat(odd) || 1.0;
+    if (!homeTeam || !awayTeam) {
+      Alert.alert('Équipes requises', 'Veuillez définir les équipes Domicile et Extérieur.');
+      return;
+    }
+    const numericOdd = parseFloat(odd) || 1.85;
     const isFifa =
-      sourceType === 'FIFA' ||
+      leagueCategory === 'fifa' ||
       selectedLeague.toUpperCase().includes('FIFA') ||
       selectedLeague.toUpperCase().includes('FC ') ||
       selectedLeagueId.toLowerCase().includes('fifa') ||
       selectedLeagueId.toLowerCase().includes('fc2');
     const finalTime = matchTime.trim() || getCurrentTimeFormatted();
     const finalDate = matchDate.trim() || getCurrentDateFormatted();
-    const eventTimestamp = formatBetDate(`${finalDate} (${finalTime})`);
+    const selectedDateTime = combineDateAndTime(finalDate, finalTime);
 
     const newEv: MatchEvent = {
       id: String(Date.now()),
       sport: isFifa ? 'FIFA' : 'Football',
       league: selectedLeague,
-      date: eventTimestamp,
+      date: selectedDateTime.formatted,
+      startDate: selectedDateTime.toISOString(),
+      matchTime: finalTime,
+      matchDate: finalDate,
       homeTeam: { name: homeTeam, logo: homeTeamLogo },
       awayTeam: { name: awayTeam, logo: awayTeamLogo },
-      prediction: selectedOptionLabel,
+      prediction: selectedOptionLabel || `Vainqueur : ${homeTeam}`,
       odd: numericOdd,
-      actualScore: isLiveBadge ? '1-1' : undefined,
+      actualScore: undefined,
       status: 'Accepté',
-      isLive: isLiveBadge,
+      isLive: isFifa ? true : isLiveBadge,
+      isFifa,
       gameCategory: 'sports',
     };
     setAddedEvents([...addedEvents, newEv]);
+    Alert.alert('Événement Ajouté', `${homeTeam} vs ${awayTeam} ajouté au coupon.`);
   };
 
   const handleRemoveEvent = (id: string) => {
@@ -131,32 +810,97 @@ export default function StudioCreationScreen({ navigation }: any) {
   };
 
   const handleSaveCoupon = () => {
-    if (addedEvents.length === 0) {
+    const finalPlacedTime = placedTime.trim() || getCurrentTimeFormatted();
+    const finalPlacedDate = placedDate.trim() || getCurrentDateFormatted();
+    const placedDateTime = combineDateAndTime(finalPlacedDate, finalPlacedTime);
+
+    const finalTime = matchTime.trim() || getCurrentTimeFormatted();
+    const finalDate = matchDate.trim() || getCurrentDateFormatted();
+    const selectedDateTime = combineDateAndTime(finalDate, finalTime);
+    const matchTimestamp = selectedDateTime.formatted;
+    const matchIso = selectedDateTime.toISOString();
+
+    let eventsToSave = [...addedEvents];
+
+    // Ajout automatique uniquement si le formulaire est entièrement rempli (aucun événement fictif)
+    if (eventsToSave.length === 0 && selectedLeague && homeTeam && awayTeam) {
+      const numericOdd = parseFloat(odd) || 1.85;
+      const isFifa =
+        leagueCategory === 'fifa' ||
+        selectedLeague.toUpperCase().includes('FIFA') ||
+        selectedLeague.toUpperCase().includes('FC ') ||
+        selectedLeagueId.toLowerCase().includes('fifa') ||
+        selectedLeagueId.toLowerCase().includes('fc2');
+      const autoEv: MatchEvent = {
+        id: String(Date.now()),
+        sport: isFifa ? 'FIFA' : 'Football',
+        league: selectedLeague || 'Football',
+        date: matchTimestamp,
+        startDate: matchIso,
+        matchTime: finalTime,
+        matchDate: finalDate,
+        homeTeam: { name: homeTeam, logo: homeTeamLogo },
+        awayTeam: { name: awayTeam, logo: awayTeamLogo },
+        prediction: selectedOptionLabel || `Vainqueur : ${homeTeam}`,
+        odd: numericOdd,
+        actualScore: undefined,
+        status: 'Accepté',
+        isLive: isFifa ? true : isLiveBadge,
+        isFifa,
+        gameCategory: 'sports',
+      };
+      eventsToSave = [autoEv];
+      setAddedEvents(eventsToSave);
+    }
+
+    if (eventsToSave.length === 0) {
       Alert.alert('Attention', 'Ajoute au moins un événement pour sauvegarder le coupon.');
       return;
     }
 
     const finalId = customId.trim() !== '' ? customId.trim() : generateCouponId();
-    const finalTime = matchTime.trim() || getCurrentTimeFormatted();
-    const finalDate = matchDate.trim() || getCurrentDateFormatted();
-    const hasLive = isLiveBadge || addedEvents.some((e) => e.isLive);
+    const hasLive =
+      isLiveBadge || eventsToSave.some((e) => e.isLive || e.isFifa || e.sport === 'FIFA');
+    const calculatedOdds = eventsToSave.reduce((acc, ev) => acc * (ev.odd || 1), 1);
+    const calculatedPayout = Math.round(numericStake * calculatedOdds);
 
     const newCoupon: BetSlip = {
       id: finalId,
-      createdAt: formatBetDate(`${finalDate} (${finalTime})`),
-      type: addedEvents.length > 1 ? 'Combiné' : 'Simple',
-      eventsCount: addedEvents.length,
+      createdAt: placedDateTime.formatted,
+      startDate: matchIso,
+      matchTime: finalTime,
+      matchDate: finalDate,
+      type: eventsToSave.length > 1 ? 'Combiné' : 'Simple',
+      eventsCount: eventsToSave.length,
       completedCount: 0,
-      totalOdds: Math.round(totalOdds * 100) / 100,
+      totalOdds: Math.round(calculatedOdds * 100) / 100,
       stake: numericStake,
-      potentialPayout: potentialPayout,
+      potentialPayout: calculatedPayout,
       status: 'Accepté',
       isLive: hasLive,
-      events: addedEvents.map((ev) => ({
-        ...ev,
-        status: 'Accepté' as const,
-        isLive: isLiveBadge ? true : ev.isLive,
-      })),
+      events: eventsToSave.map((ev) => {
+        const evTime = eventsToSave.length === 1 || !ev.matchTime ? finalTime : ev.matchTime;
+        const evDateStr = eventsToSave.length === 1 || !ev.matchDate ? finalDate : ev.matchDate;
+        const evDateTime = combineDateAndTime(evDateStr, evTime);
+        const evDate = eventsToSave.length === 1 || !ev.date ? evDateTime.formatted : ev.date;
+        const evStartDate = eventsToSave.length === 1 || !ev.startDate ? evDateTime.toISOString() : ev.startDate;
+        const evIsFifa = Boolean(
+          ev.isFifa ||
+            ev.sport === 'FIFA' ||
+            (ev.league && (ev.league.toUpperCase().includes('FIFA') || ev.league.toUpperCase().includes('FC ')))
+        );
+
+        return {
+          ...ev,
+          date: evDate,
+          startDate: evStartDate,
+          matchTime: evTime,
+          matchDate: evDateStr,
+          status: 'Accepté' as const,
+          isFifa: evIsFifa,
+          isLive: evIsFifa || isLiveBadge ? true : ev.isLive,
+        };
+      }),
       isForSale: enableCashout,
       cashoutAmount: Math.round(numericStake * 0.95),
       shareCode: generateShareCode(),
@@ -180,15 +924,52 @@ export default function StudioCreationScreen({ navigation }: any) {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={Platform.OS === 'android'} />
-      {/* Header Bar */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+  if (!hasAccess) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Ionicons name="lock-closed" size={56} color="#EF4444" />
+        <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
+          Accès restreint
+        </Text>
+        <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 8, marginBottom: 24 }}>
+          Votre compte n'a pas l'autorisation d'accéder au Studio Match & FIFA. Veuillez contacter votre administrateur.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ backgroundColor: '#EF4444', paddingVertical: 12, paddingHorizontal: 28, borderRadius: 10 }}
+          activeOpacity={0.8}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Retour</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Studio de création</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+      {/* Header Bar */}
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground,
+            borderBottomColor: currentTheme.border,
+          },
+        ]}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <BackArrowIcon size={24} color={currentTheme.textPrimary} />
+        </TouchableOpacity>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={[styles.headerTitle, { color: currentTheme.textPrimary }]}>
+            Studio de création
+          </Text>
+          <Text style={[styles.headerSub, { color: currentTheme.textSecondary }]}>
+            Championnats, Équipes & Coupons
+          </Text>
+        </View>
         <View style={{ width: 24 }} />
       </View>
 
@@ -199,14 +980,16 @@ export default function StudioCreationScreen({ navigation }: any) {
             <MaterialCommunityIcons name="ticket-percent-outline" size={24} color={Colors.primaryAccent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.bannerTitle}>Création guidée</Text>
-            <Text style={styles.bannerSubtitle}>ID, équipes, mise et résumé dans un seul parcours.</Text>
+            <Text style={styles.bannerTitle}>Création Pro & Hiérarchie Équipes</Text>
+            <Text style={styles.bannerSubtitle}>
+              Sélectionnez un championnat pour charger et configurer ses équipes en 1 clic.
+            </Text>
           </View>
         </View>
 
         {/* Section 1 : IDENTITÉ */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>IDENTITÉ</Text>
+          <Text style={styles.cardSectionTitle}>IDENTITÉ DU TICKET</Text>
           <Text style={styles.fieldLabel}>ID personnalisé optionnel</Text>
           <TextInput
             style={styles.input}
@@ -216,37 +999,60 @@ export default function StudioCreationScreen({ navigation }: any) {
             keyboardType="numeric"
           />
           <Text style={styles.helperText}>
-            11 chiffres, commence par 85. Vide = numéro généré automatiquement. Le code partageable reste séparé.
+            11 chiffres, commence par 85. Vide = numéro généré automatiquement.
           </Text>
 
-          {/* Checkbox 1 */}
-          <TouchableOpacity
-            style={styles.checkboxRow}
-            onPress={() => setHasCustomBadge(!hasCustomBadge)}
-          >
-            <Ionicons
-              name={hasCustomBadge ? 'checkbox' : 'square-outline'}
-              size={20}
-              color={hasCustomBadge ? Colors.primaryAccent : Colors.textSubtle}
-            />
-            <Text style={styles.checkboxLabel}>Ajouter un badge au coupon</Text>
-          </TouchableOpacity>
+          {/* Checkboxes */}
+          <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
+            <TouchableOpacity style={styles.checkboxRow} onPress={() => setHasCustomBadge(!hasCustomBadge)}>
+              <Ionicons
+                name={hasCustomBadge ? 'checkbox' : 'square-outline'}
+                size={20}
+                color={hasCustomBadge ? Colors.primaryAccent : Colors.textSubtle}
+              />
+              <Text style={styles.checkboxLabel}>Badge coupon</Text>
+            </TouchableOpacity>
 
-          {/* Checkbox 2 (Badge En Direct) */}
-          <TouchableOpacity style={styles.checkboxRow} onPress={() => setIsLiveBadge(!isLiveBadge)}>
-            <Ionicons
-              name={isLiveBadge ? 'checkbox' : 'square-outline'}
-              size={20}
-              color={isLiveBadge ? Colors.primaryAccent : Colors.textSubtle}
-            />
-            <Text style={styles.checkboxLabel}>
-              <Text style={{ color: Colors.liveRed }}>• </Text>Badge « En direct » sur le match
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.checkboxRow} onPress={() => setIsLiveBadge(!isLiveBadge)}>
+              <Ionicons
+                name={isLiveBadge ? 'checkbox' : 'square-outline'}
+                size={20}
+                color={isLiveBadge ? Colors.primaryAccent : Colors.textSubtle}
+              />
+              <Text style={styles.checkboxLabel}>
+                <Text style={{ color: Colors.liveRed }}>• </Text>Badge En Direct
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-          {/* Sélection de l'Heure et Date du match */}
-          <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border }}>
-            <Text style={[styles.fieldLabel, { marginBottom: 6 }]}>Horodatage du match</Text>
+          {/* Horodatage de mise du coupon (Header financier & Historique) */}
+          <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
+            <Text style={[styles.fieldLabel, { marginBottom: 6 }]}>Heure de mise du coupon (Header & Historique)</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.helperText, { marginTop: 0, marginBottom: 4 }]}>Heure de mise (HH:mm)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ex: 14:30"
+                  value={placedTime}
+                  onChangeText={setPlacedTime}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.helperText, { marginTop: 0, marginBottom: 4 }]}>Date de mise (JJ.MM.AAAA)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ex: 21.10.2026"
+                  value={placedDate}
+                  onChangeText={setPlacedDate}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Horodatage du match */}
+          <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
+            <Text style={[styles.fieldLabel, { marginBottom: 6 }]}>Horodatage du match (Début du match)</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.helperText, { marginTop: 0, marginBottom: 4 }]}>Heure (HH:mm)</Text>
@@ -267,15 +1073,21 @@ export default function StudioCreationScreen({ navigation }: any) {
                 />
               </View>
             </View>
-            <Text style={styles.helperText}>
-              Pré-rempli avec l'heure actuelle. Affiché sur le ticket : {matchDate || getCurrentDateFormatted()} ({matchTime || getCurrentTimeFormatted()}).
-            </Text>
           </View>
         </View>
 
-        {/* Section 2 : ÉVÉNEMENT */}
+        {/* Section 2 : CHAMPIONNATS & ÉQUIPES STRUCTURÉS */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>ÉVÉNEMENT</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <Text style={styles.cardSectionTitle}>CHAMPIONNATS & ÉQUIPES</Text>
+            <TouchableOpacity
+              style={styles.newLeagueTopBtn}
+              onPress={() => setCreateLeagueModalVisible(true)}
+            >
+              <Ionicons name="add-circle" size={16} color={Colors.primary} />
+              <Text style={styles.newLeagueTopBtnText}>+ Championnat</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Bouton d'importation directe API-Football */}
           <TouchableOpacity
@@ -284,138 +1096,115 @@ export default function StudioCreationScreen({ navigation }: any) {
             onPress={() => setLiveModalVisible(true)}
           >
             <View style={styles.apiFootballIconWrap}>
-              <MaterialCommunityIcons name="soccer" size={22} color="#FFFFFF" />
+              <MaterialCommunityIcons name="soccer" size={20} color="#FFFFFF" />
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.apiFootballCardTitle}>API-Football Direct & Cotes</Text>
+                <Text style={styles.apiFootballCardTitle}>API-Football Temps Réel</Text>
                 <View style={styles.apiFootballLiveTag}>
-                  <Text style={styles.apiFootballLiveTagText}>TEMPS RÉEL</Text>
+                  <Text style={styles.apiFootballLiveTagText}>DIRECT</Text>
                 </View>
               </View>
               <Text style={styles.apiFootballCardSubtitle}>
-                Importer un match en direct avec logos officiels et cotes en 1 clic
+                Importer un match en direct avec logos et cotes officielles
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
+            <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
           </TouchableOpacity>
 
-          {/* Source Filter */}
-          <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Source</Text>
-            <View style={styles.pillGroup}>
-              {(['Tout', 'FIFA', 'Original'] as const).map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.pill, sourceType === s && styles.pillActive]}
-                  onPress={() => setSourceType(s)}
-                >
-                  <Text style={[styles.pillText, sourceType === s && styles.pillTextActive]}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Championnat Toggle */}
-          <View style={[styles.toggleRow, { marginTop: 10 }]}>
-            <Text style={styles.toggleLabel}>Championnat</Text>
-            <View style={styles.pillGroup}>
-              {(['Base', 'Custo'] as const).map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.pill, champType === c && styles.pillActive]}
-                  onPress={() => setChampType(c)}
-                >
-                  <Text style={[styles.pillText, champType === c && styles.pillTextActive]}>{c}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Sélecteur Cliquable pour Nom du Championnat */}
-          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Nom du championnat</Text>
-          {isManualEntry ? (
-            <TextInput
-              style={styles.input}
-              value={selectedLeague}
-              onChangeText={setSelectedLeague}
-              placeholder="Ex: UEFA Champions League"
-            />
-          ) : (
+          {/* Onglets de Catégories de Championnats */}
+          <Text style={styles.subCategoryTitle}>1. Choisir la catégorie de championnat</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryTabsWrap}>
             <TouchableOpacity
-              style={styles.clickableSelector}
-              activeOpacity={0.8}
-              onPress={() => {
-                setPickerMode('competition');
-                setPickerModalVisible(true);
-              }}
+              style={[styles.categoryTab, leagueCategory === 'real' && styles.categoryTabActive]}
+              onPress={() => setLeagueCategory('real')}
             >
-              {selectedLeagueLogo ? (
-                <Image source={{ uri: selectedLeagueLogo }} style={styles.selectorMiniLogo} resizeMode="contain" />
-              ) : (
-                <View style={styles.selectorPlaceholderIcon}>
-                  <Ionicons name="trophy-outline" size={16} color={Colors.primaryAccent} />
-                </View>
-              )}
-              <Text
-                style={[
-                  styles.selectorText,
-                  !selectedLeague && styles.selectorPlaceholderText,
-                ]}
-                numberOfLines={1}
-              >
-                {selectedLeague || 'Sélectionner un championnat...'}
+              <Text style={styles.categoryTabIcon}>🌍</Text>
+              <Text style={[styles.categoryTabText, leagueCategory === 'real' && styles.categoryTabTextActive]}>
+                Top Ligues
               </Text>
-              {selectedLeague ? (
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedLeague('');
-                    setSelectedLeagueLogo('');
-                    setSelectedLeagueId('');
-                  }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
-                </TouchableOpacity>
-              ) : (
-                <Ionicons name="chevron-down" size={18} color="#94A3B8" />
-              )}
             </TouchableOpacity>
-          )}
 
-          {/* Championnats FIFA rapides si Source === 'FIFA' */}
-          {sourceType === 'FIFA' && (
-            <View style={{ marginTop: 8 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                {FIFA_LEAGUES_LIST.map((fl) => {
+            <TouchableOpacity
+              style={[styles.categoryTab, leagueCategory === 'fifa' && styles.categoryTabActive]}
+              onPress={() => setLeagueCategory('fifa')}
+            >
+              <Text style={styles.categoryTabIcon}>🎮</Text>
+              <Text style={[styles.categoryTabText, leagueCategory === 'fifa' && styles.categoryTabTextActive]}>
+                FIFA & Cyber
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.categoryTab, leagueCategory === 'regions' && styles.categoryTabActive]}
+              onPress={() => setLeagueCategory('regions')}
+            >
+              <Text style={styles.categoryTabIcon}>🦁</Text>
+              <Text style={[styles.categoryTabText, leagueCategory === 'regions' && styles.categoryTabTextActive]}>
+                Sélections & Afrique
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.categoryTab, leagueCategory === 'custom' && styles.categoryTabActive]}
+              onPress={() => setLeagueCategory('custom')}
+            >
+              <Text style={styles.categoryTabIcon}>⭐</Text>
+              <Text style={[styles.categoryTabText, leagueCategory === 'custom' && styles.categoryTabTextActive]}>
+                Personnalisés ({customLeagues.length})
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          {/* Carrousel des Championnats selon Catégorie */}
+          <View style={{ marginVertical: 8 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+              {leagueCategory === 'real' &&
+                TOP_REAL_LEAGUES.map((l) => {
+                  const isSelected = selectedLeague === l.name;
+                  return (
+                    <TouchableOpacity
+                      key={l.id}
+                      style={[styles.leagueChip, isSelected && styles.leagueChipActive]}
+                      activeOpacity={0.75}
+                      onPress={() => handleSelectLeague(l)}
+                    >
+                      <Image source={{ uri: l.logo }} style={styles.leagueChipLogo} resizeMode="contain" />
+                      <View>
+                        <Text style={[styles.leagueChipName, isSelected && styles.leagueChipNameActive]}>
+                          {l.name}
+                        </Text>
+                        <Text style={styles.leagueChipCountry}>{l.country}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+
+              {leagueCategory === 'fifa' &&
+                FIFA_LEAGUES_LIST.map((fl) => {
                   const isSelected = selectedLeague === fl.name || selectedLeagueId === fl.id;
                   const logo = getFifaLeagueLogo(fl.flagType);
                   return (
                     <TouchableOpacity
                       key={fl.id}
-                      style={[
-                        styles.fifaQuickChip,
-                        isSelected && styles.fifaQuickChipActive,
-                      ]}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        setSelectedLeague(fl.name);
-                        setSelectedLeagueId(fl.id);
-                        setSelectedLeagueLogo(logo);
-                        fetchTeamsByLeague(fl.name);
-                      }}
+                      style={[styles.leagueChip, isSelected && styles.leagueChipActive]}
+                      activeOpacity={0.75}
+                      onPress={() =>
+                        handleSelectLeague({
+                          id: fl.id,
+                          name: fl.name,
+                          logo,
+                          country: 'E-Sports',
+                        })
+                      }
                     >
-                      <Image source={{ uri: logo }} style={styles.fifaChipLogo} resizeMode="contain" />
-                      <Text
-                        style={[
-                          styles.fifaChipText,
-                          isSelected && styles.fifaChipTextActive,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {fl.name}
-                      </Text>
+                      <Image source={{ uri: logo }} style={styles.leagueChipLogo} resizeMode="contain" />
+                      <View>
+                        <Text style={[styles.leagueChipName, isSelected && styles.leagueChipNameActive]}>
+                          {fl.name}
+                        </Text>
+                        <Text style={styles.leagueChipCountry}>{fl.category}</Text>
+                      </View>
                       {fl.isNew && (
                         <View style={styles.chipNewBadge}>
                           <Text style={styles.chipNewText}>NEW</Text>
@@ -424,20 +1213,220 @@ export default function StudioCreationScreen({ navigation }: any) {
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
-            </View>
-          )}
 
-          {/* Configuration des Équipes (Domicile VS Extérieur) */}
-          <View style={styles.teamsInputBlock}>
+              {leagueCategory === 'regions' &&
+                AFRICA_AND_REGIONS_LEAGUES.map((l) => {
+                  const isSelected = selectedLeague === l.name;
+                  return (
+                    <TouchableOpacity
+                      key={l.id}
+                      style={[styles.leagueChip, isSelected && styles.leagueChipActive]}
+                      activeOpacity={0.75}
+                      onPress={() => handleSelectLeague(l)}
+                    >
+                      <Image source={{ uri: l.logo }} style={styles.leagueChipLogo} resizeMode="contain" />
+                      <View>
+                        <Text style={[styles.leagueChipName, isSelected && styles.leagueChipNameActive]}>
+                          {l.name}
+                        </Text>
+                        <Text style={styles.leagueChipCountry}>{l.country}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+
+              {leagueCategory === 'custom' && (
+                <>
+                  {customLeagues.map((cl) => {
+                    const isSelected = selectedLeague === cl.name || selectedLeagueId === cl.id;
+                    const logoUrl = cl.logo || makeAvatarLogo(cl.name);
+                    return (
+                      <TouchableOpacity
+                        key={cl.id}
+                        style={[styles.leagueChip, isSelected && styles.leagueChipActive]}
+                        activeOpacity={0.75}
+                        onPress={() =>
+                          handleSelectLeague({
+                            id: cl.id,
+                            name: cl.name,
+                            logo: logoUrl,
+                            country: cl.country,
+                          })
+                        }
+                      >
+                        <Image source={{ uri: logoUrl }} style={styles.leagueChipLogo} resizeMode="contain" />
+                        <View>
+                          <Text style={[styles.leagueChipName, isSelected && styles.leagueChipNameActive]}>
+                            {cl.name}
+                          </Text>
+                          <Text style={styles.leagueChipCountry}>{cl.country || 'Custom'}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <TouchableOpacity
+                    style={styles.addCustomLeagueChip}
+                    onPress={() => setCreateLeagueModalVisible(true)}
+                  >
+                    <Ionicons name="add" size={18} color={Colors.primary} />
+                    <Text style={styles.addCustomLeagueChipText}>Nouveau</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </ScrollView>
+          </View>
+
+          {/* Recherche & Sélecteur Universel */}
+          <TouchableOpacity
+            style={styles.fullCatalogBtn}
+            onPress={() => {
+              setPickerMode('competition');
+              setPickerModalVisible(true);
+            }}
+          >
+            <Ionicons name="search" size={16} color={Colors.primary} />
+            <Text style={styles.fullCatalogBtnText}>Rechercher parmi tous les championnats du monde...</Text>
+            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          </TouchableOpacity>
+
+          {/* Carte Visuelle du Championnat Sélectionné */}
+          <View style={styles.activeLeagueCard}>
+            {selectedLeague ? (
+              <Image
+                source={{ uri: selectedLeagueLogo || makeAvatarLogo(selectedLeague) }}
+                style={styles.activeLeagueLogo}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={[styles.activeLeagueLogo, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }]}>
+                <Ionicons name="trophy-outline" size={20} color="#0284C7" />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.activeLeagueTitle} numberOfLines={1}>
+                {selectedLeague || 'Aucun championnat sélectionné'}
+              </Text>
+              <Text style={styles.activeLeagueMeta}>
+                {selectedLeague
+                  ? `${selectedLeagueCountry ? `${selectedLeagueCountry} • ` : ''}${availableLeagueTeams.length} équipes référencées`
+                  : 'Choisissez un championnat ci-dessus'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.activeLeagueChangeBtn}
+              onPress={() => {
+                setPickerMode('competition');
+                setPickerModalVisible(true);
+              }}
+            >
+              <Text style={styles.activeLeagueChangeBtnText}>Changer</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 2. Hiérarchie Directe : ÉQUIPES DU CHAMPIONNAT ACTIF */}
+          <View style={styles.leagueTeamsContainer}>
+            <View style={styles.leagueTeamsHeader}>
+              <View>
+                <Text style={styles.subCategoryTitle}>2. Équipes du championnat</Text>
+                <Text style={styles.slotHintText}>
+                  Slot actif :{' '}
+                  <Text style={{ fontWeight: '800', color: activeSlot === 'home' ? Colors.primaryAccent : '#EA580C' }}>
+                    {activeSlot === 'home' ? '🏠 Domicile (1)' : '✈️ Extérieur (2)'}
+                  </Text>{' '}
+                  (cliquez sur une équipe pour l'attribuer)
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.addTeamSmallBtn}
+                onPress={() => setCreateTeamModalVisible(true)}
+              >
+                <Ionicons name="add" size={14} color={Colors.primary} />
+                <Text style={styles.addTeamSmallBtnText}>+ Équipe</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingTeams && (
+              <View style={styles.teamsLoadingRow}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+                <Text style={styles.teamsLoadingText}>Chargement des équipes du championnat...</Text>
+              </View>
+            )}
+
+            {/* Grille / Puces des Équipes de ce Championnat */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+            >
+              {availableLeagueTeams.map((team) => {
+                const isHome = homeTeam.toLowerCase() === team.name.toLowerCase();
+                const isAway = awayTeam.toLowerCase() === team.name.toLowerCase();
+                const isAssigned = isHome || isAway;
+
+                return (
+                  <TouchableOpacity
+                    key={team.id}
+                    style={[
+                      styles.teamQuickChip,
+                      isHome && styles.teamQuickChipHome,
+                      isAway && styles.teamQuickChipAway,
+                    ]}
+                    activeOpacity={0.7}
+                    onPress={() => handleAssignTeam(team)}
+                  >
+                    <TeamLogo teamName={team.name} logoUrl={team.logo} size={24} />
+                    <Text
+                      style={[
+                        styles.teamQuickChipText,
+                        isHome && styles.teamQuickChipTextHome,
+                        isAway && styles.teamQuickChipTextAway,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {team.name}
+                    </Text>
+                    {isHome && (
+                      <View style={styles.teamChipBadgeHome}>
+                        <Text style={styles.teamChipBadgeText}>DOM</Text>
+                      </View>
+                    )}
+                    {isAway && (
+                      <View style={styles.teamChipBadgeAway}>
+                        <Text style={styles.teamChipBadgeText}>EXT</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+
+              {availableLeagueTeams.length === 0 && !loadingTeams && (
+                <View style={styles.noTeamsNotice}>
+                  <Text style={styles.noTeamsText}>
+                    {selectedLeague
+                      ? 'Aucune équipe trouvée dans ce championnat.'
+                      : 'Sélectionnez un championnat pour afficher ses équipes.'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.noTeamsAddBtn}
+                    onPress={() => setCreateTeamModalVisible(true)}
+                  >
+                    <Text style={styles.noTeamsAddBtnText}>+ Ajouter une équipe</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+
+          {/* 3. CONFRONTATION MATCHUP (DOMICILE VS EXTÉRIEUR) */}
+          <View style={styles.matchupBlock}>
             <View style={styles.teamsHeaderRow}>
-              <Text style={styles.fieldLabel}>Équipes (Domicile VS Extérieur)</Text>
+              <Text style={styles.subCategoryTitle}>3. Confrontation du match</Text>
               <TouchableOpacity
                 onPress={() => setIsManualEntry(!isManualEntry)}
                 style={styles.toggleManualBtn}
               >
                 <Text style={styles.toggleManualText}>
-                  {isManualEntry ? '📋 Choisir du catalogue' : '✍️ Saisie manuelle'}
+                  {isManualEntry ? '📋 Utiliser le catalogue' : '✍️ Saisie manuelle'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -450,7 +1439,9 @@ export default function StudioCreationScreen({ navigation }: any) {
                   onChangeText={setHomeTeam}
                   placeholder="Équipe Domicile"
                 />
-                <Text style={styles.vsBadgeText}>VS</Text>
+                <TouchableOpacity onPress={handleSwapTeams} style={styles.swapBadgeButton}>
+                  <Text style={styles.vsBadgeText}>⇄ VS</Text>
+                </TouchableOpacity>
                 <TextInput
                   style={[styles.teamInput, { textAlign: 'right' }]}
                   value={awayTeam}
@@ -459,101 +1450,332 @@ export default function StudioCreationScreen({ navigation }: any) {
                 />
               </View>
             ) : (
-              <View style={styles.teamsRowPickers}>
+              <View style={styles.matchupPickersRow}>
                 {/* Sélecteur Domicile */}
                 <TouchableOpacity
-                  style={[styles.teamPickerCard, styles.teamPickerCardHome]}
+                  style={[
+                    styles.matchupSlotCard,
+                    activeSlot === 'home' && styles.matchupSlotCardActiveHome,
+                  ]}
                   activeOpacity={0.8}
-                  onPress={() => {
-                    setPickerMode('team');
-                    setPickingTarget('home');
-                    setPickerModalVisible(true);
-                  }}
+                  onPress={() => setActiveSlot('home')}
                 >
-                  <View style={styles.teamLogoThumbWrap}>
+                  <View style={styles.slotBadgeHome}>
+                    <Text style={styles.slotBadgeText}>1 • DOMICILE</Text>
+                  </View>
+                  <View style={styles.slotLogoWrap}>
                     {homeTeam ? (
-                      <TeamLogo teamName={homeTeam} logoUrl={homeTeamLogo} size={30} />
+                      <TeamLogo teamName={homeTeam} logoUrl={homeTeamLogo} size={36} />
                     ) : (
-                      <Ionicons name="shield-outline" size={18} color={Colors.primary} />
+                      <Ionicons name="shield-outline" size={24} color={Colors.primary} />
                     )}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.teamRoleLabel}>Domicile</Text>
-                    <Text style={styles.teamSelectedName} numberOfLines={1}>
-                      {homeTeam || 'Choisir...'}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+                  <Text style={styles.slotTeamName} numberOfLines={1}>
+                    {homeTeam || 'Choisir...'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.slotActionBtn}
+                    onPress={() => {
+                      setPickerMode('team');
+                      setPickingTarget('home');
+                      setPickerModalVisible(true);
+                    }}
+                  >
+                    <Ionicons name="search" size={12} color={Colors.primary} />
+                    <Text style={styles.slotActionBtnText}>Changer</Text>
+                  </TouchableOpacity>
                 </TouchableOpacity>
 
-                {/* Badge Central VS */}
-                <View style={styles.vsCenterBadge}>
-                  <Text style={styles.vsCenterText}>VS</Text>
-                </View>
+                {/* Bouton Central d'Inversion VS */}
+                <TouchableOpacity
+                  style={styles.vsSwapCircle}
+                  activeOpacity={0.7}
+                  onPress={handleSwapTeams}
+                >
+                  <Ionicons name="swap-horizontal" size={18} color="#FFFFFF" />
+                  <Text style={styles.vsSwapText}>VS</Text>
+                </TouchableOpacity>
 
                 {/* Sélecteur Extérieur */}
                 <TouchableOpacity
-                  style={[styles.teamPickerCard, styles.teamPickerCardAway]}
+                  style={[
+                    styles.matchupSlotCard,
+                    activeSlot === 'away' && styles.matchupSlotCardActiveAway,
+                  ]}
                   activeOpacity={0.8}
-                  onPress={() => {
-                    setPickerMode('team');
-                    setPickingTarget('away');
-                    setPickerModalVisible(true);
-                  }}
+                  onPress={() => setActiveSlot('away')}
                 >
-                  <View style={styles.teamLogoThumbWrap}>
+                  <View style={styles.slotBadgeAway}>
+                    <Text style={styles.slotBadgeText}>2 • EXTÉRIEUR</Text>
+                  </View>
+                  <View style={styles.slotLogoWrap}>
                     {awayTeam ? (
-                      <TeamLogo teamName={awayTeam} logoUrl={awayTeamLogo} size={30} />
+                      <TeamLogo teamName={awayTeam} logoUrl={awayTeamLogo} size={36} />
                     ) : (
-                      <Ionicons name="shield-outline" size={18} color="#EA580C" />
+                      <Ionicons name="shield-outline" size={24} color="#EA580C" />
                     )}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.teamRoleLabel}>Extérieur</Text>
-                    <Text style={styles.teamSelectedName} numberOfLines={1}>
-                      {awayTeam || 'Choisir...'}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-down" size={14} color="#94A3B8" />
+                  <Text style={styles.slotTeamName} numberOfLines={1}>
+                    {awayTeam || 'Choisir...'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.slotActionBtn}
+                    onPress={() => {
+                      setPickerMode('team');
+                      setPickingTarget('away');
+                      setPickerModalVisible(true);
+                    }}
+                  >
+                    <Ionicons name="search" size={12} color="#EA580C" />
+                    <Text style={[styles.slotActionBtnText, { color: '#EA580C' }]}>Changer</Text>
+                  </TouchableOpacity>
                 </TouchableOpacity>
               </View>
             )}
           </View>
 
-          {/* Marché Categories Tabs */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subTabsContainer}>
-            {['Résultat', 'Double chance', 'Score', 'Stats'].map((cat) => (
+          {/* 4. Suggestions de Pronostics Intelligents en 1 Clic */}
+          {Boolean(homeTeam && awayTeam) && (
+            <View style={{ marginTop: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={styles.subCategoryTitle}>4. Pronostics rapides suggérés</Text>
+                <View style={styles.quickPredCountBadge}>
+                  <Text style={styles.quickPredCountText}>{smartPredictions.length} cotes</Text>
+                </View>
+              </View>
+
+              {/* Filtres par type dans les pronostics rapides */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.quickPredFilterRow}
+              >
+                {[
+                  { id: 'Tous', label: 'Tous' },
+                  { id: '1X2', label: '1X2' },
+                  { id: 'Total pair', label: 'Total pair' },
+                  { id: 'Double chance', label: 'Double chance' },
+                  { id: 'Total', label: 'Total' },
+                  { id: 'Buts', label: 'Buts & BTTS' },
+                  { id: 'Handicap', label: 'Handicap' },
+                  { id: 'Score', label: '🎯 Score exact' },
+                ].map((ft) => (
+                  <TouchableOpacity
+                    key={ft.id}
+                    style={[
+                      styles.quickPredFilterPill,
+                      quickPredFilter === ft.id && styles.quickPredFilterPillActive,
+                      ft.id === 'Score' && styles.quickPredFilterPillScore,
+                    ]}
+                    onPress={() => setQuickPredFilter(ft.id as any)}
+                  >
+                    <Text
+                      style={[
+                        styles.quickPredFilterPillText,
+                        quickPredFilter === ft.id && styles.quickPredFilterPillTextActive,
+                      ]}
+                    >
+                      {ft.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Liste horizontale des puces rapides avec Score Exact directement intégré */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginTop: 4 }}>
+                {smartPredictions.map((pred) => {
+                  const isSelected = selectedPredKey === pred.key || selectedOptionLabel === pred.label;
+                  const isScore = pred.category === 'Score';
+
+                  return (
+                    <TouchableOpacity
+                      key={pred.key}
+                      style={[
+                        styles.smartPredChip,
+                        isScore && styles.smartPredChipScore,
+                        isSelected && styles.smartPredChipActive,
+                      ]}
+                      onPress={() => handleSelectQuickPrediction(pred)}
+                    >
+                      {isScore && (
+                        <MaterialCommunityIcons
+                          name="scoreboard-outline"
+                          size={13}
+                          color={isSelected ? Colors.primaryAccent : '#64748B'}
+                          style={{ marginRight: 2 }}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.smartPredLabel,
+                          isSelected && styles.smartPredLabelActive,
+                        ]}
+                      >
+                        {pred.label}
+                      </Text>
+                      <View style={[styles.smartPredOddBadge, isSelected && styles.smartPredOddBadgeActive]}>
+                        <Text style={[styles.smartPredOddText, isSelected && styles.smartPredOddTextActive]}>
+                          {pred.odd}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Score exact */}
+              <View style={styles.exactScoreBox}>
+                <View style={styles.exactScoreHeader}>
+                  <MaterialCommunityIcons name="scoreboard-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.exactScoreTitle}>Score exact</Text>
+                </View>
+
+                {/* Scores fréquents groupés : Victoire Domicile / Nul / Victoire Extérieur */}
+                {EXACT_SCORE_GROUPS.map((group) => (
+                  <View key={group.key} style={styles.exactGroupRow}>
+                    <Text style={[styles.exactGroupLabel, { color: group.color }]} numberOfLines={1}>
+                      {group.key === '1' ? homeTeam : group.key === '2' ? awayTeam : 'Nul'}
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                      {group.scores.map(([h, a]) => {
+                        const chipKey = `cs-${h}-${a}`;
+                        const label = exactScoreLabel(h, a);
+                        const isActive = selectedPredKey === chipKey || selectedOptionLabel === label;
+                        return (
+                          <TouchableOpacity
+                            key={`${h}-${a}`}
+                            style={[
+                              styles.exactScoreChip,
+                              isActive && { borderColor: group.color, backgroundColor: group.bg },
+                            ]}
+                            onPress={() => applyExactScore(h, a)}
+                          >
+                            <Text style={[styles.exactScoreChipScore, isActive && { color: group.color }]}>
+                              {h} - {a}
+                            </Text>
+                            <Text style={styles.exactScoreChipOdd}>{estimateExactScoreOdd(h, a)}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ))}
+
+                {/* Score personnalisé */}
+                <View style={styles.exactCustomRow}>
+                  <View style={styles.exactStepperCol}>
+                    <Text style={styles.exactStepperTeam} numberOfLines={1}>{homeTeam}</Text>
+                    <View style={styles.exactStepper}>
+                      <TouchableOpacity
+                        style={styles.exactStepBtn}
+                        onPress={() => {
+                          const nextH = Math.max(0, exactHome - 1);
+                          setExactHome(nextH);
+                          applyExactScore(nextH, exactAway);
+                        }}
+                      >
+                        <Ionicons name="remove" size={16} color={Colors.primary} />
+                      </TouchableOpacity>
+                      <Text style={styles.exactStepValue}>{exactHome}</Text>
+                      <TouchableOpacity
+                        style={styles.exactStepBtn}
+                        onPress={() => {
+                          const nextH = Math.min(15, exactHome + 1);
+                          setExactHome(nextH);
+                          applyExactScore(nextH, exactAway);
+                        }}
+                      >
+                        <Ionicons name="add" size={16} color={Colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <Text style={styles.exactDash}>–</Text>
+
+                  <View style={styles.exactStepperCol}>
+                    <Text style={styles.exactStepperTeam} numberOfLines={1}>{awayTeam}</Text>
+                    <View style={styles.exactStepper}>
+                      <TouchableOpacity
+                        style={styles.exactStepBtn}
+                        onPress={() => {
+                          const nextA = Math.max(0, exactAway - 1);
+                          setExactAway(nextA);
+                          applyExactScore(exactHome, nextA);
+                        }}
+                      >
+                        <Ionicons name="remove" size={16} color="#EA580C" />
+                      </TouchableOpacity>
+                      <Text style={styles.exactStepValue}>{exactAway}</Text>
+                      <TouchableOpacity
+                        style={styles.exactStepBtn}
+                        onPress={() => {
+                          const nextA = Math.min(15, exactAway + 1);
+                          setExactAway(nextA);
+                          applyExactScore(exactHome, nextA);
+                        }}
+                      >
+                        <Ionicons name="add" size={16} color="#EA580C" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.exactApplyBtn}
+                    onPress={() => applyExactScore(exactHome, exactAway)}
+                  >
+                    <Text style={styles.exactApplyText}>Appliquer</Text>
+                    <Text style={styles.exactApplyOdd}>@ {estimateExactScoreOdd(exactHome, exactAway)}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* 5. Choix / Édition du Pronostic & Cote */}
+          <View style={styles.predHeaderRow}>
+            <Text style={styles.subCategoryTitle}>5. Intitulé du pronostic personnalisé</Text>
+            {selectedPredKey !== 'custom' && Boolean(selectedOptionLabel) ? (
+              <View style={styles.syncedBadge}>
+                <Ionicons name="sparkles" size={11} color="#059669" />
+                <Text style={styles.syncedBadgeText}>Adapté au pronostic rapide</Text>
+              </View>
+            ) : (
               <TouchableOpacity
-                key={cat}
-                style={[styles.subTab, selectedCategory === cat && styles.subTabActive]}
+                style={styles.reSyncBtn}
                 onPress={() => {
-                  setSelectedCategory(cat);
-                  if (cat === 'Résultat') setSelectedOptionLabel(`Vainqueur : ${homeTeam}`);
-                  else if (cat === 'Score') setSelectedOptionLabel('Score exact : 2–1');
-                  else if (cat === 'Double chance') setSelectedOptionLabel(`1X (${homeTeam} ou Nul)`);
-                  else setSelectedOptionLabel('Plus de 9.5 Corners');
+                  if (homeTeam) {
+                    setSelectedPredKey('1');
+                    setSelectedOptionLabel(`Vainqueur : ${homeTeam}`);
+                    setOdd('1.85');
+                  }
                 }}
               >
-                <Text style={[styles.subTabText, selectedCategory === cat && styles.subTabTextActive]}>
-                  {cat}
-                </Text>
+                <Ionicons name="sync-outline" size={12} color={Colors.primary} />
+                <Text style={styles.reSyncBtnText}>Réadapter à la suggestion</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Selected Option Input / Selector */}
-          <Text style={[styles.fieldLabel, { marginTop: 6 }]}>Pronostic / Marché</Text>
+            )}
+          </View>
           <TextInput
             style={styles.input}
             value={selectedOptionLabel}
-            onChangeText={setSelectedOptionLabel}
-            placeholder="Intitulé du pronostic"
+            onChangeText={(text) => {
+              setSelectedOptionLabel(text);
+              const matched = allSmartPredictions.find(
+                (p) => p.label.trim().toLowerCase() === text.trim().toLowerCase()
+              );
+              if (matched) {
+                setSelectedPredKey(matched.key);
+                setOdd(matched.odd);
+              } else {
+                setSelectedPredKey('custom');
+              }
+            }}
+            placeholder={homeTeam ? `Ex: Vainqueur : ${homeTeam}` : 'Ex: Vainqueur : Real Madrid'}
           />
 
-          {/* Odd and Final Score */}
           <View style={styles.oddRowWrap}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>Cote</Text>
+              <Text style={styles.fieldLabel}>Cote du pari</Text>
               <TextInput
                 style={[styles.input, styles.oddInputText]}
                 value={odd}
@@ -572,18 +1794,20 @@ export default function StudioCreationScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Add Event Button */}
+          {/* Bouton Ajouter l'Événement */}
           <TouchableOpacity style={styles.addBtn} onPress={handleAddEvent}>
             <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.addBtnText}>Ajouter l'événement</Text>
+            <Text style={styles.addBtnText}>Ajouter l'événement au coupon</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Section 3 : ÉVÉNEMENTS (Liste) */}
+        {/* Section 3 : ÉVÉNEMENTS DU COUPON (Liste) */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>ÉVÉNEMENTS ({addedEvents.length})</Text>
+          <Text style={styles.cardSectionTitle}>ÉVÉNEMENTS DU TICKET ({addedEvents.length})</Text>
           {addedEvents.length === 0 ? (
-            <Text style={styles.emptyNote}>Ajoute au moins un événement pour sauvegarder le coupon.</Text>
+            <Text style={styles.emptyNote}>
+              Aucun match ajouté. Cliquez sur « Ajouter l'événement » ci-dessus ou importez un match en direct.
+            </Text>
           ) : (
             addedEvents.map((ev, idx) => (
               <View key={ev.id} style={styles.addedItem}>
@@ -595,9 +1819,9 @@ export default function StudioCreationScreen({ navigation }: any) {
                   </Text>
                   <Text style={styles.addedLabel}>{ev.prediction}</Text>
                 </View>
-                <Text style={styles.addedOdd}>{ev.odd}</Text>
+                <Text style={styles.addedOdd}>{formatCleanOdds(ev.odd)}</Text>
                 <TouchableOpacity style={{ padding: 6 }} onPress={() => handleRemoveEvent(ev.id)}>
-                  <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
                 </TouchableOpacity>
               </View>
             ))
@@ -606,7 +1830,7 @@ export default function StudioCreationScreen({ navigation }: any) {
 
         {/* Section 4 : MISE ET RÉSUMÉ */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>MISE ET RÉSUMÉ</Text>
+          <Text style={styles.cardSectionTitle}>MISE ET RÉSUMÉ DU TICKET</Text>
           <Text style={styles.fieldLabel}>Mise virtuelle (₣)</Text>
           <TextInput
             style={[styles.input, { fontWeight: '700', fontSize: 16 }]}
@@ -617,7 +1841,7 @@ export default function StudioCreationScreen({ navigation }: any) {
 
           {/* Checkbox Cashout */}
           <TouchableOpacity
-            style={[styles.checkboxRow, { marginTop: 14 }]}
+            style={[styles.checkboxRow, { marginTop: 12 }]}
             onPress={() => setEnableCashout(!enableCashout)}
           >
             <Ionicons
@@ -626,8 +1850,8 @@ export default function StudioCreationScreen({ navigation }: any) {
               color={enableCashout ? Colors.primaryAccent : Colors.textSubtle}
             />
             <View style={{ flex: 1 }}>
-              <Text style={styles.checkboxLabel}>Activer la vente (cashout)</Text>
-              <Text style={styles.helperText}>Affiche un bouton « Vendre pour X ₣ » sur le détail du pari.</Text>
+              <Text style={styles.checkboxLabel}>Activer la vente immédiate (cashout)</Text>
+              <Text style={styles.helperText}>Affiche un bouton « Vendre pour X ₣ » sur le coupon.</Text>
             </View>
           </TouchableOpacity>
 
@@ -639,7 +1863,7 @@ export default function StudioCreationScreen({ navigation }: any) {
             </View>
             <View style={styles.statLine}>
               <Text style={styles.statLabel}>Cote totale :</Text>
-              <Text style={styles.statVal}>{addedEvents.length > 0 ? totalOdds.toFixed(2) : '-'}</Text>
+              <Text style={styles.statVal}>{addedEvents.length > 0 ? formatCleanOdds(totalOdds) : '-'}</Text>
             </View>
             <View style={styles.statLine}>
               <Text style={styles.statLabel}>Gains potentiels :</Text>
@@ -649,7 +1873,9 @@ export default function StudioCreationScreen({ navigation }: any) {
             </View>
           </View>
 
-          <Text style={styles.dateAutoText}>Date du pari : Auto (maintenant)</Text>
+          <Text style={styles.dateAutoText}>
+            Mise du coupon : {placedDate} ({placedTime}) • Début match : {matchDate} ({matchTime})
+          </Text>
 
           <TouchableOpacity style={styles.saveBtn} onPress={handleSaveCoupon}>
             <Text style={styles.saveBtnText}>Sauvegarder le coupon</Text>
@@ -661,21 +1887,20 @@ export default function StudioCreationScreen({ navigation }: any) {
       <SportsPickerModal
         visible={pickerModalVisible}
         mode={pickerMode}
-        initialCategoryTab={sourceType === 'FIFA' ? 'FIFA' : undefined}
         filterCompetitionId={pickerMode === 'team' ? selectedLeagueId : undefined}
         selectedId={
           pickerMode === 'competition'
             ? selectedLeagueId || selectedLeague
             : pickingTarget === 'home'
-              ? homeTeam
-              : awayTeam
+            ? homeTeam
+            : awayTeam
         }
         onSelectCompetition={(comp) => {
           setSelectedLeague(comp.name);
           const logo = (comp as any).badge || comp.logo || resolveCompetitionLogo(comp.name) || '';
           setSelectedLeagueLogo(logo);
           setSelectedLeagueId(comp.id);
-          // Déclenche l'appel API REST TheSportsDB pour mettre à jour les équipes en temps réel
+          if ((comp as any).country) setSelectedLeagueCountry((comp as any).country);
           fetchTeamsByLeague(comp.name);
         }}
         onSelectTeam={(team, comp) => {
@@ -683,12 +1908,12 @@ export default function StudioCreationScreen({ navigation }: any) {
           if (pickingTarget === 'home') {
             setHomeTeam(team.name);
             setHomeTeamLogo(teamLogo);
+            setActiveSlot('away');
           } else {
             setAwayTeam(team.name);
             setAwayTeamLogo(teamLogo);
           }
 
-          // Auto-complétion de la compétition si non définie ou liée
           if (comp) {
             setSelectedLeague(comp.name);
             const compLogo = (comp as any).badge || comp.logo || resolveCompetitionLogo(comp.name) || '';
@@ -721,6 +1946,114 @@ export default function StudioCreationScreen({ navigation }: any) {
           );
         }}
       />
+
+      {/* Modale : Créer un Championnat Personnalisé */}
+      <Modal
+        visible={createLeagueModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCreateLeagueModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Créer un Championnat</Text>
+              <TouchableOpacity onPress={() => setCreateLeagueModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.fieldLabel}>Nom du championnat</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: Tournoi Inter-Quartiers 2026"
+              value={newLeagueName}
+              onChangeText={setNewLeagueName}
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Pays ou Territoire</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: France, Cameroun, Global..."
+              value={newLeagueCountry}
+              onChangeText={setNewLeagueCountry}
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Discipline sportive</Text>
+            <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+              {['Football', 'FIFA', 'Cyber-Sport', 'Basketball'].map((sp) => (
+                <TouchableOpacity
+                  key={sp}
+                  style={[styles.smallPill, newLeagueSport === sp && styles.smallPillActive]}
+                  onPress={() => setNewLeagueSport(sp)}
+                >
+                  <Text style={[styles.smallPillText, newLeagueSport === sp && styles.smallPillTextActive]}>
+                    {sp}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleSaveCustomLeague}>
+              <Text style={styles.modalSubmitBtnText}>Créer et Sélectionner</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Modale : Créer une Équipe Personnalisée */}
+      <Modal
+        visible={createTeamModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCreateTeamModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Ajouter une Équipe</Text>
+              <TouchableOpacity onPress={() => setCreateTeamModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.helperText}>
+              Cette équipe sera attachée au championnat :{' '}
+              <Text style={{ fontWeight: '800', color: Colors.primary }}>{selectedLeague}</Text>
+            </Text>
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Nom de l'équipe</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: FC Étoile Bleue"
+              value={newTeamName}
+              onChangeText={setNewTeamName}
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Code court (3-4 lettres)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: ETB"
+              value={newTeamShort}
+              onChangeText={setNewTeamShort}
+              maxLength={4}
+              autoCapitalize="characters"
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Logo URL (Optionnel)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="https://... (vide = blason automatique)"
+              value={newTeamLogo}
+              onChangeText={setNewTeamLogo}
+            />
+
+            <TouchableOpacity style={styles.modalSubmitBtn} onPress={handleSaveCustomTeam}>
+              <Text style={styles.modalSubmitBtnText}>Ajouter l'Équipe au Championnat</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -729,30 +2062,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   backBtn: {
-    padding: 4,
+    padding: 6,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
+  headerSub: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
   scrollArea: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingTop: 10,
-    paddingBottom: 110,
+    paddingBottom: 120,
   },
   bannerBox: {
     flexDirection: 'row',
@@ -774,23 +2112,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bannerTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: Colors.primary,
+  },
+  bannerSubtitle: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   apiFootballCardBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(37, 99, 235, 0.08)',
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
+    padding: 10,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(37, 99, 235, 0.25)',
   },
   apiFootballIconWrap: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: 8,
     backgroundColor: '#2563EB',
     justifyContent: 'center',
@@ -811,22 +2154,17 @@ const styles = StyleSheet.create({
   },
   apiFootballLiveTagText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '900',
   },
   apiFootballCardSubtitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: '#64748B',
-    marginTop: 2,
-  },
-  bannerSubtitle: {
-    fontSize: 11,
-    color: Colors.primary,
     marginTop: 2,
   },
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
@@ -836,7 +2174,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: Colors.primary,
-    marginBottom: 10,
+    letterSpacing: 0.3,
   },
   fieldLabel: {
     fontSize: 11,
@@ -850,105 +2188,334 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 8,
     fontSize: 13,
     color: Colors.textPrimary,
   },
   helperText: {
     fontSize: 10,
     color: Colors.textMuted,
-    marginTop: 4,
+    marginTop: 3,
     lineHeight: 14,
   },
   checkboxRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginTop: 10,
+    alignItems: 'center',
+    gap: 6,
   },
   checkboxLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
-  toggleRow: {
+  subCategoryTitle: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  newLeagueTopBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  toggleLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '700',
-  },
-  pillGroup: {
-    flexDirection: 'row',
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    padding: 2,
-  },
-  pill: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#EFF6FF',
     borderRadius: 6,
   },
-  pillActive: {
-    backgroundColor: Colors.primary,
-  },
-  pillText: {
+  newLeagueTopBtnText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.textMuted,
+    color: Colors.primary,
   },
-  pillTextActive: {
-    color: '#fff',
+  categoryTabsWrap: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 4,
   },
-  dropdownSelector: {
+  categoryTab: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surfaceSecondary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 10,
+    gap: 5,
+  },
+  categoryTabActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  categoryTabIcon: {
+    fontSize: 13,
+  },
+  categoryTabText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  categoryTabTextActive: {
+    color: '#FFFFFF',
+  },
+  leagueChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
     gap: 8,
   },
-  dropdownText: {
-    flex: 1,
-    fontSize: 13,
-    color: Colors.textMuted,
+  leagueChipActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: Colors.primaryAccent,
   },
-  inlineLeaguePicker: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    marginTop: 4,
-    paddingVertical: 4,
+  leagueChipLogo: {
+    width: 26,
+    height: 26,
+    borderRadius: 4,
   },
-  leagueItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  leagueItemText: {
+  leagueChipName: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
-  teamsInputBlock: {
-    marginTop: 10,
+  leagueChipNameActive: {
+    color: Colors.primaryAccent,
+  },
+  leagueChipCountry: {
+    fontSize: 9.5,
+    color: Colors.textMuted,
+  },
+  chipNewBadge: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  chipNewText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  addCustomLeagueChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: Colors.primary,
+    gap: 4,
+  },
+  addCustomLeagueChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  fullCatalogBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  fullCatalogBtnText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: Colors.textMuted,
+  },
+  activeLeagueCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    gap: 10,
+    marginBottom: 10,
+  },
+  activeLeagueLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+  },
+  activeLeagueTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0369A1',
+  },
+  activeLeagueMeta: {
+    fontSize: 10.5,
+    color: '#0284C7',
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  activeLeagueChangeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  activeLeagueChangeBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
+  leagueTeamsContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+  },
+  leagueTeamsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  slotHintText: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+  addTeamSmallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 2,
+  },
+  addTeamSmallBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  teamsLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  teamsLoadingText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  teamQuickChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  teamQuickChipHome: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
+  },
+  teamQuickChipAway: {
+    borderColor: '#EA580C',
+    backgroundColor: '#FFF7ED',
+  },
+  teamQuickChipText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  teamQuickChipTextHome: {
+    color: '#2563EB',
+  },
+  teamQuickChipTextAway: {
+    color: '#EA580C',
+  },
+  teamChipBadgeHome: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  teamChipBadgeAway: {
+    backgroundColor: '#EA580C',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  teamChipBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '900',
+  },
+  noTeamsNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+  },
+  noTeamsText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+  },
+  noTeamsAddBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 6,
+  },
+  noTeamsAddBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  matchupBlock: {
+    marginTop: 4,
+  },
+  teamsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  toggleManualBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+  },
+  toggleManualText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primaryAccent,
   },
   teamsRowInput: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.border,
     padding: 6,
@@ -956,38 +2523,239 @@ const styles = StyleSheet.create({
   },
   teamInput: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
     color: Colors.textPrimary,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+  },
+  swapBadgeButton: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   vsBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    color: Colors.textSubtle,
+    color: Colors.textSecondary,
   },
-  subTabsContainer: {
+  matchupPickersRow: {
     flexDirection: 'row',
-    marginTop: 10,
+    alignItems: 'center',
+    gap: 8,
+  },
+  matchupSlotCard: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    padding: 10,
+    position: 'relative',
+  },
+  matchupSlotCardActiveHome: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
+  },
+  matchupSlotCardActiveAway: {
+    borderColor: '#EA580C',
+    backgroundColor: '#FFF7ED',
+  },
+  slotBadgeHome: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
     marginBottom: 6,
   },
-  subTab: {
-    backgroundColor: Colors.background,
-    borderRadius: 6,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    marginRight: 6,
+  slotBadgeAway: {
+    backgroundColor: '#EA580C',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginBottom: 6,
   },
-  subTabActive: {
-    backgroundColor: Colors.primaryAccent,
+  slotBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '900',
   },
-  subTabText: {
-    fontSize: 11,
+  slotLogoWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  slotTeamName: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  slotActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  slotActionBtnText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: Colors.textMuted,
+    color: Colors.primary,
   },
-  subTabTextActive: {
-    color: '#fff',
+  vsSwapCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  vsSwapText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '900',
+    marginTop: -2,
+  },
+  smartPredChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 6,
+  },
+  smartPredChipScore: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+  },
+  quickPredCountBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  quickPredCountText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.primaryAccent,
+  },
+  quickPredFilterRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 6,
+  },
+  quickPredFilterPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  quickPredFilterPillScore: {
+    borderColor: '#BFDBFE',
+    backgroundColor: '#F0F9FF',
+  },
+  quickPredFilterPillActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  quickPredFilterPillText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  quickPredFilterPillTextActive: {
+    color: '#FFFFFF',
+  },
+  smartPredOddBadgeActive: {
+    backgroundColor: Colors.primary,
+  },
+  smartPredOddTextActive: {
+    color: '#FFFFFF',
+  },
+  smartPredChipActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: Colors.primaryAccent,
+  },
+  smartPredLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  smartPredLabelActive: {
+    color: Colors.primaryAccent,
+    fontWeight: '800',
+  },
+  smartPredOddBadge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  smartPredOddText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  predHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  syncedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  syncedBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  reSyncBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  reSyncBtnText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: Colors.primary,
   },
   oddRowWrap: {
     flexDirection: 'row',
@@ -1006,7 +2774,7 @@ const styles = StyleSheet.create({
   addBtn: {
     flexDirection: 'row',
     backgroundColor: Colors.primary,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1015,7 +2783,7 @@ const styles = StyleSheet.create({
   },
   addBtnText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 13,
   },
   emptyNote: {
@@ -1026,10 +2794,10 @@ const styles = StyleSheet.create({
   addedItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    gap: 6,
+    gap: 8,
   },
   addedIndex: {
     fontSize: 12,
@@ -1041,7 +2809,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   addedMatchTeams: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
@@ -1057,9 +2825,9 @@ const styles = StyleSheet.create({
   },
   statBox: {
     backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 8,
+    borderRadius: 10,
     padding: 10,
-    marginTop: 12,
+    marginTop: 10,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -1069,7 +2837,7 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: Colors.textMuted,
   },
   statVal: {
@@ -1080,7 +2848,7 @@ const styles = StyleSheet.create({
   dateAutoText: {
     fontSize: 11,
     color: Colors.textMuted,
-    marginVertical: 10,
+    marginVertical: 8,
     textAlign: 'center',
   },
   saveBtn: {
@@ -1094,161 +2862,167 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-  // Nouveaux Styles Sélecteurs Visuels
-  clickableSelector: {
+  exactScoreBox: {
+    marginTop: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 8,
+  },
+  exactScoreHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    gap: 10,
+    gap: 6,
+    marginBottom: 6,
   },
-  selectorMiniLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
+  exactScoreTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.primary,
   },
-  selectorPlaceholderIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: '#EFF6FF',
+  exactGroupRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 6,
+    gap: 6,
   },
-  selectorText: {
-    flex: 1,
-    fontSize: 13.5,
-    fontWeight: '700',
+  exactGroupLabel: {
+    width: 64,
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  exactScoreChip: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    minWidth: 52,
+  },
+  exactScoreChipScore: {
+    fontSize: 13,
+    fontWeight: '800',
     color: Colors.textPrimary,
   },
-  selectorPlaceholderText: {
+  exactScoreChipOdd: {
+    fontSize: 10,
+    fontWeight: '700',
     color: Colors.textMuted,
-    fontWeight: '500',
   },
-  teamsHeaderRow: {
+  exactCustomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  exactStepperCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  exactStepperTeam: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    marginBottom: 3,
+  },
+  exactStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  exactStepBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  exactStepValue: {
+    minWidth: 22,
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '900',
+    color: Colors.textPrimary,
+  },
+  exactDash: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: Colors.textSubtle,
+    paddingBottom: 6,
+  },
+  exactApplyBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    alignItems: 'center',
+  },
+  exactApplyText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  exactApplyOdd: {
+    color: '#C7D2FE',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+  },
+  modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  toggleManualBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  smallPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 6,
     backgroundColor: '#F1F5F9',
   },
-  toggleManualText: {
+  smallPillActive: {
+    backgroundColor: Colors.primary,
+  },
+  smallPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primaryAccent,
-  },
-  teamsRowPickers: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  teamPickerCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  teamPickerCardHome: {
-    borderColor: '#BFDBFE',
-    backgroundColor: '#F8FAFC',
-  },
-  teamPickerCardAway: {
-    borderColor: '#FED7AA',
-    backgroundColor: '#F8FAFC',
-  },
-  teamLogoThumbWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  teamThumbImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  teamRoleLabel: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  teamSelectedName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  vsCenterBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  vsCenterText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#64748B',
-  },
-  fifaQuickChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 6,
-  },
-  fifaQuickChipActive: {
-    backgroundColor: '#EFF6FF',
-    borderColor: Colors.primaryAccent,
-  },
-  fifaChipLogo: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-  },
-  fifaChipText: {
-    fontSize: 11.5,
-    fontWeight: '600',
     color: Colors.textSecondary,
   },
-  fifaChipTextActive: {
-    color: Colors.primaryAccent,
-    fontWeight: '700',
-  },
-  chipNewBadge: {
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 3,
-  },
-  chipNewText: {
+  smallPillTextActive: {
     color: '#FFFFFF',
-    fontSize: 8,
+  },
+  modalSubmitBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  modalSubmitBtnText: {
+    color: '#FFFFFF',
     fontWeight: '800',
+    fontSize: 13.5,
   },
 });
-

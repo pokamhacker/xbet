@@ -106,41 +106,16 @@ const BASE_SPORTS_CATALOG: Competition[] = [
     category: 'major',
     sport: 'Football',
     country: 'Angleterre',
+    continent: 'Europe',
     logo: 'https://media.api-sports.io/football/leagues/39.png',
-    teams: [
-      {
-        id: 'team-arsenal',
-        name: 'Arsenal',
-        shortName: 'ARS',
-        logo: 'https://media.api-sports.io/football/teams/42.png',
-        country: 'Angleterre',
-        leagueId: 'premier-league',
-      },
-      {
-        id: 'team-chelsea',
-        name: 'Chelsea',
-        shortName: 'CHE',
-        logo: 'https://media.api-sports.io/football/teams/49.png',
-        country: 'Angleterre',
-        leagueId: 'premier-league',
-      },
-      {
-        id: 'team-liverpool',
-        name: 'Liverpool',
-        shortName: 'LIV',
-        logo: 'https://media.api-sports.io/football/teams/40.png',
-        country: 'Angleterre',
-        leagueId: 'premier-league',
-      },
-      {
-        id: 'team-man-united',
-        name: 'Manchester United',
-        shortName: 'MUN',
-        logo: 'https://media.api-sports.io/football/teams/33.png',
-        country: 'Angleterre',
-        leagueId: 'premier-league',
-      },
-    ],
+    teams: FIFA_DEFAULT_TEAMS.england.map((t) => ({
+      id: `team-${t.id.replace('fifa-', '')}-pl`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: 'Angleterre',
+      leagueId: 'premier-league',
+    })),
   },
   {
     id: 'la-liga',
@@ -148,41 +123,67 @@ const BASE_SPORTS_CATALOG: Competition[] = [
     category: 'major',
     sport: 'Football',
     country: 'Espagne',
+    continent: 'Europe',
     logo: 'https://media.api-sports.io/football/leagues/140.png',
-    teams: [
-      {
-        id: 'team-atletico-madrid',
-        name: 'Atlético Madrid',
-        shortName: 'ATM',
-        logo: 'https://media.api-sports.io/football/teams/530.png',
-        country: 'Espagne',
-        leagueId: 'la-liga',
-      },
-      {
-        id: 'team-sevilla',
-        name: 'Sevilla FC',
-        shortName: 'SEV',
-        logo: 'https://media.api-sports.io/football/teams/536.png',
-        country: 'Espagne',
-        leagueId: 'la-liga',
-      },
-      {
-        id: 'team-betis',
-        name: 'Real Betis',
-        shortName: 'BET',
-        logo: 'https://media.api-sports.io/football/teams/543.png',
-        country: 'Espagne',
-        leagueId: 'la-liga',
-      },
-      {
-        id: 'team-athletic-bilbao',
-        name: 'Athletic Bilbao',
-        shortName: 'ATH',
-        logo: 'https://media.api-sports.io/football/teams/531.png',
-        country: 'Espagne',
-        leagueId: 'la-liga',
-      },
-    ],
+    teams: FIFA_DEFAULT_TEAMS.spain.map((t) => ({
+      id: `team-${t.id.replace('fifa-', '')}-ll`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: 'Espagne',
+      leagueId: 'la-liga',
+    })),
+  },
+  {
+    id: 'serie-a',
+    name: 'Serie A',
+    category: 'major',
+    sport: 'Football',
+    country: 'Italie',
+    continent: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/135.png',
+    teams: FIFA_DEFAULT_TEAMS.italy.map((t) => ({
+      id: `team-${t.id.replace('fifa-', '')}-sa`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: 'Italie',
+      leagueId: 'serie-a',
+    })),
+  },
+  {
+    id: 'bundesliga',
+    name: 'Bundesliga',
+    category: 'major',
+    sport: 'Football',
+    country: 'Allemagne',
+    continent: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/78.png',
+    teams: FIFA_DEFAULT_TEAMS.germany.map((t) => ({
+      id: `team-${t.id.replace('fifa-', '')}-bl`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: 'Allemagne',
+      leagueId: 'bundesliga',
+    })),
+  },
+  {
+    id: 'ligue-1',
+    name: "Ligue 1 McDonald's",
+    category: 'major',
+    sport: 'Football',
+    country: 'France',
+    continent: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/61.png',
+    teams: (FIFA_DEFAULT_TEAMS.france || []).map((t) => ({
+      id: `team-${t.id.replace('fifa-', '')}-l1`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: 'France',
+      leagueId: 'ligue-1',
+    })),
   },
 
   // ==========================================
@@ -922,6 +923,22 @@ const BASE_SPORTS_CATALOG: Competition[] = [
         country: 'Italie',
         leagueId: 'fifa-ligue-des-champions',
       },
+      {
+        id: 'fifa-team-olympiacos',
+        name: 'Olympiacos',
+        shortName: 'OLY',
+        logo: 'https://media.api-sports.io/football/teams/553.png',
+        country: 'Grèce',
+        leagueId: 'fifa-ligue-des-champions',
+      },
+      {
+        id: 'fifa-team-roma',
+        name: 'Roma',
+        shortName: 'ROM',
+        logo: 'https://media.api-sports.io/football/teams/497.png',
+        country: 'Italie',
+        leagueId: 'fifa-ligue-des-champions',
+      },
     ],
   },
   {
@@ -931,72 +948,14 @@ const BASE_SPORTS_CATALOG: Competition[] = [
     sport: 'FIFA',
     country: 'Angleterre',
     logo: 'https://media.api-sports.io/football/leagues/39.png',
-    teams: [
-      {
-        id: 'fifa-team-man-city-pl',
-        name: 'Manchester City',
-        shortName: 'MCI',
-        logo: 'https://media.api-sports.io/football/teams/50.png',
-        country: 'Angleterre',
-        leagueId: 'fifa-angleterre',
-      },
-      {
-        id: 'fifa-team-arsenal-pl',
-        name: 'Arsenal',
-        shortName: 'ARS',
-        logo: 'https://media.api-sports.io/football/teams/42.png',
-        country: 'Angleterre',
-        leagueId: 'fifa-angleterre',
-      },
-      {
-        id: 'fifa-team-liverpool-pl',
-        name: 'Liverpool',
-        shortName: 'LIV',
-        logo: 'https://media.api-sports.io/football/teams/40.png',
-        country: 'Angleterre',
-        leagueId: 'fifa-angleterre',
-      },
-      {
-        id: 'fifa-team-chelsea-pl',
-        name: 'Chelsea',
-        shortName: 'CHE',
-        logo: 'https://media.api-sports.io/football/teams/49.png',
-        country: 'Angleterre',
-        leagueId: 'fifa-angleterre',
-      },
-      {
-        id: 'fifa-team-man-united-pl',
-        name: 'Manchester United',
-        shortName: 'MUN',
-        logo: 'https://media.api-sports.io/football/teams/33.png',
-        country: 'Angleterre',
-        leagueId: 'fifa-angleterre',
-      },
-      {
-        id: 'fifa-team-tottenham-pl',
-        name: 'Tottenham Hotspur',
-        shortName: 'TOT',
-        logo: 'https://media.api-sports.io/football/teams/47.png',
-        country: 'Angleterre',
-        leagueId: 'fifa-angleterre',
-      },
-      {
-        id: 'fifa-team-newcastle-pl',
-        name: 'Newcastle United',
-        shortName: 'NEW',
-        logo: 'https://media.api-sports.io/football/teams/34.png',
-        country: 'Angleterre',
-        leagueId: 'fifa-angleterre',
-      },
-      {
-        id: 'fifa-team-aston-villa-pl',
-        name: 'Aston Villa',
-        shortName: 'AVL',
-        logo: 'https://media.api-sports.io/football/teams/66.png',
-        country: 'Angleterre',
-        leagueId: 'fifa-angleterre',
-      },
-    ],
+    teams: FIFA_DEFAULT_TEAMS.england.map((t) => ({
+      id: `${t.id}-pl`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: t.country,
+      leagueId: 'fifa-angleterre',
+    })),
   },
   {
     id: 'fifa-espagne',
@@ -1005,72 +964,14 @@ const BASE_SPORTS_CATALOG: Competition[] = [
     sport: 'FIFA',
     country: 'Espagne',
     logo: 'https://media.api-sports.io/football/leagues/140.png',
-    teams: [
-      {
-        id: 'fifa-team-real-madrid-es',
-        name: 'Real Madrid',
-        shortName: 'RMA',
-        logo: 'https://media.api-sports.io/football/teams/541.png',
-        country: 'Espagne',
-        leagueId: 'fifa-espagne',
-      },
-      {
-        id: 'fifa-team-barcelona-es',
-        name: 'FC Barcelona',
-        shortName: 'BAR',
-        logo: 'https://media.api-sports.io/football/teams/529.png',
-        country: 'Espagne',
-        leagueId: 'fifa-espagne',
-      },
-      {
-        id: 'fifa-team-atletico-madrid-es',
-        name: 'Atlético Madrid',
-        shortName: 'ATM',
-        logo: 'https://media.api-sports.io/football/teams/530.png',
-        country: 'Espagne',
-        leagueId: 'fifa-espagne',
-      },
-      {
-        id: 'fifa-team-sevilla-es',
-        name: 'Sevilla FC',
-        shortName: 'SEV',
-        logo: 'https://media.api-sports.io/football/teams/536.png',
-        country: 'Espagne',
-        leagueId: 'fifa-espagne',
-      },
-      {
-        id: 'fifa-team-real-betis-es',
-        name: 'Real Betis',
-        shortName: 'BET',
-        logo: 'https://media.api-sports.io/football/teams/543.png',
-        country: 'Espagne',
-        leagueId: 'fifa-espagne',
-      },
-      {
-        id: 'fifa-team-athletic-bilbao-es',
-        name: 'Athletic Bilbao',
-        shortName: 'ATH',
-        logo: 'https://media.api-sports.io/football/teams/531.png',
-        country: 'Espagne',
-        leagueId: 'fifa-espagne',
-      },
-      {
-        id: 'fifa-team-real-sociedad-es',
-        name: 'Real Sociedad',
-        shortName: 'RSO',
-        logo: 'https://media.api-sports.io/football/teams/548.png',
-        country: 'Espagne',
-        leagueId: 'fifa-espagne',
-      },
-      {
-        id: 'fifa-team-villarreal-es',
-        name: 'Villarreal',
-        shortName: 'VIL',
-        logo: 'https://media.api-sports.io/football/teams/533.png',
-        country: 'Espagne',
-        leagueId: 'fifa-espagne',
-      },
-    ],
+    teams: FIFA_DEFAULT_TEAMS.spain.map((t) => ({
+      id: `${t.id}-es`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: t.country,
+      leagueId: 'fifa-espagne',
+    })),
   },
   {
     id: 'fifa-italie',
@@ -1079,72 +980,14 @@ const BASE_SPORTS_CATALOG: Competition[] = [
     sport: 'FIFA',
     country: 'Italie',
     logo: 'https://media.api-sports.io/football/leagues/135.png',
-    teams: [
-      {
-        id: 'fifa-team-inter-it',
-        name: 'Inter Milan',
-        shortName: 'INT',
-        logo: 'https://media.api-sports.io/football/teams/505.png',
-        country: 'Italie',
-        leagueId: 'fifa-italie',
-      },
-      {
-        id: 'fifa-team-milan-it',
-        name: 'AC Milan',
-        shortName: 'MIL',
-        logo: 'https://media.api-sports.io/football/teams/489.png',
-        country: 'Italie',
-        leagueId: 'fifa-italie',
-      },
-      {
-        id: 'fifa-team-juventus-it',
-        name: 'Juventus',
-        shortName: 'JUV',
-        logo: 'https://media.api-sports.io/football/teams/496.png',
-        country: 'Italie',
-        leagueId: 'fifa-italie',
-      },
-      {
-        id: 'fifa-team-napoli-it',
-        name: 'Napoli',
-        shortName: 'NAP',
-        logo: 'https://media.api-sports.io/football/teams/492.png',
-        country: 'Italie',
-        leagueId: 'fifa-italie',
-      },
-      {
-        id: 'fifa-team-roma-it',
-        name: 'AS Roma',
-        shortName: 'ROM',
-        logo: 'https://media.api-sports.io/football/teams/497.png',
-        country: 'Italie',
-        leagueId: 'fifa-italie',
-      },
-      {
-        id: 'fifa-team-lazio-it',
-        name: 'Lazio',
-        shortName: 'LAZ',
-        logo: 'https://media.api-sports.io/football/teams/487.png',
-        country: 'Italie',
-        leagueId: 'fifa-italie',
-      },
-      {
-        id: 'fifa-team-atalanta-it',
-        name: 'Atalanta',
-        shortName: 'ATA',
-        logo: 'https://media.api-sports.io/football/teams/499.png',
-        country: 'Italie',
-        leagueId: 'fifa-italie',
-      },
-      {
-        id: 'fifa-team-fiorentina-it',
-        name: 'Fiorentina',
-        shortName: 'FIO',
-        logo: 'https://media.api-sports.io/football/teams/502.png',
-        country: 'Italie',
-        leagueId: 'fifa-italie',
-      },
-    ],
+    teams: FIFA_DEFAULT_TEAMS.italy.map((t) => ({
+      id: `${t.id}-it`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: t.country,
+      leagueId: 'fifa-italie',
+    })),
   },
   {
     id: 'fifa-allemagne',
@@ -1153,56 +996,14 @@ const BASE_SPORTS_CATALOG: Competition[] = [
     sport: 'FIFA',
     country: 'Allemagne',
     logo: 'https://media.api-sports.io/football/leagues/78.png',
-    teams: [
-      {
-        id: 'fifa-team-bayern-de',
-        name: 'Bayern Munich',
-        shortName: 'BAY',
-        logo: 'https://media.api-sports.io/football/teams/157.png',
-        country: 'Allemagne',
-        leagueId: 'fifa-allemagne',
-      },
-      {
-        id: 'fifa-team-dortmund-de',
-        name: 'Borussia Dortmund',
-        shortName: 'BVB',
-        logo: 'https://media.api-sports.io/football/teams/165.png',
-        country: 'Allemagne',
-        leagueId: 'fifa-allemagne',
-      },
-      {
-        id: 'fifa-team-leverkusen-de',
-        name: 'Bayer Leverkusen',
-        shortName: 'B04',
-        logo: 'https://media.api-sports.io/football/teams/168.png',
-        country: 'Allemagne',
-        leagueId: 'fifa-allemagne',
-      },
-      {
-        id: 'fifa-team-leipzig-de',
-        name: 'RB Leipzig',
-        shortName: 'RBL',
-        logo: 'https://media.api-sports.io/football/teams/173.png',
-        country: 'Allemagne',
-        leagueId: 'fifa-allemagne',
-      },
-      {
-        id: 'fifa-team-frankfurt-de',
-        name: 'Eintracht Frankfurt',
-        shortName: 'SGE',
-        logo: 'https://media.api-sports.io/football/teams/169.png',
-        country: 'Allemagne',
-        leagueId: 'fifa-allemagne',
-      },
-      {
-        id: 'fifa-team-stuttgart-de',
-        name: 'VfB Stuttgart',
-        shortName: 'VFB',
-        logo: 'https://media.api-sports.io/football/teams/172.png',
-        country: 'Allemagne',
-        leagueId: 'fifa-allemagne',
-      },
-    ],
+    teams: FIFA_DEFAULT_TEAMS.germany.map((t) => ({
+      id: `${t.id}-de`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: t.country,
+      leagueId: 'fifa-allemagne',
+    })),
   },
   {
     id: 'fifa-france',
@@ -1211,56 +1012,14 @@ const BASE_SPORTS_CATALOG: Competition[] = [
     sport: 'FIFA',
     country: 'France',
     logo: 'https://media.api-sports.io/football/leagues/61.png',
-    teams: [
-      {
-        id: 'fifa-team-psg-fr',
-        name: 'Paris Saint-Germain',
-        shortName: 'PSG',
-        logo: 'https://media.api-sports.io/football/teams/85.png',
-        country: 'France',
-        leagueId: 'fifa-france',
-      },
-      {
-        id: 'fifa-team-marseille-fr',
-        name: 'Olympique de Marseille',
-        shortName: 'OM',
-        logo: 'https://media.api-sports.io/football/teams/81.png',
-        country: 'France',
-        leagueId: 'fifa-france',
-      },
-      {
-        id: 'fifa-team-lyon-fr',
-        name: 'Olympique Lyonnais',
-        shortName: 'OL',
-        logo: 'https://media.api-sports.io/football/teams/80.png',
-        country: 'France',
-        leagueId: 'fifa-france',
-      },
-      {
-        id: 'fifa-team-monaco-fr',
-        name: 'AS Monaco',
-        shortName: 'ASM',
-        logo: 'https://media.api-sports.io/football/teams/91.png',
-        country: 'France',
-        leagueId: 'fifa-france',
-      },
-      {
-        id: 'fifa-team-lille-fr',
-        name: 'Lille OSC',
-        shortName: 'LOSC',
-        logo: 'https://media.api-sports.io/football/teams/79.png',
-        country: 'France',
-        leagueId: 'fifa-france',
-      },
-      {
-        id: 'fifa-team-rennes-fr',
-        name: 'Stade Rennais',
-        shortName: 'REN',
-        logo: 'https://media.api-sports.io/football/teams/94.png',
-        country: 'France',
-        leagueId: 'fifa-france',
-      },
-    ],
+    teams: FIFA_DEFAULT_TEAMS.france.map((t) => ({
+      id: `${t.id}-fr`,
+      name: t.name,
+      shortName: t.shortName,
+      logo: t.logo,
+      country: t.country,
+      leagueId: 'fifa-france',
+    })),
   },
   {
     id: 'fifa-coupe-du-monde',
@@ -1379,15 +1138,21 @@ const extendedCompetitions: Competition[] = EXTENDED_LEAGUES_DATA.map((league) =
 
 // Conversion des 11 championnats FIFA / EA FC officiels
 export const FC_FIFA_COMPETITIONS: Competition[] = FIFA_LEAGUES_LIST.map((fl) => {
-  const teamsData = FIFA_DEFAULT_TEAMS[fl.flagType] || FIFA_DEFAULT_TEAMS.globe;
+  const isSuperligue =
+    fl.id.includes('superligue') ||
+    fl.name.toLowerCase().includes('superligue') ||
+    fl.name.toLowerCase().includes('rush');
+  const teamsData = isSuperligue
+    ? FIFA_DEFAULT_TEAMS.europe
+    : FIFA_DEFAULT_TEAMS[fl.flagType] || FIFA_DEFAULT_TEAMS.europe;
   return {
     id: fl.id,
     name: fl.name,
     category: 'fifa' as const,
     sport: 'FIFA',
-    country: getFifaLeagueCountry(fl.flagType),
-    continent: getFifaLeagueContinent(fl.flagType),
-    logo: getFifaLeagueLogo(fl.flagType),
+    country: isSuperligue ? 'Europe' : getFifaLeagueCountry(fl.flagType),
+    continent: isSuperligue ? 'Europe' : getFifaLeagueContinent(fl.flagType),
+    logo: isSuperligue ? getFifaLeagueLogo('europe') : getFifaLeagueLogo(fl.flagType),
     matchesCount: fl.matchesCount,
     isNew: fl.isNew,
     teams: teamsData.map((t) => ({
@@ -1401,24 +1166,50 @@ export const FC_FIFA_COMPETITIONS: Competition[] = FIFA_LEAGUES_LIST.map((fl) =>
   };
 });
 
+// ==========================================
+// UTILITAIRES D'ACCÈS ET RECHERCHE
+// ==========================================
+
+/**
+ * Normalise un nom d'équipe ou de compétition pour les comparaisons tolérantes
+ */
+function normalizeName(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(fc|cf|ac|sc|as|cd|us|rb|ssc|fsv|rc|ud|ca)\b/gi, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
+
 export const SPORTS_CATALOG: Competition[] = (() => {
   const merged: Competition[] = [...FC_FIFA_COMPETITIONS, ...BASE_SPORTS_CATALOG];
 
   for (const extComp of extendedCompetitions) {
     const existingIndex = merged.findIndex(
       (c) =>
-        c.id.toLowerCase() === extComp.id.toLowerCase() ||
-        c.name.toLowerCase() === extComp.name.toLowerCase()
+        c.sport === extComp.sport &&
+        (c.id.toLowerCase() === extComp.id.toLowerCase() ||
+          c.name.toLowerCase() === extComp.name.toLowerCase() ||
+          normalizeName(c.id) === normalizeName(extComp.id) ||
+          normalizeName(c.name) === normalizeName(extComp.name) ||
+          (c.logo && extComp.logo && c.logo === extComp.logo))
     );
 
     if (existingIndex >= 0) {
       // Enrichit la compétition existante avec les clubs manquants
       const existingComp = merged[existingIndex];
+      const existingTeamLogos = new Set(
+        existingComp.teams.map((t) => t.logo).filter(Boolean)
+      );
       const existingTeamNames = new Set(
-        existingComp.teams.map((t) => t.name.toLowerCase())
+        existingComp.teams.map((t) => normalizeName(t.name))
       );
       const newTeams = extComp.teams.filter(
-        (t) => !existingTeamNames.has(t.name.toLowerCase())
+        (t) =>
+          !existingTeamNames.has(normalizeName(t.name)) &&
+          !(t.logo && existingTeamLogos.has(t.logo))
       );
       existingComp.teams = [...existingComp.teams, ...newTeams];
       if (!existingComp.continent) {
@@ -1431,23 +1222,6 @@ export const SPORTS_CATALOG: Competition[] = (() => {
 
   return merged;
 })();
-
-// ==========================================
-// UTILITAIRES D'ACCÈS ET RECHERCHE
-// ==========================================
-
-/**
- * Récupère une compétition par son identifiant unique
- */
-function normalizeName(str: string): string {
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\b(fc|cf|ac|sc|as|cd|us|rb|ssc|fsv|rc|ud|ca)\b/gi, '')
-    .replace(/[^a-z0-9]/g, '')
-    .trim();
-}
 
 /**
  * Récupère une compétition par son identifiant unique ou nom

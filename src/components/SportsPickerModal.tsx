@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../store/themeStore';
+import { useBetStore } from '../store/useBetStore';
 import { Colors } from '../theme/theme';
 import { SPORTS_CATALOG, Competition, Team } from '../data/sportsCatalog';
 import { TeamLogo } from './common/TeamLogo';
@@ -38,7 +39,8 @@ export type PickerCategoryTab =
   | 'FIFA'
   | 'Sélections'
   | 'Exotiques'
-  | 'Fictifs / Cyber';
+  | 'Fictifs / Cyber'
+  | 'Personnalisés';
 
 export interface SportsPickerModalProps {
   visible: boolean;
@@ -64,6 +66,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
   onClose,
 }) => {
   const { theme } = useThemeStore();
+  const { customLeagues, customTeams } = useBetStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<PickerCategoryTab>('Tous');
   const [useLeagueConstraint, setUseLeagueConstraint] = useState<boolean>(!!filterCompetitionId);
@@ -213,6 +216,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
     'Sélections',
     'Exotiques',
     'Fictifs / Cyber',
+    'Personnalisés',
   ];
 
   // Trouver la compétition filtrée active
@@ -242,8 +246,32 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
       }
     }
 
+    // 3. Ajouter les ligues personnalisées créées dans le Studio
+    for (const cl of customLeagues) {
+      const cTeams: Team[] = customTeams
+        .filter((ct) => ct.leagueId === cl.id)
+        .map((ct) => ({
+          id: ct.id,
+          name: ct.name,
+          shortName: ct.shortName,
+          logo: ct.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(ct.name)}&background=243DB5&color=FFFFFF&size=128&bold=true&rounded=true`,
+          country: ct.country || cl.country,
+          leagueId: cl.id,
+        }));
+
+      list.unshift({
+        id: cl.id,
+        name: cl.name,
+        category: 'custom' as any,
+        sport: cl.sport || 'Football',
+        country: cl.country || 'Personnalisé',
+        logo: cl.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(cl.name)}&background=243DB5&color=FFFFFF&size=128&bold=true&rounded=true`,
+        teams: cTeams,
+      });
+    }
+
     return list.length > 0 ? list : SPORTS_CATALOG;
-  }, [apiLeagues]);
+  }, [apiLeagues, customLeagues, customTeams]);
 
   // Liste des Compétitions filtrées
   const filteredCompetitions = useMemo(() => {
@@ -269,6 +297,8 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
       list = list.filter((c) => c.category === 'exotic');
     } else if (activeTab === 'Fictifs / Cyber') {
       list = list.filter((c) => c.category === 'cybersport');
+    } else if (activeTab === 'Personnalisés') {
+      list = list.filter((c) => (c as any).category === 'custom' || c.id.startsWith('custo-'));
     }
 
     // Filtre par Requête texte
@@ -310,20 +340,79 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
     // 2. Ajouter les équipes du catalogue local (pour garantir fallback immédiat)
     for (const comp of SPORTS_CATALOG) {
       for (const team of comp.teams) {
-        // Éviter les doublons exacts de nom
-        if (!allTeamEntries.some((e) => e.team.name.toLowerCase() === team.name.toLowerCase())) {
-          allTeamEntries.push({ team, comp });
-        }
+        allTeamEntries.push({ team, comp });
       }
+    }
+
+    // 3. Ajouter les équipes personnalisées du store
+    for (const ct of customTeams) {
+      const parentComp = customLeagues.find((cl) => cl.id === ct.leagueId);
+      const compObj: Competition = {
+        id: ct.leagueId,
+        name: parentComp ? parentComp.name : 'Championnat personnalisé',
+        category: 'custom' as any,
+        sport: parentComp?.sport || 'Football',
+        country: parentComp?.country || 'Personnalisé',
+        logo: parentComp?.logo || '',
+        teams: [],
+      };
+      allTeamEntries.unshift({
+        team: {
+          id: ct.id,
+          name: ct.name,
+          shortName: ct.shortName,
+          logo: ct.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(ct.name)}&background=243DB5&color=FFFFFF&size=128&bold=true&rounded=true`,
+          country: ct.country,
+          leagueId: ct.leagueId,
+        },
+        comp: compObj,
+      });
     }
 
     // Restriction optionnelle à la ligue choisie
     if (useLeagueConstraint && filterCompetitionId) {
-      allTeamEntries = allTeamEntries.filter(
-        (e) =>
-          e.comp.id === filterCompetitionId ||
-          e.comp.name.toLowerCase() === filterCompetitionId.toLowerCase()
-      );
+      const cleanFilter = filterCompetitionId.trim().toLowerCase();
+      const normFilter = cleanFilter.replace(/[^a-z0-9]/g, '');
+      const isFifaFilter = cleanFilter.includes('fifa') || cleanFilter.includes('fc2') || cleanFilter.startsWith('fc ');
+      const isLaLigaFilter =
+        !isFifaFilter &&
+        (cleanFilter === 'la-liga' ||
+          cleanFilter === 'laliga' ||
+          cleanFilter === '140' ||
+          cleanFilter === '4335' ||
+          cleanFilter === 'la liga' ||
+          cleanFilter === 'spanish la liga' ||
+          cleanFilter.includes('la liga ea') ||
+          cleanFilter.includes('laliga ea'));
+
+      allTeamEntries = allTeamEntries.filter((e) => {
+        const compId = e.comp.id.toLowerCase();
+        const compName = e.comp.name.toLowerCase();
+        const normCompId = compId.replace(/[^a-z0-9]/g, '');
+        const normCompName = compName.replace(/[^a-z0-9]/g, '');
+        const isCompFifa = e.comp.category === 'fifa' || compId.includes('fifa') || compId.includes('fc2');
+
+        if (isLaLigaFilter && !isCompFifa) {
+          if (
+            compId === 'la-liga' ||
+            compId === 'laliga' ||
+            compId === '140' ||
+            compId === '4335' ||
+            compName.includes('la liga') ||
+            compName.includes('laliga')
+          ) {
+            return true;
+          }
+        }
+
+        return (
+          compId === cleanFilter ||
+          compName === cleanFilter ||
+          (normFilter.length >= 4 &&
+            isCompFifa === isFifaFilter &&
+            (normCompId === normFilter || normCompName === normFilter || normCompName.includes(normFilter) || normFilter.includes(normCompName)))
+        );
+      });
     }
 
     // Filtre par Onglet de Catégorie
@@ -347,6 +436,10 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
       allTeamEntries = allTeamEntries.filter((e) => e.comp.category === 'exotic');
     } else if (activeTab === 'Fictifs / Cyber') {
       allTeamEntries = allTeamEntries.filter((e) => e.comp.category === 'cybersport');
+    } else if (activeTab === 'Personnalisés') {
+      allTeamEntries = allTeamEntries.filter(
+        (e) => (e.comp as any).category === 'custom' || e.comp.id.startsWith('custo-')
+      );
     }
 
     // Filtre par Requête texte
@@ -361,7 +454,18 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
       );
     }
 
-    return allTeamEntries;
+    // Déduplication finale par nom d'équipe après filtrage par ligue/catégorie
+    const seenTeams = new Set<string>();
+    const deduplicated: { team: Team | SportsTeam; comp: Competition | SportsLeague }[] = [];
+    for (const entry of allTeamEntries) {
+      const key = entry.team.name.trim().toLowerCase();
+      if (!seenTeams.has(key)) {
+        seenTeams.add(key);
+        deduplicated.push(entry);
+      }
+    }
+
+    return deduplicated;
   }, [mode, activeTab, searchQuery, useLeagueConstraint, filterCompetitionId, dynamicTeams, constrainedCompetition]);
 
   return (

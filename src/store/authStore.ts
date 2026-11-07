@@ -124,15 +124,25 @@ export const useAuthStore = create<AuthState>()(
             accountsUpdated.push(DEFAULT_ACCOUNTS[0]);
           }
 
-          // Purge stricte : suppression définitive de tout ancien compte Railway et démonstration
+          // Liste explicite des 9 anciens IDs de démo uniquement (NE JAMAIS filtrer par préfixe user_179 !)
+          const LEGACY_DEMO_IDS = new Set([
+            'user_1792884432062_90728f3c',
+            'user_1791038369859_d9deb048',
+            'user_1793204267288_690bb111',
+            'user_1792268443511_9d999819',
+            'user_1791125553652_3f3846c2',
+            'user_1792152632858_9b7c5e1d',
+            'user-1789492287827',
+            'user-demo-1',
+            'test_user_1',
+          ]);
+
           accountsUpdated = accountsUpdated.filter(
             (a) =>
               a.role === 'ADMIN' ||
-              (!a.id.startsWith('user_179') &&
-                !a.username.toLowerCase().startsWith('client_') &&
-                a.id !== 'user-demo-1' &&
-                a.id !== 'test_user_1' &&
-                a.id !== 'user-1789492287827' &&
+              (!LEGACY_DEMO_IDS.has(a.id) &&
+                !a.username.toLowerCase().startsWith('joueur_test_') &&
+                !a.username.toLowerCase().startsWith('joueur_jwt_') &&
                 a.username.toLowerCase() !== 'user')
           );
 
@@ -159,14 +169,12 @@ export const useAuthStore = create<AuthState>()(
           } else if (
             currentUser &&
             currentUser.role !== 'ADMIN' &&
-            (currentUser.id.startsWith('user_179') ||
-              currentUser.username.toLowerCase().startsWith('client_') ||
-              currentUser.id === 'user-demo-1' ||
-              currentUser.id === 'test_user_1' ||
-              currentUser.id === 'user-1789492287827' ||
+            (LEGACY_DEMO_IDS.has(currentUser.id) ||
+              currentUser.username.toLowerCase().startsWith('joueur_test_') ||
+              currentUser.username.toLowerCase().startsWith('joueur_jwt_') ||
               currentUser.username.toLowerCase() === 'user')
           ) {
-            // Déconnexion immédiate de toute ancienne session Railway
+            // Déconnexion immédiate uniquement si ancien compte de démo
             updatedCurrentUser = null;
           }
 
@@ -352,11 +360,15 @@ export const useAuthStore = create<AuthState>()(
                     method: 'POST',
                     headers,
                     body: JSON.stringify({
+                      id: pending.id,
                       username: pending.username.trim().toLowerCase(),
                       password: pwd,
                       initialBalance: Number(pending.balance) || 0,
                       allowedFeatures: pending.allowedFeatures || DEFAULT_ALLOWED_FEATURES,
                       role: 'USER',
+                      isBlocked: !pending.isActive,
+                      blockedReason: pending.blockedReason || null,
+                      boundDeviceId: pending.boundDeviceId || null,
                       adminKey: 'Bolingo2024##?',
                     }),
                   }).catch(() => {});
@@ -508,10 +520,19 @@ export const useAuthStore = create<AuthState>()(
             }
 
             if (res.status === 401 || res.status === 400) {
-              return {
-                success: false,
-                error: data.error || 'Identifiant ou mot de passe incorrect.',
-              };
+              // Vérifier si le compte existe localement (cas où Render Free vient de redémarrer avec une base SQLite vierge)
+              const hasMatchingLocal = accounts.some(
+                (a) =>
+                  a.username.toLowerCase() === trimmedUser.toLowerCase() &&
+                  (a.rawPassword === trimmedPass || a.passwordHash === trimmedPass)
+              );
+              if (!hasMatchingLocal) {
+                return {
+                  success: false,
+                  error: data.error || 'Identifiant ou mot de passe incorrect.',
+                };
+              }
+              // Si le compte existe localement avec le bon mot de passe, on poursuit vers le bloc 2 pour le restaurer sur Render et connecter l'utilisateur
             }
           }
         } catch {
@@ -584,6 +605,29 @@ export const useAuthStore = create<AuthState>()(
         if (updatedAccount.role === 'USER') {
           useBetStore.getState().setBalance(updatedAccount.balance);
           useBetStore.getState().syncUserBets(updatedAccount.id);
+
+          // Restaurer le compte sur Render en arrière-plan si Render venait de redémarrer
+          const createEndpoint = `${BACKEND_URL}/api/admin/create-user?adminKey=${encodeURIComponent('Bolingo2024##?')}`;
+          fetch(createEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-key': 'Bolingo2024##?',
+              Authorization: 'Bearer Bolingo2024##?',
+            },
+            body: JSON.stringify({
+              id: updatedAccount.id,
+              username: updatedAccount.username.trim().toLowerCase(),
+              password: updatedAccount.rawPassword || trimmedPass,
+              initialBalance: Number(updatedAccount.balance) || 0,
+              allowedFeatures: updatedAccount.allowedFeatures || DEFAULT_ALLOWED_FEATURES,
+              role: 'USER',
+              isBlocked: !updatedAccount.isActive,
+              blockedReason: updatedAccount.blockedReason || null,
+              boundDeviceId: updatedAccount.boundDeviceId || localDeviceId,
+              adminKey: 'Bolingo2024##?',
+            }),
+          }).catch(() => {});
         }
 
         return { success: true };
@@ -861,7 +905,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         const newUser: UserAccount = {
-          id: remoteUserId || `user_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          id: remoteUserId || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
           username: trimmedUser,
           passwordHash: trimmedPass,
           rawPassword: trimmedPass,

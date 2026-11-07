@@ -25,9 +25,9 @@ export const EXTENDED_LEAGUES_DATA: LeagueData[] = [
   // 1. EUROPE (15 CHAMPIONNATS)
   // =========================================================================
 
-  // 1.1 ANGLETERRE : PREMIER LEAGUE
+  // 1.1 ANGLETERRE : PREMIER LEAGUE (20 équipes)
   {
-    id: 'epl',
+    id: 'premier-league',
     name: 'Premier League',
     country: 'Angleterre',
     category: 'Europe',
@@ -40,50 +40,58 @@ export const EXTENDED_LEAGUES_DATA: LeagueData[] = [
       { id: 'che', name: 'Chelsea FC', shortCode: 'CHE', logoUrl: 'https://media.api-sports.io/football/teams/49.png' },
       { id: 'mun', name: 'Manchester United', shortCode: 'MUN', logoUrl: 'https://media.api-sports.io/football/teams/33.png' },
       { id: 'tot', name: 'Tottenham Hotspur', shortCode: 'TOT', logoUrl: 'https://media.api-sports.io/football/teams/47.png' },
-      { id: 'avl', name: 'Aston Villa', shortCode: 'AVL', logoUrl: 'https://media.api-sports.io/football/teams/66.png' },
       { id: 'new', name: 'Newcastle United', shortCode: 'NEW', logoUrl: 'https://media.api-sports.io/football/teams/34.png' },
+      { id: 'avl', name: 'Aston Villa', shortCode: 'AVL', logoUrl: 'https://media.api-sports.io/football/teams/66.png' },
       { id: 'bha', name: 'Brighton & Hove Albion', shortCode: 'BHA', logoUrl: 'https://media.api-sports.io/football/teams/51.png' },
       { id: 'whu', name: 'West Ham United', shortCode: 'WHU', logoUrl: 'https://media.api-sports.io/football/teams/48.png' },
-      { id: 'wol', name: 'Wolverhampton Wanderers', shortCode: 'WOL', logoUrl: 'https://media.api-sports.io/football/teams/39.png' },
-      { id: 'eve', name: 'Everton FC', shortCode: 'EVE', logoUrl: 'https://media.api-sports.io/football/teams/45.png' },
       { id: 'cry', name: 'Crystal Palace', shortCode: 'CRY', logoUrl: 'https://media.api-sports.io/football/teams/52.png' },
       { id: 'ful', name: 'Fulham FC', shortCode: 'FUL', logoUrl: 'https://media.api-sports.io/football/teams/36.png' },
       { id: 'bre', name: 'Brentford FC', shortCode: 'BRE', logoUrl: 'https://media.api-sports.io/football/teams/55.png' },
+      { id: 'wol', name: 'Wolverhampton Wanderers', shortCode: 'WOL', logoUrl: 'https://media.api-sports.io/football/teams/39.png' },
+      { id: 'eve', name: 'Everton FC', shortCode: 'EVE', logoUrl: 'https://media.api-sports.io/football/teams/45.png' },
+      { id: 'bou', name: 'AFC Bournemouth', shortCode: 'BOU', logoUrl: 'https://media.api-sports.io/football/teams/35.png' },
       { id: 'nfo', name: 'Nottingham Forest', shortCode: 'NFO', logoUrl: 'https://media.api-sports.io/football/teams/65.png' },
+      { id: 'lei', name: 'Leicester City', shortCode: 'LEI', logoUrl: 'https://media.api-sports.io/football/teams/46.png' },
+      { id: 'sou', name: 'Southampton FC', shortCode: 'SOU', logoUrl: 'https://media.api-sports.io/football/teams/41.png' },
+      { id: 'ips', name: 'Ipswich Town', shortCode: 'IPS', logoUrl: 'https://media.api-sports.io/football/teams/57.png' },
     ],
   },
 
-  // 1.2 ESPAGNE : LALIGA EA SPORTS
+  // 1.2 ESPAGNE : LALIGA EA SPORTS (20 équipes)
   {
-    id: 'laliga',
-    name: 'LaLiga EA Sports',
+    id: 'la-liga',
+    name: 'La Liga EA Sports',
     country: 'Espagne',
     category: 'Europe',
     isMajor: true,
     logoUrl: 'https://media.api-sports.io/football/leagues/140.png',
     clubs: [
       { id: 'rma', name: 'Real Madrid', shortCode: 'RMA', logoUrl: 'https://media.api-sports.io/football/teams/541.png' },
-      { id: 'bar', name: 'FC Barcelone', shortCode: 'BAR', logoUrl: 'https://media.api-sports.io/football/teams/529.png' },
-      { id: 'atm', name: 'Atletico de Madrid', shortCode: 'ATM', logoUrl: 'https://media.api-sports.io/football/teams/530.png' },
-      { id: 'sev', name: 'Seville FC', shortCode: 'SEV', logoUrl: 'https://media.api-sports.io/football/teams/536.png' },
-      { id: 'bil', name: 'Athletic Club Bilbao', shortCode: 'BIL', logoUrl: 'https://media.api-sports.io/football/teams/531.png' },
+      { id: 'bar', name: 'FC Barcelona', shortCode: 'BAR', logoUrl: 'https://media.api-sports.io/football/teams/529.png' },
+      { id: 'atm', name: 'Atlético Madrid', shortCode: 'ATM', logoUrl: 'https://media.api-sports.io/football/teams/530.png' },
+      { id: 'bil', name: 'Athletic Bilbao', shortCode: 'ATH', logoUrl: 'https://media.api-sports.io/football/teams/531.png' },
       { id: 'vil', name: 'Villarreal CF', shortCode: 'VIL', logoUrl: 'https://media.api-sports.io/football/teams/533.png' },
-      { id: 'bet', name: 'Real Betis', shortCode: 'BET', logoUrl: 'https://media.api-sports.io/football/teams/543.png' },
       { id: 'rso', name: 'Real Sociedad', shortCode: 'RSO', logoUrl: 'https://media.api-sports.io/football/teams/548.png' },
+      { id: 'bet', name: 'Real Betis', shortCode: 'BET', logoUrl: 'https://media.api-sports.io/football/teams/543.png' },
+      { id: 'sev', name: 'Sevilla FC', shortCode: 'SEV', logoUrl: 'https://media.api-sports.io/football/teams/536.png' },
       { id: 'val', name: 'Valencia CF', shortCode: 'VAL', logoUrl: 'https://media.api-sports.io/football/teams/532.png' },
+      { id: 'gir', name: 'Girona FC', shortCode: 'GIR', logoUrl: 'https://media.api-sports.io/football/teams/547.png' },
       { id: 'osa', name: 'CA Osasuna', shortCode: 'OSA', logoUrl: 'https://media.api-sports.io/football/teams/727.png' },
-      { id: 'get', name: 'Getafe CF', shortCode: 'GET', logoUrl: 'https://media.api-sports.io/football/teams/546.png' },
       { id: 'cel', name: 'RC Celta Vigo', shortCode: 'CEL', logoUrl: 'https://media.api-sports.io/football/teams/538.png' },
       { id: 'ray', name: 'Rayo Vallecano', shortCode: 'RAY', logoUrl: 'https://media.api-sports.io/football/teams/728.png' },
       { id: 'mll', name: 'RCD Mallorca', shortCode: 'MLL', logoUrl: 'https://media.api-sports.io/football/teams/798.png' },
-      { id: 'gir', name: 'Girona FC', shortCode: 'GIR', logoUrl: 'https://media.api-sports.io/football/teams/547.png' },
+      { id: 'get', name: 'Getafe CF', shortCode: 'GET', logoUrl: 'https://media.api-sports.io/football/teams/546.png' },
+      { id: 'ala', name: 'Deportivo Alavés', shortCode: 'ALA', logoUrl: 'https://media.api-sports.io/football/teams/542.png' },
+      { id: 'esp', name: 'RCD Espanyol', shortCode: 'ESP', logoUrl: 'https://media.api-sports.io/football/teams/540.png' },
+      { id: 'leg', name: 'CD Leganés', shortCode: 'LEG', logoUrl: 'https://media.api-sports.io/football/teams/537.png' },
       { id: 'lpa', name: 'UD Las Palmas', shortCode: 'LPA', logoUrl: 'https://media.api-sports.io/football/teams/534.png' },
+      { id: 'vld', name: 'Real Valladolid', shortCode: 'VLD', logoUrl: 'https://media.api-sports.io/football/teams/720.png' },
     ],
   },
 
-  // 1.3 ITALIE : SERIE A
+  // 1.3 ITALIE : SERIE A (20 équipes)
   {
-    id: 'seriea',
+    id: 'serie-a',
     name: 'Serie A',
     country: 'Italie',
     category: 'Europe',
@@ -91,8 +99,8 @@ export const EXTENDED_LEAGUES_DATA: LeagueData[] = [
     logoUrl: 'https://media.api-sports.io/football/leagues/135.png',
     clubs: [
       { id: 'int', name: 'Inter Milan', shortCode: 'INT', logoUrl: 'https://media.api-sports.io/football/teams/505.png' },
-      { id: 'juv', name: 'Juventus FC', shortCode: 'JUV', logoUrl: 'https://media.api-sports.io/football/teams/496.png' },
       { id: 'acm', name: 'AC Milan', shortCode: 'ACM', logoUrl: 'https://media.api-sports.io/football/teams/489.png' },
+      { id: 'juv', name: 'Juventus FC', shortCode: 'JUV', logoUrl: 'https://media.api-sports.io/football/teams/496.png' },
       { id: 'nap', name: 'SSC Napoli', shortCode: 'NAP', logoUrl: 'https://media.api-sports.io/football/teams/492.png' },
       { id: 'rom', name: 'AS Roma', shortCode: 'ROM', logoUrl: 'https://media.api-sports.io/football/teams/497.png' },
       { id: 'laz', name: 'SS Lazio', shortCode: 'LAZ', logoUrl: 'https://media.api-sports.io/football/teams/487.png' },
@@ -106,10 +114,14 @@ export const EXTENDED_LEAGUES_DATA: LeagueData[] = [
       { id: 'cag', name: 'Cagliari Calcio', shortCode: 'CAG', logoUrl: 'https://media.api-sports.io/football/teams/490.png' },
       { id: 'ver', name: 'Hellas Verona', shortCode: 'VER', logoUrl: 'https://media.api-sports.io/football/teams/504.png' },
       { id: 'lec', name: 'US Lecce', shortCode: 'LEC', logoUrl: 'https://media.api-sports.io/football/teams/867.png' },
+      { id: 'emp', name: 'Empoli FC', shortCode: 'EMP', logoUrl: 'https://media.api-sports.io/football/teams/511.png' },
+      { id: 'par', name: 'Parma Calcio 1913', shortCode: 'PAR', logoUrl: 'https://media.api-sports.io/football/teams/523.png' },
+      { id: 'com', name: 'Como 1907', shortCode: 'COM', logoUrl: 'https://media.api-sports.io/football/teams/895.png' },
+      { id: 'ven', name: 'Venezia FC', shortCode: 'VEN', logoUrl: 'https://media.api-sports.io/football/teams/517.png' },
     ],
   },
 
-  // 1.4 ALLEMAGNE : BUNDESLIGA
+  // 1.4 ALLEMAGNE : BUNDESLIGA (18 équipes)
   {
     id: 'bundesliga',
     name: 'Bundesliga',
@@ -122,8 +134,8 @@ export const EXTENDED_LEAGUES_DATA: LeagueData[] = [
       { id: 'bvb', name: 'Borussia Dortmund', shortCode: 'BVB', logoUrl: 'https://media.api-sports.io/football/teams/165.png' },
       { id: 'b04', name: 'Bayer Leverkusen', shortCode: 'B04', logoUrl: 'https://media.api-sports.io/football/teams/168.png' },
       { id: 'rbl', name: 'RB Leipzig', shortCode: 'RBL', logoUrl: 'https://media.api-sports.io/football/teams/173.png' },
-      { id: 'fra', name: 'Eintracht Frankfurt', shortCode: 'FRA', logoUrl: 'https://media.api-sports.io/football/teams/169.png' },
       { id: 'vfb', name: 'VfB Stuttgart', shortCode: 'VFB', logoUrl: 'https://media.api-sports.io/football/teams/172.png' },
+      { id: 'fra', name: 'Eintracht Frankfurt', shortCode: 'SGE', logoUrl: 'https://media.api-sports.io/football/teams/169.png' },
       { id: 'wob', name: 'VfL Wolfsburg', shortCode: 'WOB', logoUrl: 'https://media.api-sports.io/football/teams/161.png' },
       { id: 'scf', name: 'SC Freiburg', shortCode: 'SCF', logoUrl: 'https://media.api-sports.io/football/teams/160.png' },
       { id: 'tsg', name: 'TSG 1899 Hoffenheim', shortCode: 'TSG', logoUrl: 'https://media.api-sports.io/football/teams/167.png' },
@@ -133,13 +145,15 @@ export const EXTENDED_LEAGUES_DATA: LeagueData[] = [
       { id: 'm05', name: '1. FSV Mainz 05', shortCode: 'M05', logoUrl: 'https://media.api-sports.io/football/teams/164.png' },
       { id: 'fca', name: 'FC Augsburg', shortCode: 'FCA', logoUrl: 'https://media.api-sports.io/football/teams/170.png' },
       { id: 'hdh', name: '1. FC Heidenheim', shortCode: 'HDH', logoUrl: 'https://media.api-sports.io/football/teams/180.png' },
+      { id: 'boc', name: 'VfL Bochum', shortCode: 'BOC', logoUrl: 'https://media.api-sports.io/football/teams/176.png' },
       { id: 'stp', name: 'FC St. Pauli', shortCode: 'STP', logoUrl: 'https://media.api-sports.io/football/teams/186.png' },
+      { id: 'kie', name: 'Holstein Kiel', shortCode: 'KIE', logoUrl: 'https://media.api-sports.io/football/teams/191.png' },
     ],
   },
 
-  // 1.5 FRANCE : LIGUE 1 MCDONALD'S
+  // 1.5 FRANCE : LIGUE 1 MCDONALD'S (18 équipes)
   {
-    id: 'ligue1',
+    id: 'ligue-1',
     name: "Ligue 1 McDonald's",
     country: 'France',
     category: 'Europe',
@@ -148,20 +162,22 @@ export const EXTENDED_LEAGUES_DATA: LeagueData[] = [
     clubs: [
       { id: 'psg', name: 'Paris Saint-Germain', shortCode: 'PSG', logoUrl: 'https://media.api-sports.io/football/teams/85.png' },
       { id: 'om', name: 'Olympique de Marseille', shortCode: 'OM', logoUrl: 'https://media.api-sports.io/football/teams/81.png' },
-      { id: 'ol', name: 'Olympique Lyonnais', shortCode: 'OL', logoUrl: 'https://media.api-sports.io/football/teams/80.png' },
       { id: 'asm', name: 'AS Monaco', shortCode: 'ASM', logoUrl: 'https://media.api-sports.io/football/teams/91.png' },
+      { id: 'ol', name: 'Olympique Lyonnais', shortCode: 'OL', logoUrl: 'https://media.api-sports.io/football/teams/80.png' },
       { id: 'lil', name: 'LOSC Lille', shortCode: 'LIL', logoUrl: 'https://media.api-sports.io/football/teams/79.png' },
-      { id: 'ren', name: 'Stade Rennais FC', shortCode: 'REN', logoUrl: 'https://media.api-sports.io/football/teams/94.png' },
-      { id: 'nis', name: 'OGC Nice', shortCode: 'NIS', logoUrl: 'https://media.api-sports.io/football/teams/84.png' },
+      { id: 'nis', name: 'OGC Nice', shortCode: 'NIC', logoUrl: 'https://media.api-sports.io/football/teams/84.png' },
       { id: 'rcl', name: 'RC Lens', shortCode: 'RCL', logoUrl: 'https://media.api-sports.io/football/teams/116.png' },
+      { id: 'ren', name: 'Stade Rennais FC', shortCode: 'REN', logoUrl: 'https://media.api-sports.io/football/teams/94.png' },
+      { id: 'sb29', name: 'Stade Brestois 29', shortCode: 'BRE', logoUrl: 'https://media.api-sports.io/football/teams/106.png' },
       { id: 'tfc', name: 'Toulouse FC', shortCode: 'TFC', logoUrl: 'https://media.api-sports.io/football/teams/96.png' },
       { id: 'sdr', name: 'Stade de Reims', shortCode: 'SDR', logoUrl: 'https://media.api-sports.io/football/teams/93.png' },
-      { id: 'mhsc', name: 'Montpellier HSC', shortCode: 'MHS', logoUrl: 'https://media.api-sports.io/football/teams/82.png' },
       { id: 'rcsa', name: 'RC Strasbourg Alsace', shortCode: 'RCS', logoUrl: 'https://media.api-sports.io/football/teams/95.png' },
       { id: 'fcn', name: 'FC Nantes', shortCode: 'FCN', logoUrl: 'https://media.api-sports.io/football/teams/83.png' },
-      { id: 'sb29', name: 'Stade Brestois 29', shortCode: 'BRE', logoUrl: 'https://media.api-sports.io/football/teams/106.png' },
+      { id: 'mhsc', name: 'Montpellier HSC', shortCode: 'MHS', logoUrl: 'https://media.api-sports.io/football/teams/82.png' },
       { id: 'hac', name: 'Le Havre AC', shortCode: 'HAC', logoUrl: 'https://media.api-sports.io/football/teams/111.png' },
       { id: 'aja', name: 'AJ Auxerre', shortCode: 'AUX', logoUrl: 'https://media.api-sports.io/football/teams/108.png' },
+      { id: 'ang', name: 'Angers SCO', shortCode: 'ANG', logoUrl: 'https://media.api-sports.io/football/teams/77.png' },
+      { id: 'asse', name: 'AS Saint-Étienne', shortCode: 'ASSE', logoUrl: 'https://media.api-sports.io/football/teams/1063.png' },
     ],
   },
 

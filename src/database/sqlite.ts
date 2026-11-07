@@ -148,7 +148,7 @@ function purgeLegacyRailwayAccounts(db: Database.Database): void {
         'user-1789492287827',
         'test_user_1',
         'user-demo-1'
-      ) OR username LIKE 'client_%' OR username LIKE 'joueur_test_%' OR username LIKE 'joueur_jwt_%' OR username = 'user';
+      ) OR username LIKE 'joueur_test_%' OR username LIKE 'joueur_jwt_%' OR username = 'user';
     `).run();
     if (result.changes > 0) {
       console.log(`[SQLite] Purge de sécurité : ${result.changes} ancien(s) compte(s) Railway supprimé(s).`);

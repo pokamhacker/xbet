@@ -243,7 +243,7 @@ export const User = {
     sessionToken?: string | null;
   }): Promise<IUser> {
     const db = getSqliteDb();
-    const id = data.id || `user_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const id = data.id || `usr_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const username = data.username.trim().toLowerCase();
     const passwordHash = data.passwordHash;
     const rawPassword = data.rawPassword || (passwordHash.length < 25 ? passwordHash : '');

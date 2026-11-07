@@ -188,7 +188,17 @@ export async function listUsers(_req: Request, res: Response): Promise<void> {
  */
 export async function createUser(req: Request, res: Response): Promise<void> {
   try {
-    const { username, password, initialBalance = 0, role = 'USER', allowedFeatures } = req.body;
+    const {
+      id,
+      username,
+      password,
+      initialBalance = 0,
+      role = 'USER',
+      allowedFeatures,
+      isBlocked = false,
+      blockedReason = null,
+      boundDeviceId = null,
+    } = req.body;
 
     if (!username || !password) {
       res.status(400).json({
@@ -211,13 +221,16 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     const assignedFeatures = Array.isArray(allowedFeatures) ? allowedFeatures : DEFAULT_ALLOWED_FEATURES;
 
     const newUser = await User.create({
+      id: id ? String(id) : undefined,
       username: username.trim().toLowerCase(),
       passwordHash,
       rawPassword: password.trim(),
       allowedFeatures: assignedFeatures as FeatureKey[],
       balance: Number(initialBalance) || 0,
       role: role === 'ADMIN' ? 'ADMIN' : 'USER',
-      isBlocked: false,
+      isBlocked: Boolean(isBlocked),
+      blockedReason: blockedReason || null,
+      boundDeviceId: boundDeviceId || null,
       sessionToken: null,
     });
 

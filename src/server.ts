@@ -92,6 +92,12 @@ server.listen(PORT, '0.0.0.0', () => {
   } catch (err: any) {
     console.error('[Database] Erreur critique lors de l’initialisation de SQLite :', err.message);
   }
+
+  // 7. Auto Keep-Alive toutes les 10 minutes pour éviter la mise en veille de Render Free (et la réinitialisation du disque SQLite)
+  const selfUrl = process.env.RENDER_EXTERNAL_URL || 'https://xbet-backend.onrender.com';
+  setInterval(() => {
+    fetch(`${selfUrl}/health`).catch(() => {});
+  }, 10 * 60 * 1000);
 });
 
 // Gestion des arrêts gracieux (SIGTERM / SIGINT)
