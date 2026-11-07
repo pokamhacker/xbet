@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getSqliteDb } from '../database/sqlite';
+import { getSqliteDb, saveUsersSnapshotToDisk } from '../database/sqlite';
 import { DEFAULT_ALLOWED_FEATURES, FeatureKey } from '../types/permissions';
 
 export type UserRole = 'ADMIN' | 'USER';
@@ -131,6 +131,7 @@ export class SQLiteUser implements IUser {
       db.prepare(sql).run(params);
     }
 
+    saveUsersSnapshotToDisk(db);
     this.updatedAt = new Date();
     return this;
   }
@@ -281,12 +282,16 @@ export const User = {
 
     const user = await this.findById(id);
     if (!user) throw new Error("Erreur lors de la création de l'utilisateur dans SQLite.");
+    saveUsersSnapshotToDisk(db);
     return user;
   },
 
   async findByIdAndDelete(id: string): Promise<boolean> {
     const db = getSqliteDb();
     const result = db.prepare('DELETE FROM users WHERE id = ?').run(String(id));
+    if (result.changes > 0) {
+      saveUsersSnapshotToDisk(db);
+    }
     return result.changes > 0;
   },
 

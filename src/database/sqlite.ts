@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 const DB_DIR = path.resolve(__dirname, '../data');
 const SCHEMA_PATH = path.resolve(__dirname, 'schema.sql');
 const LEGACY_JSON_BETS_FILE = path.join(DB_DIR, 'bets_db.json');
+const USERS_SNAPSHOT_FILE = path.join(DB_DIR, 'users_snapshot.json');
 
 let dbInstance: Database.Database | null = null;
 
@@ -79,6 +80,9 @@ export function getSqliteDb(): Database.Database {
     // 2. Initialiser les accès administrateur s'ils n'existent pas
     seedDefaultUsers(dbInstance);
 
+    // 2b. Restaurer les utilisateurs sauvegardés depuis users_snapshot.json après redéploiement
+    seedUsersSnapshot(dbInstance);
+
     // 3. Migrer les anciens paris depuis bets_db.json si la table bets est vide
     migrateLegacyBets(dbInstance);
 
@@ -94,6 +98,7 @@ export function getSqliteDb(): Database.Database {
       try {
         initSchema(dbInstance);
         seedDefaultUsers(dbInstance);
+        seedUsersSnapshot(dbInstance);
       } catch (memErr) {
         console.error('[SQLite] Erreur schéma en mémoire :', memErr);
       }
@@ -215,6 +220,104 @@ function seedDefaultUsers(db: Database.Database): void {
   } catch (error) {
     console.warn('[SQLite] Erreur lors de l’initialisation de l’administrateur :', error);
   }
+}
+
+/**
+ * Restaure automatiquement les comptes utilisateurs depuis src/data/users_snapshot.json
+ * lors d'un redéploiement ou redémarrage du conteneur Render
+ */
+function seedUsersSnapshot(db: Database.Database): void {
+  try {
+    if (!fs.existsSync(USERS_SNAPSHOT_FILE)) {
+      return;
+    }
+    const raw = fs.readFileSync(USERS_SNAPSHOT_FILE, 'utf-8');
+    const savedUsers = JSON.parse(raw);
+    if (!Array.isArray(savedUsers) || savedUsers.length === 0) {
+      return;
+    }
+
+    const defaultFeaturesJson = JSON.stringify([
+      'studio_match',
+      'studio_tv',
+      'studio_mk',
+      'game_crash',
+      'game_apple',
+      'game_royal_feast',
+      'game_kamikaze',
+    ]);
+
+    const insertUser = db.prepare(`
+      INSERT OR IGNORE INTO users (
+        id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
+        blocked_reason, bound_device_id, last_device_id, session_token, created_at, updated_at
+      ) VALUES (
+        @id, @username, @password_hash, @raw_password, @allowed_features, @role, @balance, @is_blocked,
+        @blocked_reason, @bound_device_id, @last_device_id, @session_token, @created_at, datetime('now')
+      )
+    `);
+
+    let restoredCount = 0;
+    const tx = db.transaction(() => {
+      for (const u of savedUsers) {
+        const uname = String(u.username || '').trim().toLowerCase();
+        if (!uname || uname === 'bookmekerstudio' || uname === 'admin') continue;
+        const rawPwd = String(u.raw_password || u.rawPassword || u.password || '');
+        const pwdHash =
+          u.password_hash && String(u.password_hash).startsWith('$2')
+            ? String(u.password_hash)
+            : rawPwd
+              ? bcrypt.hashSync(rawPwd, 10)
+              : '';
+        const featuresStr = Array.isArray(u.allowedFeatures)
+          ? JSON.stringify(u.allowedFeatures)
+          : typeof u.allowed_features === 'string' && u.allowed_features
+            ? u.allowed_features
+            : defaultFeaturesJson;
+
+        const res = insertUser.run({
+          id: String(u.id || u._id || `usr_${Date.now()}`),
+          username: uname,
+          password_hash: pwdHash,
+          raw_password: rawPwd || null,
+          allowed_features: featuresStr,
+          role: u.role === 'ADMIN' ? 'ADMIN' : 'USER',
+          balance: Number(u.balance) || 0,
+          is_blocked: u.is_blocked || u.isBlocked ? 1 : 0,
+          blocked_reason: u.blocked_reason || u.blockedReason || null,
+          bound_device_id: u.bound_device_id || u.boundDeviceId || null,
+          last_device_id: u.last_device_id || u.lastDeviceId || null,
+          session_token: u.session_token || u.sessionToken || null,
+          created_at: u.created_at || u.createdAt || new Date().toISOString(),
+        });
+        if (res.changes > 0) restoredCount++;
+      }
+    });
+
+    tx();
+    if (restoredCount > 0) {
+      console.log(`[SQLite] ${restoredCount} compte(s) restauré(s) depuis users_snapshot.json.`);
+    }
+  } catch (err) {
+    console.warn('[SQLite] Avertissement lors de la restauration de users_snapshot.json :', err);
+  }
+}
+
+/**
+ * Sauvegarde les utilisateurs actuels dans src/data/users_snapshot.json
+ */
+export function saveUsersSnapshotToDisk(db?: Database.Database): void {
+  try {
+    const activeDb = db || dbInstance;
+    if (!activeDb) return;
+    const rows = activeDb
+      .prepare("SELECT * FROM users WHERE LOWER(username) NOT IN ('bookmekerstudio', 'admin') ORDER BY created_at DESC")
+      .all();
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
+    }
+    fs.writeFileSync(USERS_SNAPSHOT_FILE, JSON.stringify(rows, null, 2), 'utf-8');
+  } catch (_) {}
 }
 
 /**
