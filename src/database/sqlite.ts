@@ -76,14 +76,14 @@ export function getSqliteDb(): Database.Database {
     // 1. Schéma des tables et index synchronisé
     initSchema(dbInstance);
 
-    // 2. Nettoyage de sécurité : suppression définitive de tout ancien compte Railway ou démo
-    purgeLegacyRailwayAccounts(dbInstance);
-
-    // 3. Initialiser les accès administrateur s'ils n'existent pas
+    // 2. Initialiser les accès administrateur s'ils n'existent pas
     seedDefaultUsers(dbInstance);
 
-    // Migrer les anciens paris depuis bets_db.json si la table bets est vide
+    // 3. Migrer les anciens paris depuis bets_db.json si la table bets est vide
     migrateLegacyBets(dbInstance);
+
+    // 4. Nettoyage de sécurité : suppression définitive de tout ancien compte Railway ou démo
+    purgeLegacyRailwayAccounts(dbInstance);
 
     return dbInstance;
   } catch (fatalError: any) {

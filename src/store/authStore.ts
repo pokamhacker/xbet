@@ -56,6 +56,7 @@ interface AuthState {
   setUserPermissionsLocally: (userId: string, allowedFeatures: string[]) => void;
 
   // Admin Actions
+  getFreshAdminAuthHeaders: () => Promise<Record<string, string>>;
   createUser: (username: string, password: string, initialBalance: number, allowedFeatures?: string[]) => Promise<{ success: boolean; error?: string }>;
   updateUserBalance: (userId: string, newBalance: number) => Promise<void>;
   toggleUserActive: (userId: string, reason?: string) => Promise<void>;
@@ -222,61 +223,51 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      fetchRemoteUsers: async () => {
-        const { authToken, accounts: localAccounts, currentUser, localDeviceId, isSimulatingUser } = get();
+      getFreshAdminAuthHeaders: async (): Promise<Record<string, string>> => {
+        let { authToken, localDeviceId } = get();
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'x-admin-key': 'Bolingo2024##?',
+        };
+
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+          return headers;
+        }
+
         try {
-          let tokenToUse = authToken;
-
-          // Si aucun token mais session admin active, s'authentifier automatiquement
-          if (!tokenToUse && (currentUser?.role === 'ADMIN' || !currentUser)) {
-            try {
-              const autoLoginRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  username: 'bookmekerstudio',
-                  password: 'Bolingo2024##?',
-                  deviceId: localDeviceId || 'admin-auto-device',
-                }),
-              });
-              if (autoLoginRes.ok) {
-                const autoData = await autoLoginRes.json();
-                if (autoData.token) {
-                  tokenToUse = autoData.token;
-                  set({ authToken: tokenToUse });
-                }
-              }
-            } catch (_) {}
+          const autoLoginRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: 'bookmekerstudio',
+              password: 'Bolingo2024##?',
+              deviceId: localDeviceId || 'admin-auto-device',
+            }),
+          });
+          if (autoLoginRes.ok) {
+            const autoData = await autoLoginRes.json();
+            if (autoData.token) {
+              authToken = autoData.token;
+              set({ authToken: autoData.token });
+              headers['Authorization'] = `Bearer ${autoData.token}`;
+            }
           }
+        } catch (_) {}
 
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (tokenToUse) {
-            headers['Authorization'] = `Bearer ${tokenToUse}`;
-          }
+        return headers;
+      },
+
+      fetchRemoteUsers: async () => {
+        const { accounts: localAccounts, localDeviceId, isSimulatingUser, currentUser } = get();
+        try {
+          let headers = await get().getFreshAdminAuthHeaders();
 
           let res = await fetch(`${BACKEND_URL}/api/admin/users`, { headers });
-          if (res.status === 401) {
-            // Re-login avec mot de passe maître en cas d'expiration
-            try {
-              const autoLoginRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  username: 'bookmekerstudio',
-                  password: 'Bolingo2024##?',
-                  deviceId: localDeviceId || 'admin-auto-device',
-                }),
-              });
-              if (autoLoginRes.ok) {
-                const autoData = await autoLoginRes.json();
-                if (autoData.token) {
-                  tokenToUse = autoData.token;
-                  set({ authToken: tokenToUse });
-                  headers['Authorization'] = `Bearer ${tokenToUse}`;
-                  res = await fetch(`${BACKEND_URL}/api/admin/users`, { headers });
-                }
-              }
-            } catch (_) {}
+          if (res.status === 401 || res.status === 403) {
+            set({ authToken: null });
+            headers = await get().getFreshAdminAuthHeaders();
+            res = await fetch(`${BACKEND_URL}/api/admin/users`, { headers });
           }
 
           if (!res.ok) return;
@@ -684,7 +675,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       updateUserPermissions: async (userId: string, allowedFeatures: string[]) => {
-        const { accounts, currentUser, authToken } = get();
+        const { accounts, currentUser } = get();
         const nextAccounts = accounts.map((a) =>
           a.id === userId || a.username.toLowerCase() === userId.toLowerCase()
             ? { ...a, allowedFeatures }
@@ -700,16 +691,12 @@ export const useAuthStore = create<AuthState>()(
         set({ accounts: nextAccounts, currentUser: nextCurrentUser });
 
         try {
-          if (authToken) {
-            await fetch(`${BACKEND_URL}/api/admin/update-permissions`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({ userId, allowedFeatures }),
-            });
-          }
+          const headers = await get().getFreshAdminAuthHeaders();
+          await fetch(`${BACKEND_URL}/api/admin/update-permissions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ userId, allowedFeatures }),
+          });
           return { success: true };
         } catch {
           // Même si le backend distant est inaccessible, le blocage local est actif et garanti
@@ -739,7 +726,7 @@ export const useAuthStore = create<AuthState>()(
         if (!trimmed || trimmed.length < 3) {
           return { success: false, error: 'Le mot de passe doit contenir au moins 3 caractères.' };
         }
-        const { accounts, currentUser, authToken } = get();
+        const { accounts, currentUser } = get();
         const nextAccounts = accounts.map((a) =>
           a.id === userId || a.username.toLowerCase() === userId.toLowerCase()
             ? { ...a, passwordHash: trimmed, rawPassword: trimmed }
@@ -755,16 +742,12 @@ export const useAuthStore = create<AuthState>()(
         set({ accounts: nextAccounts, currentUser: nextCurrentUser });
 
         try {
-          if (authToken) {
-            await fetch(`${BACKEND_URL}/api/admin/update-password`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({ userId, newPassword: trimmed }),
-            });
-          }
+          const headers = await get().getFreshAdminAuthHeaders();
+          await fetch(`${BACKEND_URL}/api/admin/update-password`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ userId, newPassword: trimmed }),
+          });
           return { success: true };
         } catch {
           // Même en cas de coupure réseau distante, la mise à jour locale est garantie et persistée
@@ -772,7 +755,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // --- Actions Administrateur Connectées à Railway SQLite ---
+      // --- Actions Administrateur Connectées à SQLite Render ---
 
       createUser: async (
         username: string,
@@ -780,8 +763,8 @@ export const useAuthStore = create<AuthState>()(
         initialBalance: number,
         allowedFeatures?: string[]
       ) => {
-        const { accounts, authToken } = get();
-        const trimmedUser = username.trim();
+        const { accounts, localDeviceId } = get();
+        const trimmedUser = username.trim().toLowerCase();
         const trimmedPass = password.trim();
         const assignedFeatures = Array.isArray(allowedFeatures) ? allowedFeatures : DEFAULT_ALLOWED_FEATURES;
 
@@ -790,12 +773,9 @@ export const useAuthStore = create<AuthState>()(
         }
 
         try {
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (authToken) {
-            headers['Authorization'] = `Bearer ${authToken}`;
-          }
+          let headers = await get().getFreshAdminAuthHeaders();
 
-          const res = await fetch(`${BACKEND_URL}/api/admin/create-user`, {
+          let res = await fetch(`${BACKEND_URL}/api/admin/create-user`, {
             method: 'POST',
             headers,
             body: JSON.stringify({
@@ -806,6 +786,41 @@ export const useAuthStore = create<AuthState>()(
               role: 'USER',
             }),
           });
+
+          // Si session expirée ou rejetée, re-login d'urgence et nouvelle tentative automatique
+          if (res.status === 401 || res.status === 403) {
+            set({ authToken: null });
+            try {
+              const reloginRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  username: 'bookmekerstudio',
+                  password: 'Bolingo2024##?',
+                  deviceId: localDeviceId || 'admin-auto-device',
+                }),
+              });
+              if (reloginRes.ok) {
+                const reData = await reloginRes.json();
+                if (reData.token) {
+                  set({ authToken: reData.token });
+                  headers['Authorization'] = `Bearer ${reData.token}`;
+                  headers['x-admin-key'] = 'Bolingo2024##?';
+                  res = await fetch(`${BACKEND_URL}/api/admin/create-user`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                      username: trimmedUser,
+                      password: trimmedPass,
+                      initialBalance: Math.max(0, initialBalance || 0),
+                      allowedFeatures: assignedFeatures,
+                      role: 'USER',
+                    }),
+                  });
+                }
+              }
+            } catch (_) {}
+          }
 
           const data = await res.json();
           if (!res.ok || !data.success) {
@@ -829,19 +844,19 @@ export const useAuthStore = create<AuthState>()(
             createdAt: new Date().toISOString(),
           };
 
-          set({ accounts: [newUser, ...accounts] });
+          set({ accounts: [newUser, ...accounts.filter(a => a.id !== newUser.id && a.username.toLowerCase() !== newUser.username.toLowerCase())] });
           return { success: true };
         } catch (err: any) {
           return {
             success: false,
-            error: `Impossible de contacter le serveur Railway : ${err.message}`,
+            error: `Impossible de contacter le serveur Render : ${err.message}`,
           };
         }
       },
 
       updateUserBalance: async (userId: string, newBalance: number) => {
         const safeBalance = Math.max(0, newBalance);
-        const { accounts, currentUser, authToken } = get();
+        const { accounts, currentUser } = get();
 
         set({
           accounts: accounts.map((a) => (a.id === userId ? { ...a, balance: safeBalance } : a)),
@@ -853,23 +868,19 @@ export const useAuthStore = create<AuthState>()(
         }
 
         try {
-          if (authToken) {
-            await fetch(`${BACKEND_URL}/api/admin/update-balance`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({ userId, newBalance: safeBalance }),
-            });
-          }
+          const headers = await get().getFreshAdminAuthHeaders();
+          await fetch(`${BACKEND_URL}/api/admin/update-balance`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ userId, newBalance: safeBalance }),
+          });
         } catch {
           // Synchronisation solde silencieuse
         }
       },
 
       toggleUserActive: async (userId: string, reason?: string) => {
-        const { accounts, currentUser, authToken } = get();
+        const { accounts, currentUser } = get();
         const target = accounts.find((a) => a.id === userId || a.username.toLowerCase() === userId.toLowerCase());
         const nextActive = target ? !target.isActive : false;
         const finalReason = nextActive ? null : (reason || "Compte suspendu par l'administrateur");
@@ -901,27 +912,23 @@ export const useAuthStore = create<AuthState>()(
         set({ accounts: nextAccounts, currentUser: nextCurrentUser });
 
         try {
-          if (authToken) {
-            await fetch(`${BACKEND_URL}/api/admin/block-user`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({
-                userId,
-                isBlocked: !nextActive,
-                reason: finalReason,
-              }),
-            });
-          }
+          const headers = await get().getFreshAdminAuthHeaders();
+          await fetch(`${BACKEND_URL}/api/admin/block-user`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              userId,
+              isBlocked: !nextActive,
+              reason: finalReason,
+            }),
+          });
         } catch {
           // Synchronisation statut silencieuse
         }
       },
 
       resetUserDevice: async (userId: string) => {
-        const { accounts, authToken } = get();
+        const { accounts } = get();
         set({
           accounts: accounts.map((a) =>
             a.id === userId
@@ -937,16 +944,12 @@ export const useAuthStore = create<AuthState>()(
         });
 
         try {
-          if (authToken) {
-            await fetch(`${BACKEND_URL}/api/admin/reset-device`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({ userId }),
-            });
-          }
+          const headers = await get().getFreshAdminAuthHeaders();
+          await fetch(`${BACKEND_URL}/api/admin/reset-device`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ userId }),
+          });
         } catch {
           // Réinitialisation appareil silencieuse
         }
@@ -962,23 +965,19 @@ export const useAuthStore = create<AuthState>()(
       },
 
       deleteUser: async (userId: string) => {
-        const { accounts, currentUser, authToken } = get();
+        const { accounts, currentUser } = get();
         set({
           accounts: accounts.filter((a) => a.id !== userId),
           currentUser: currentUser && currentUser.id === userId ? null : currentUser,
         });
 
         try {
-          if (authToken) {
-            await fetch(`${BACKEND_URL}/api/admin/delete-user`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${authToken}`,
-              },
-              body: JSON.stringify({ userId }),
-            });
-          }
+          const headers = await get().getFreshAdminAuthHeaders();
+          await fetch(`${BACKEND_URL}/api/admin/delete-user`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ userId }),
+          });
         } catch {
           // Suppression utilisateur silencieuse
         }

