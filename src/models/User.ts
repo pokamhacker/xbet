@@ -82,7 +82,23 @@ export class SQLiteUser implements IUser {
 
   async save(): Promise<IUser> {
     const db = getSqliteDb();
-    const updateStmt = db.prepare(`
+    const params = {
+      id: this.id,
+      username: this.username.trim().toLowerCase(),
+      password_hash: this.passwordHash,
+      raw_password: this.rawPassword || null,
+      allowed_features: JSON.stringify(this.allowedFeatures || DEFAULT_ALLOWED_FEATURES),
+      role: this.role,
+      balance: this.balance,
+      is_blocked: this.isBlocked ? 1 : 0,
+      blocked_reason: this.blockedReason,
+      bound_device_id: this.boundDeviceId,
+      last_device_id: this.lastDeviceId,
+      session_token: this.sessionToken,
+      last_login_at: this.lastLoginAt ? this.lastLoginAt.toISOString() : null,
+    };
+
+    const sql = `
       UPDATE users SET
         username = @username,
         password_hash = @password_hash,
@@ -98,23 +114,22 @@ export class SQLiteUser implements IUser {
         last_login_at = @last_login_at,
         updated_at = datetime('now')
       WHERE id = @id
-    `);
+    `;
 
-    updateStmt.run({
-      id: this.id,
-      username: this.username.trim().toLowerCase(),
-      password_hash: this.passwordHash,
-      raw_password: this.rawPassword || null,
-      allowed_features: JSON.stringify(this.allowedFeatures || DEFAULT_ALLOWED_FEATURES),
-      role: this.role,
-      balance: this.balance,
-      is_blocked: this.isBlocked ? 1 : 0,
-      blocked_reason: this.blockedReason,
-      bound_device_id: this.boundDeviceId,
-      last_device_id: this.lastDeviceId,
-      session_token: this.sessionToken,
-      last_login_at: this.lastLoginAt ? this.lastLoginAt.toISOString() : null,
-    });
+    try {
+      db.prepare(sql).run(params);
+    } catch (_) {
+      try {
+        db.exec('ALTER TABLE users ADD COLUMN last_login_at TEXT DEFAULT NULL;');
+      } catch (_) {}
+      try {
+        db.exec('ALTER TABLE users ADD COLUMN raw_password TEXT DEFAULT NULL;');
+      } catch (_) {}
+      try {
+        db.exec('ALTER TABLE users ADD COLUMN allowed_features TEXT DEFAULT NULL;');
+      } catch (_) {}
+      db.prepare(sql).run(params);
+    }
 
     this.updatedAt = new Date();
     return this;

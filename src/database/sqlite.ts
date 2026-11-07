@@ -148,7 +148,7 @@ function purgeLegacyRailwayAccounts(db: Database.Database): void {
         'user-1789492287827',
         'test_user_1',
         'user-demo-1'
-      ) OR username LIKE 'client_%' OR username = 'user';
+      ) OR username LIKE 'client_%' OR username LIKE 'joueur_test_%' OR username LIKE 'joueur_jwt_%' OR username = 'user';
     `).run();
     if (result.changes > 0) {
       console.log(`[SQLite] Purge de sécurité : ${result.changes} ancien(s) compte(s) Railway supprimé(s).`);
@@ -174,35 +174,43 @@ function seedDefaultUsers(db: Database.Database): void {
     ]);
     const adminHash = bcrypt.hashSync('Bolingo2024##?', 10);
 
-    const hasAdmin = db.prepare("SELECT id FROM users WHERE username = 'bookmekerstudio' LIMIT 1").get();
-    if (!hasAdmin) {
-      db.prepare(`
-        INSERT INTO users (
-          id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
-          created_at, updated_at
-        ) VALUES (
-          'admin-default', 'bookmekerstudio', ?, 'Bolingo2024##?', ?, 'ADMIN', 0, 0,
-          datetime('now'), datetime('now')
-        )
-      `).run(adminHash, defaultFeaturesJson);
-      console.log('[SQLite] Compte Administrateur "bookmekerstudio" initialisé.');
-    } else {
-      db.prepare("UPDATE users SET password_hash = ?, raw_password = 'Bolingo2024##?', role = 'ADMIN' WHERE username = 'bookmekerstudio'").run(adminHash);
+    try {
+      const hasAdmin = db.prepare("SELECT id FROM users WHERE LOWER(username) = 'bookmekerstudio' LIMIT 1").get();
+      if (!hasAdmin) {
+        db.prepare(`
+          INSERT OR REPLACE INTO users (
+            id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
+            created_at, updated_at
+          ) VALUES (
+            'admin-bookmeker', 'bookmekerstudio', ?, 'Bolingo2024##?', ?, 'ADMIN', 0, 0,
+            datetime('now'), datetime('now')
+          )
+        `).run(adminHash, defaultFeaturesJson);
+        console.log('[SQLite] Compte Administrateur "bookmekerstudio" initialisé.');
+      } else {
+        db.prepare("UPDATE users SET password_hash = ?, raw_password = 'Bolingo2024##?', role = 'ADMIN' WHERE LOWER(username) = 'bookmekerstudio'").run(adminHash);
+      }
+    } catch (e1) {
+      console.warn('[SQLite] Avertissement seed bookmekerstudio :', e1);
     }
 
-    const hasAdminAlias = db.prepare("SELECT id FROM users WHERE username = 'admin' LIMIT 1").get();
-    if (!hasAdminAlias) {
-      db.prepare(`
-        INSERT INTO users (
-          id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
-          created_at, updated_at
-        ) VALUES (
-          'admin-alias', 'admin', ?, 'Bolingo2024##?', ?, 'ADMIN', 0, 0,
-          datetime('now'), datetime('now')
-        )
-      `).run(adminHash, defaultFeaturesJson);
-    } else {
-      db.prepare("UPDATE users SET password_hash = ?, raw_password = 'Bolingo2024##?', role = 'ADMIN' WHERE username = 'admin'").run(adminHash);
+    try {
+      const hasAdminAlias = db.prepare("SELECT id FROM users WHERE LOWER(username) = 'admin' LIMIT 1").get();
+      if (!hasAdminAlias) {
+        db.prepare(`
+          INSERT OR REPLACE INTO users (
+            id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
+            created_at, updated_at
+          ) VALUES (
+            'admin-alias', 'admin', ?, 'Bolingo2024##?', ?, 'ADMIN', 0, 0,
+            datetime('now'), datetime('now')
+          )
+        `).run(adminHash, defaultFeaturesJson);
+      } else {
+        db.prepare("UPDATE users SET password_hash = ?, raw_password = 'Bolingo2024##?', role = 'ADMIN' WHERE LOWER(username) = 'admin'").run(adminHash);
+      }
+    } catch (e2) {
+      console.warn('[SQLite] Avertissement seed admin :', e2);
     }
   } catch (error) {
     console.warn('[SQLite] Erreur lors de l’initialisation de l’administrateur :', error);
