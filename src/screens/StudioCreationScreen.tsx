@@ -449,8 +449,8 @@ export default function StudioCreationScreen({ navigation }: any) {
     ) {
       return baseLabel;
     }
-    if (period === 'first_half') return `1ère mi-temps. ${baseLabel}`;
-    if (period === 'second_half') return `2ème mi-temps. ${baseLabel}`;
+    if (period === 'first_half') return `${baseLabel}. 1ère mi-temps`;
+    if (period === 'second_half') return `${baseLabel}. 2ème mi-temps`;
     return baseLabel;
   };
 
@@ -592,18 +592,18 @@ export default function StudioCreationScreen({ navigation }: any) {
       { label: withP('Total 2. (6.5) Plus de'), odd: '2.23', key: 't2-o-6.5', category: 'Total' as const },
       { label: withP('Total 2. (6.5) Moins de'), odd: '1.58', key: 't2-u-6.5', category: 'Total' as const },
 
-      // Mi-temps & Périodes dédiées (Spécification 2)
-      { label: '1ère mi-temps. 1X2. V1', odd: '2.07', key: 'ht1-1x2-v1', category: 'Mi-temps' as const },
-      { label: '1ère mi-temps. 1X2. X', odd: '4.59', key: 'ht1-1x2-x', category: 'Mi-temps' as const },
-      { label: '1ère mi-temps. 1X2. V2', odd: '2.655', key: 'ht1-1x2-v2', category: 'Mi-temps' as const },
-      { label: '2ème mi-temps. 1X2. V1', odd: '2.07', key: 'ht2-1x2-v1', category: 'Mi-temps' as const },
-      { label: '2ème mi-temps. 1X2. X', odd: '4.59', key: 'ht2-1x2-x', category: 'Mi-temps' as const },
-      { label: '2ème mi-temps. 1X2. V2', odd: '2.655', key: 'ht2-1x2-v2', category: 'Mi-temps' as const },
-      { label: '1ère mi-temps. Total. (1.5) Plus de', odd: '2.45', key: 'ht1-tot-o-1.5', category: 'Mi-temps' as const },
-      { label: '1ère mi-temps. Total. (6.5) Plus de', odd: '1.77', key: 'ht1-tot-o-6.5', category: 'Mi-temps' as const },
-      { label: '1ère mi-temps. Total. (6.5) Moins de', odd: '1.94', key: 'ht1-tot-u-6.5', category: 'Mi-temps' as const },
-      { label: '2ème mi-temps. Total. (6.5) Plus de', odd: '1.77', key: 'ht2-tot-o-6.5', category: 'Mi-temps' as const },
-      { label: '2ème mi-temps. Total. (6.5) Moins de', odd: '1.94', key: 'ht2-tot-u-6.5', category: 'Mi-temps' as const },
+      // Mi-temps & Périodes dédiées (Spécification 2 : [Marché]. [Sélection]. [Période])
+      { label: '1X2. V1. 1ère mi-temps', odd: '2.07', key: '1x2-1-1t', category: 'Mi-temps' as const },
+      { label: '1X2. X. 1ère mi-temps', odd: '4.59', key: '1x2-x-1t', category: 'Mi-temps' as const },
+      { label: '1X2. V2. 1ère mi-temps', odd: '2.655', key: '1x2-2-1t', category: 'Mi-temps' as const },
+      { label: '1X2. V1. 2ème mi-temps', odd: '2.07', key: 'ht2-1x2-v1', category: 'Mi-temps' as const },
+      { label: '1X2. X. 2ème mi-temps', odd: '4.59', key: 'ht2-1x2-x', category: 'Mi-temps' as const },
+      { label: '1X2. V2. 2ème mi-temps', odd: '2.655', key: 'ht2-1x2-v2', category: 'Mi-temps' as const },
+      { label: 'Total. (1.5) Plus de. 1ère mi-temps', odd: '2.45', key: 'ht1-tot-o-1.5', category: 'Mi-temps' as const },
+      { label: 'Total. (6.5) Plus de. 1ère mi-temps', odd: '1.77', key: 'ht1-tot-o-6.5', category: 'Mi-temps' as const },
+      { label: 'Total. (6.5) Moins de. 1ère mi-temps', odd: '1.94', key: 'ht1-tot-u-6.5', category: 'Mi-temps' as const },
+      { label: 'Total. (6.5) Plus de. 2ème mi-temps', odd: '1.77', key: 'ht2-tot-o-6.5', category: 'Mi-temps' as const },
+      { label: 'Total. (6.5) Moins de. 2ème mi-temps', odd: '1.94', key: 'ht2-tot-u-6.5', category: 'Mi-temps' as const },
       { label: 'Score dans chaque mi-temps. 1 > 2', odd: '2.056', key: 'seh-12', category: 'Mi-temps' as const },
       { label: 'Score dans chaque mi-temps. 1 = 2', odd: '8.34', key: 'seh-eq', category: 'Mi-temps' as const },
       { label: 'Score dans chaque mi-temps. 1 < 2', odd: '2.12', key: 'seh-21', category: 'Mi-temps' as const },
@@ -1002,8 +1002,8 @@ export default function StudioCreationScreen({ navigation }: any) {
         const evStartDate = eventsToSave.length === 1 || !ev.startDate ? evDateTime.toISOString() : ev.startDate;
         const evIsFifa = Boolean(
           ev.isFifa ||
-            ev.sport === 'FIFA' ||
-            (ev.league && (ev.league.toUpperCase().includes('FIFA') || ev.league.toUpperCase().includes('FC ')))
+          ev.sport === 'FIFA' ||
+          (ev.league && (ev.league.toUpperCase().includes('FIFA') || ev.league.toUpperCase().includes('FC ')))
         );
         const evHomeName = typeof ev.homeTeam === 'string' ? ev.homeTeam : ev.homeTeam?.name;
         const evAwayName = typeof ev.awayTeam === 'string' ? ev.awayTeam : ev.awayTeam?.name;
@@ -2079,8 +2079,8 @@ export default function StudioCreationScreen({ navigation }: any) {
           pickerMode === 'competition'
             ? selectedLeagueId || selectedLeague
             : pickingTarget === 'home'
-            ? homeTeam
-            : awayTeam
+              ? homeTeam
+              : awayTeam
         }
         onSelectCompetition={(comp) => {
           setSelectedLeague(comp.name);

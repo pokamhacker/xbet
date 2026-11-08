@@ -17,7 +17,7 @@ export type BetPeriodKey = 'regular' | 'first_half' | 'second_half';
  * - 1X2 -> "1X2. V1", "1X2. X", "1X2. V2"
  * - Total -> "Total. (14.5) Plus de", "Total. (2.5) Moins de"
  * - Total 1 / Total 2 -> "Total 1. (7.5) Plus de", "Total 2. (5.5) Moins de"
- * - Préfixe mi-temps si applicable : "1ère mi-temps. 1X2. V1", "2ème mi-temps. Total. (7.5) Moins de"
+ * - Suffixe mi-temps si applicable : "1X2. V2. 1ère mi-temps", "Total. (7.5) Moins de. 2ème mi-temps"
  */
 export function formatBetSelectionLabel(params: {
   period?: BetPeriodKey | string;
@@ -26,11 +26,11 @@ export function formatBetSelectionLabel(params: {
 }): string {
   const { period = 'regular', marketTitle, optionLabel } = params;
   const pLower = String(period || 'regular').toLowerCase().trim();
-  const periodPrefix =
+  const periodSuffix =
     pLower === 'first_half' || pLower.includes('1ère') || pLower.includes('1ere')
-      ? '1ère mi-temps. '
+      ? '. 1ère mi-temps'
       : pLower === 'second_half' || pLower.includes('2ème') || pLower.includes('2eme')
-      ? '2ème mi-temps. '
+      ? '. 2ème mi-temps'
       : '';
 
   const mTitle = (marketTitle || '').trim();
@@ -41,15 +41,15 @@ export function formatBetSelectionLabel(params: {
   // 1. Marché 1X2
   if (mUpper === '1X2') {
     if (optUpper === '1' || optUpper === 'V1' || optUpper.includes('DOMICILE') || optUpper.includes('ÉQUIPE 1')) {
-      return `${periodPrefix}1X2. V1`;
+      return `1X2. V1${periodSuffix}`;
     }
     if (optUpper === 'X' || optUpper === 'N' || optUpper.includes('NUL')) {
-      return `${periodPrefix}1X2. X`;
+      return `1X2. X${periodSuffix}`;
     }
     if (optUpper === '2' || optUpper === 'V2' || optUpper.includes('EXTÉRIEUR') || optUpper.includes('ÉQUIPE 2')) {
-      return `${periodPrefix}1X2. V2`;
+      return `1X2. V2${periodSuffix}`;
     }
-    return `${periodPrefix}1X2. ${opt}`;
+    return `1X2. ${opt}${periodSuffix}`;
   }
 
   // 2. Marchés Total / Total 1 / Total 2
@@ -60,27 +60,37 @@ export function formatBetSelectionLabel(params: {
     if (parenFirst) {
       const val = parenFirst[1];
       const dir = parenFirst[2].toLowerCase().includes('plus') ? 'Plus de' : 'Moins de';
-      return `${periodPrefix}${canonMarket}. (${val}) ${dir}`;
+      return `${canonMarket}. (${val}) ${dir}${periodSuffix}`;
     }
     // Format inverse "Plus de (2.5)" ou "Plus de 2.5"
     const dirFirst = opt.match(/(Plus de|Moins de)\s*\(?(\d+(?:\.\d+)?)\)?/i);
     if (dirFirst) {
       const dir = dirFirst[1].toLowerCase().includes('plus') ? 'Plus de' : 'Moins de';
       const val = dirFirst[2];
-      return `${periodPrefix}${canonMarket}. (${val}) ${dir}`;
+      return `${canonMarket}. (${val}) ${dir}${periodSuffix}`;
     }
-    return `${periodPrefix}${canonMarket}. ${opt}`;
+    return `${canonMarket}. ${opt}${periodSuffix}`;
   }
 
-  // 3. Deux équipes vont marquer
+  // 3. Double chance
+  if (mUpper === 'DOUBLE CHANCE' || mUpper === 'DOUBLE_CHANCE') {
+    return `Double chance. ${opt}${periodSuffix}`;
+  }
+
+  // 4. Deux équipes vont marquer
   if (mUpper.includes('DEUX ÉQUIPES VONT MARQUER') || mUpper.includes('DEUX EQUIPES VONT MARQUER')) {
     if (opt.toLowerCase().startsWith('chaque equipe va marquer') || opt.toLowerCase().startsWith('chaque équipe va marquer')) {
-      return `${periodPrefix}${opt}`;
+      return `${opt}${periodSuffix}`;
     }
-    return `${periodPrefix}Deux équipes vont marquer - ${opt}`;
+    return `Deux équipes vont marquer - ${opt}${periodSuffix}`;
   }
 
-  // 4. Marchés mi-temps spécifiques (Equipe 1/2 va gagner au moins une mi-temps / les deux mi-temps)
+  // 5. Total pair
+  if (mUpper === 'TOTAL PAIR' || mUpper === 'TOTAL_PAIR') {
+    return `Total pair. ${opt}${periodSuffix}`;
+  }
+
+  // 6. Marchés mi-temps spécifiques (Equipe 1/2 va gagner au moins une mi-temps / les deux mi-temps)
   if (
     mUpper.includes('GAGNER AU MOINS UNE MI-TEMPS') ||
     mUpper.includes('GAGNER LES DEUX MI-TEMPS')
@@ -88,18 +98,19 @@ export function formatBetSelectionLabel(params: {
     return `${mTitle} - ${opt}`;
   }
 
-  // 5. Score dans chaque mi-temps
+  // 7. Score dans chaque mi-temps
   if (mUpper.includes('SCORE DANS CHAQUE MI-TEMPS')) {
     return `Score dans chaque mi-temps. ${opt}`;
   }
 
-  return `${periodPrefix}${mTitle}. ${opt}`;
+  return `${mTitle}. ${opt}${periodSuffix}`;
 }
 
 /**
  * Normalise n'importe quel intitulé de pronostic (y compris les anciens coupons enregistrés)
  * vers la nomenclature stricte :
  * - "Vainqueur : Real Madrid" -> "1X2. V1" ou "1X2. V2"
+ * - "1ère mi-temps. 1X2. V2" -> "1X2. V2. 1ère mi-temps"
  * - "Match nul (X)" -> "1X2. X"
  * - "Plus de 2.5 buts" / "Total. Plus de (2.5)" -> "Total. (2.5) Plus de"
  * - "Total 1. Plus de (6.5)" -> "Total 1. (6.5) Plus de"
@@ -113,16 +124,24 @@ export function normalizeBetSelectionLabel(
   let trimmed = rawPrediction.trim();
   if (!trimmed) return '1X2. V1';
 
-  // Extraire un éventuel préfixe de période
-  let periodPrefix = '';
+  // Extraire un éventuel préfixe ou suffixe de période
+  let periodSuffix = '';
   if (/^1[èe]re\s*mi-temps[\s\.:,-]+/i.test(trimmed)) {
-    periodPrefix = '1ère mi-temps. ';
+    periodSuffix = '. 1ère mi-temps';
     trimmed = trimmed.replace(/^1[èe]re\s*mi-temps[\s\.:,-]+/i, '').trim();
   } else if (/^2[èe]me\s*mi-temps[\s\.:,-]+/i.test(trimmed)) {
-    periodPrefix = '2ème mi-temps. ';
+    periodSuffix = '. 2ème mi-temps';
     trimmed = trimmed.replace(/^2[èe]me\s*mi-temps[\s\.:,-]+/i, '').trim();
   } else if (/^temps\s*r[ée]glementaire[\s\.,:-]+/i.test(trimmed)) {
     trimmed = trimmed.replace(/^temps\s*r[ée]glementaire[\s\.,:-]+/i, '').trim();
+  }
+
+  if (/[\s\.:,-]+1[èe]re\s*mi-temps[\s\.:,-]*$/i.test(trimmed)) {
+    periodSuffix = '. 1ère mi-temps';
+    trimmed = trimmed.replace(/[\s\.:,-]+1[èe]re\s*mi-temps[\s\.:,-]*$/i, '').trim();
+  } else if (/[\s\.:,-]+2[èe]me\s*mi-temps[\s\.:,-]*$/i.test(trimmed)) {
+    periodSuffix = '. 2ème mi-temps';
+    trimmed = trimmed.replace(/[\s\.:,-]+2[èe]me\s*mi-temps[\s\.:,-]*$/i, '').trim();
   }
 
   const lower = trimmed.toLowerCase();
@@ -133,9 +152,9 @@ export function normalizeBetSelectionLabel(
   if (lower.startsWith('vainqueur')) {
     const teamPart = trimmed.replace(/^vainqueur\s*:\s*/i, '').trim().toLowerCase();
     if (awayLower && (teamPart === awayLower || teamPart.includes(awayLower) || awayLower.includes(teamPart))) {
-      return `${periodPrefix}1X2. V2`;
+      return `1X2. V2${periodSuffix}`;
     }
-    return `${periodPrefix}1X2. V1`;
+    return `1X2. V1${periodSuffix}`;
   }
 
   if (
@@ -146,26 +165,26 @@ export function normalizeBetSelectionLabel(
     lower === '1x2. x' ||
     lower === 'x'
   ) {
-    return `${periodPrefix}1X2. X`;
+    return `1X2. X${periodSuffix}`;
   }
 
   if (lower === '1x2: v1' || lower === '1x2: 1' || lower === '1x2. 1' || lower === '1x2. v1' || lower === 'v1') {
-    return `${periodPrefix}1X2. V1`;
+    return `1X2. V1${periodSuffix}`;
   }
 
   if (lower === '1x2: v2' || lower === '1x2: 2' || lower === '1x2. 2' || lower === '1x2. v2' || lower === 'v2') {
-    return `${periodPrefix}1X2. V2`;
+    return `1X2. V2${periodSuffix}`;
   }
 
   // 2. Anciens intitulés Double chance "1X (Domicile ou Nul)"
-  if (/^1x\s*\(/i.test(trimmed) || lower === 'double chance: 1x') {
-    return `${periodPrefix}Double chance. 1X`;
+  if (/^1x\s*\(/i.test(trimmed) || lower === 'double chance: 1x' || lower === 'double chance. 1x') {
+    return `Double chance. 1X${periodSuffix}`;
   }
-  if (/^12\s*\(/i.test(trimmed) || lower === 'double chance: 12') {
-    return `${periodPrefix}Double chance. 12`;
+  if (/^12\s*\(/i.test(trimmed) || lower === 'double chance: 12' || lower === 'double chance. 12') {
+    return `Double chance. 12${periodSuffix}`;
   }
-  if (/^(?:x2|2x)\s*\(/i.test(trimmed) || lower === 'double chance: 2x' || lower === 'double chance: x2') {
-    return `${periodPrefix}Double chance. 2X`;
+  if (/^(?:x2|2x)\s*\(/i.test(trimmed) || lower === 'double chance: 2x' || lower === 'double chance: x2' || lower === 'double chance. 2x') {
+    return `Double chance. 2X${periodSuffix}`;
   }
 
   // 3. Normalisation des Totaux :
@@ -176,7 +195,7 @@ export function normalizeBetSelectionLabel(
     const dirRaw = total1Match[1] || total1Match[4] || 'Plus de';
     const val = total1Match[2] || total1Match[3] || '1.5';
     const dir = dirRaw.toLowerCase().includes('moins') ? 'Moins de' : 'Plus de';
-    return `${periodPrefix}Total 1. (${val}) ${dir}`;
+    return `Total 1. (${val}) ${dir}${periodSuffix}`;
   }
 
   const total2Match =
@@ -185,7 +204,7 @@ export function normalizeBetSelectionLabel(
     const dirRaw = total2Match[1] || total2Match[4] || 'Plus de';
     const val = total2Match[2] || total2Match[3] || '1.5';
     const dir = dirRaw.toLowerCase().includes('moins') ? 'Moins de' : 'Plus de';
-    return `${periodPrefix}Total 2. (${val}) ${dir}`;
+    return `Total 2. (${val}) ${dir}${periodSuffix}`;
   }
 
   const totalGlobalMatch =
@@ -195,7 +214,7 @@ export function normalizeBetSelectionLabel(
     const dirRaw = totalGlobalMatch[1] || totalGlobalMatch[4] || 'Plus de';
     const val = totalGlobalMatch[2] || totalGlobalMatch[3] || '2.5';
     const dir = dirRaw.toLowerCase().includes('moins') ? 'Moins de' : 'Plus de';
-    return `${periodPrefix}Total. (${val}) ${dir}`;
+    return `Total. (${val}) ${dir}${periodSuffix}`;
   }
 
   // 4. Normalisation générique des ":" après le nom de marché FIFA
@@ -203,14 +222,14 @@ export function normalizeBetSelectionLabel(
     const [mPart, oPart] = trimmed.split(/:\s+/);
     if (mPart && oPart) {
       return formatBetSelectionLabel({
-        period: periodPrefix ? (periodPrefix.includes('1') ? 'first_half' : 'second_half') : 'regular',
+        period: periodSuffix ? (periodSuffix.includes('1') ? 'first_half' : 'second_half') : 'regular',
         marketTitle: mPart,
         optionLabel: oPart,
       });
     }
   }
 
-  return `${periodPrefix}${trimmed}`;
+  return `${trimmed}${periodSuffix}`;
 }
 
 /**
@@ -229,10 +248,15 @@ export function adaptEventResultToPrediction(
   const isFifa = isFifaMatch(event);
 
   // Détection de la période ciblée (1ère mi-temps, 2ème mi-temps, ou Temps réglementaire)
-  const isFirstHalfBet = /^1[èe]re\s*mi-temps/i.test(prediction);
-  const isSecondHalfBet = /^2[èe]me\s*mi-temps/i.test(prediction);
+  const isFirstHalfBet =
+    /^1[èe]re\s*mi-temps/i.test(prediction) ||
+    /[\s\.:,-]+1[èe]re\s*mi-temps$/i.test(prediction);
+  const isSecondHalfBet =
+    /^2[èe]me\s*mi-temps/i.test(prediction) ||
+    /[\s\.:,-]+2[èe]me\s*mi-temps$/i.test(prediction);
   const corePred = prediction
     .replace(/^(?:1[èe]re|2[èe]me)\s*mi-temps[\s\.:,-]+/i, '')
+    .replace(/[\s\.:,-]+(?:1[èe]re|2[èe]me)\s*mi-temps$/i, '')
     .trim();
   const lowerCore = corePred.toLowerCase();
 
