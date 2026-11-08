@@ -36,6 +36,7 @@ import { LiveMatchPickerModal } from '../components/modals/LiveMatchPickerModal'
 import { FIFA_LEAGUES_LIST, getFifaLeagueLogo, FIFA_DEFAULT_TEAMS } from '../constants/fifaLeagues';
 import { formatBetDate, combineDateAndTime } from '../utils/dateFormatter';
 import { formatCleanOdds } from '../utils/oddsFormatter';
+import { normalizeBetSelectionLabel } from '../utils/scoreAdapter';
 
 // Championnats majeurs de football réel
 const TOP_REAL_LEAGUES = [
@@ -275,13 +276,16 @@ export default function StudioCreationScreen({ navigation }: any) {
   const [finalScoreSwitch, setFinalScoreSwitch] = useState(false);
   // Clé du pronostic rapide actif ('1', 'X', '2', etc. ou 'custom') pour adapter dynamiquement l'intitulé
   const [selectedPredKey, setSelectedPredKey] = useState<string>('1');
+  const [predictionPeriod, setPredictionPeriod] = useState<'regular' | 'first_half' | 'second_half'>('regular');
+  const [liveElapsedInput, setLiveElapsedInput] = useState<string>('22:10');
 
   // 3. Événements ajoutés
   const [addedEvents, setAddedEvents] = useState<MatchEvent[]>([]);
 
   // 4. Mise & Résumé
-  const [stake, setStake] = useState('1000');
-  const [enableCashout, setEnableCashout] = useState(false);
+  const [stake, setStake] = useState('500');
+  const [enableCashout, setEnableCashout] = useState(true);
+  const [customCashoutAmount, setCustomCashoutAmount] = useState<string>('');
 
   // Charger les équipes dès que la ligue sélectionnée change
   useEffect(() => {
@@ -431,73 +435,82 @@ export default function StudioCreationScreen({ navigation }: any) {
     return results;
   }, [selectedLeague, selectedLeagueId, customTeams, dynamicLeagueTeams]);
 
-  // Filtre des suggestions rapides (Tous, Score exact, 1X2, Total pair, Total, Handicap, etc.)
+  // Filtre des suggestions rapides (Tous, Score exact, 1X2, Total pair, Total, Mi-temps, Handicap, etc.)
   const [quickPredFilter, setQuickPredFilter] = useState<
-    'Tous' | '1X2' | 'Double chance' | 'Total pair' | 'Total' | 'Buts' | 'Handicap' | 'Score'
+    'Tous' | '1X2' | 'Double chance' | 'Total pair' | 'Total' | 'Buts' | 'Mi-temps' | 'Handicap' | 'Score'
   >('Tous');
 
-  // Helper pour calculer les détails d'un pronostic rapide selon les équipes actuelles
+  const getPeriodPrefix = (period: 'regular' | 'first_half' | 'second_half', baseLabel: string): string => {
+    const lower = baseLabel.toLowerCase();
+    if (
+      lower.includes('mi-temps') ||
+      lower.startsWith('mt-fin') ||
+      lower.startsWith('temps réglementaire')
+    ) {
+      return baseLabel;
+    }
+    if (period === 'first_half') return `1ère mi-temps. ${baseLabel}`;
+    if (period === 'second_half') return `2ème mi-temps. ${baseLabel}`;
+    return baseLabel;
+  };
+
+  // Helper pour calculer les détails d'un pronostic rapide selon les équipes actuelles et la période
   const getQuickPredictionDetails = (
     key: string,
     hTeam: string,
     aTeam: string,
     eHome: number,
-    eAway: number
+    eAway: number,
+    period: 'regular' | 'first_half' | 'second_half' = predictionPeriod
   ): { label: string; odd: string; category: string } => {
-    const h = hTeam || 'Domicile';
-    const a = aTeam || 'Extérieur';
+    const withP = (lbl: string) => getPeriodPrefix(period, lbl);
 
-    if (key === '1') return { label: `Vainqueur : ${h}`, odd: '1.85', category: '1X2' };
-    if (key === 'X') return { label: 'Match nul (X)', odd: '3.40', category: '1X2' };
-    if (key === '2') return { label: `Vainqueur : ${a}`, odd: '3.90', category: '1X2' };
-    if (key === '1x2-v1') return { label: '1X2. V1', odd: '2.167', category: '1X2' };
-    if (key === '1x2-x') return { label: '1X2. X', odd: '3.92', category: '1X2' };
-    if (key === '1x2-v2') return { label: '1X2. V2', odd: '3.075', category: '1X2' };
-    if (key === '1X') return { label: `1X (${h} ou Nul)`, odd: '1.25', category: 'Double chance' };
-    if (key === '12') return { label: `12 (${h} ou ${a})`, odd: '1.30', category: 'Double chance' };
-    if (key === 'X2') return { label: `X2 (Nul ou ${a})`, odd: '1.85', category: 'Double chance' };
-    if (key === '+2.5') return { label: 'Plus de 2.5 buts', odd: '1.75', category: 'Total' };
-    if (key === '-2.5') return { label: 'Moins de 2.5 buts', odd: '2.05', category: 'Total' };
-    if (key === 'BTTS') return { label: 'Les deux équipes marquent', odd: '1.68', category: 'Buts' };
+    if (key === '1' || key === '1x2-v1') return { label: withP('1X2. V1'), odd: period === 'regular' ? '1.85' : '2.07', category: '1X2' };
+    if (key === 'X' || key === '1x2-x') return { label: withP('1X2. X'), odd: period === 'regular' ? '3.40' : '4.59', category: '1X2' };
+    if (key === '2' || key === '1x2-v2') return { label: withP('1X2. V2'), odd: period === 'regular' ? '3.90' : '2.655', category: '1X2' };
+    if (key === 'fifa-1x2-v1') return { label: withP('1X2. V1'), odd: period === 'regular' ? '1.51' : '2.07', category: '1X2' };
+    if (key === 'fifa-1x2-x') return { label: withP('1X2. X'), odd: period === 'regular' ? '8.68' : '4.59', category: '1X2' };
+    if (key === 'fifa-1x2-v2') return { label: withP('1X2. V2'), odd: period === 'regular' ? '3.22' : '2.655', category: '1X2' };
+    if (key === '1X' || key === 'dc-1x') return { label: withP('Double chance. 1X'), odd: period === 'regular' ? '1.29' : '1.41', category: 'Double chance' };
+    if (key === '12' || key === 'dc-12') return { label: withP('Double chance. 12'), odd: period === 'regular' ? '1.01' : '1.15', category: 'Double chance' };
+    if (key === 'X2' || key === 'dc-2x') return { label: withP('Double chance. 2X'), odd: period === 'regular' ? '2.36' : '1.63', category: 'Double chance' };
+    if (key === '+2.5') return { label: withP('Total. (2.5) Plus de'), odd: '1.75', category: 'Total' };
+    if (key === '-2.5') return { label: withP('Total. (2.5) Moins de'), odd: '2.05', category: 'Total' };
+    if (key === 'BTTS') return { label: withP('Deux équipes vont marquer - Oui'), odd: '1.68', category: 'Buts' };
     if (key.startsWith('cs-')) {
       const parts = key.replace('cs-', '').split('-');
       const scoreH = parseInt(parts[0], 10) || 0;
       const scoreA = parseInt(parts[1], 10) || 0;
       return {
-        label: `Score exact : ${scoreH}–${scoreA}`,
+        label: withP(`Score exact. ${scoreH}-${scoreA}`),
         odd: estimateExactScoreOdd(scoreH, scoreA),
         category: 'Score',
       };
     }
     if (key === 'exact-custom') {
       return {
-        label: `Score exact : ${eHome}–${eAway}`,
+        label: withP(`Score exact. ${eHome}-${eAway}`),
         odd: estimateExactScoreOdd(eHome, eAway),
         category: 'Score',
       };
     }
-    return { label: `Vainqueur : ${h}`, odd: '1.85', category: '1X2' };
+    return { label: withP('1X2. V1'), odd: '1.85', category: '1X2' };
   };
 
-  // Liste exhaustive de toutes les suggestions rapides issues des options de pronostique&cote.mp4
+  // Liste exhaustive de toutes les suggestions rapides issues des captures vidéo et nomenclature stricte
   const allSmartPredictions = useMemo(() => {
     if (!homeTeam || !awayTeam) return [];
-    return [
-      // Total pair (FIFA & Football)
-      { label: 'Total pair. Oui', odd: '1.92', key: 'tp-oui', category: 'Total pair' as const, badge: 'Oui' },
-      { label: 'Total pair. Non', odd: '1.92', key: 'tp-non', category: 'Total pair' as const, badge: 'Non' },
-      { label: 'Individuel Total 1 Pair. Oui', odd: '1.91', key: 'it1p-oui', category: 'Total pair' as const },
-      { label: 'Individuel Total 1 Pair. Non', odd: '1.9', key: 'it1p-non', category: 'Total pair' as const },
-      { label: 'Individuel Total 2 Pair. Oui', odd: '1.93', key: 'it2p-oui', category: 'Total pair' as const },
-      { label: 'Individuel Total 2 Pair. Non', odd: '1.88', key: 'it2p-non', category: 'Total pair' as const },
+    const withP = (lbl: string) => getPeriodPrefix(predictionPeriod, lbl);
+    const isHalf = predictionPeriod !== 'regular';
 
-      // 1X2 & 1X2 (2UP)
-      { label: `Vainqueur : ${homeTeam}`, odd: '1.85', key: '1', category: '1X2' as const, badge: '1' },
-      { label: 'Match nul (X)', odd: '3.40', key: 'X', category: '1X2' as const, badge: 'X' },
-      { label: `Vainqueur : ${awayTeam}`, odd: '3.90', key: '2', category: '1X2' as const, badge: '2' },
-      { label: '1X2. V1', odd: '1.565', key: 'fifa-1x2-v1', category: '1X2' as const, badge: 'V1' },
-      { label: '1X2. X', odd: '9.05', key: 'fifa-1x2-x', category: '1X2' as const, badge: 'X' },
-      { label: '1X2. V2', odd: '3.015', key: 'fifa-1x2-v2', category: '1X2' as const, badge: 'V2' },
+    return [
+      // 1X2 (Nomenclature stricte : 1X2. V1, 1X2. X, 1X2. V2)
+      { label: withP('1X2. V1'), odd: isHalf ? '2.07' : '1.51', key: 'fifa-1x2-v1', category: '1X2' as const, badge: 'V1' },
+      { label: withP('1X2. X'), odd: isHalf ? '4.59' : '8.68', key: 'fifa-1x2-x', category: '1X2' as const, badge: 'X' },
+      { label: withP('1X2. V2'), odd: isHalf ? '2.655' : '3.22', key: 'fifa-1x2-v2', category: '1X2' as const, badge: 'V2' },
+      { label: withP('1X2. V1'), odd: '1.85', key: '1', category: '1X2' as const, badge: '1' },
+      { label: withP('1X2. X'), odd: '3.40', key: 'X', category: '1X2' as const, badge: 'X' },
+      { label: withP('1X2. V2'), odd: '1.275', key: '2', category: '1X2' as const, badge: '2' },
       { label: 'Temps réglementaire, 1X2: V1', odd: '3.075', key: 'tr-1x2-v1', category: '1X2' as const },
       { label: 'Temps réglementaire, 1X2: X', odd: '3.92', key: 'tr-1x2-x', category: '1X2' as const },
       { label: 'Temps réglementaire, 1X2: V2', odd: '2.167', key: 'tr-1x2-v2', category: '1X2' as const },
@@ -505,85 +518,151 @@ export default function StudioCreationScreen({ navigation }: any) {
       { label: '1X2 (2UP). Match nul', odd: '3.92', key: '2up-x', category: '1X2' as const },
       { label: '1X2 (2UP). V2', odd: '2.137', key: '2up-v2', category: '1X2' as const },
 
-      // Double chance
-      { label: `1X (${homeTeam} ou Nul)`, odd: '1.25', key: '1X', category: 'Double chance' as const, badge: '1X' },
-      { label: `12 (${homeTeam} ou ${awayTeam})`, odd: '1.30', key: '12', category: 'Double chance' as const, badge: '12' },
-      { label: `X2 (Nul ou ${awayTeam})`, odd: '1.85', key: 'X2', category: 'Double chance' as const, badge: 'X2' },
-      { label: 'Double chance. 1X', odd: '1.38', key: 'dc-1x', category: 'Double chance' as const },
-      { label: 'Double chance. 12', odd: '1.08', key: 'dc-12', category: 'Double chance' as const },
-      { label: 'Double chance. 2X', odd: '2.501', key: 'dc-2x', category: 'Double chance' as const },
+      // Double chance (captures vidéo : 1.29 / 1.01 / 2.36 en régulier, 1.41 / 1.15 / 1.63 en mi-temps)
+      { label: withP('Double chance. 1X'), odd: isHalf ? '1.41' : '1.29', key: 'dc-1x', category: 'Double chance' as const, badge: '1X' },
+      { label: withP('Double chance. 12'), odd: isHalf ? '1.15' : '1.01', key: 'dc-12', category: 'Double chance' as const, badge: '12' },
+      { label: withP('Double chance. 2X'), odd: isHalf ? '1.63' : '2.36', key: 'dc-2x', category: 'Double chance' as const, badge: '2X' },
       { label: 'Double Chance + Les deux équipes vont marquer. 1X et Oui', odd: '2.31', key: 'dc-btts-1x-o', category: 'Double chance' as const },
       { label: 'Double Chance + Les deux équipes vont marquer. 12 et Oui', odd: '1.87', key: 'dc-btts-12-o', category: 'Double chance' as const },
       { label: 'Double Chance + Les deux équipes vont marquer. 2X et Oui', odd: '1.96', key: 'dc-btts-2x-o', category: 'Double chance' as const },
 
-      // Total (Football & FIFA)
-      { label: 'Total. Plus de (1.5)', odd: '1.153', key: 'tot-o-1.5', category: 'Total' as const },
-      { label: 'Total. Moins de (1.5)', odd: '5.35', key: 'tot-u-1.5', category: 'Total' as const },
-      { label: 'Total. Plus de (2.5)', odd: '1.522', key: 'tot-o-2.5', category: 'Total' as const },
-      { label: 'Total. Moins de (2.5)', odd: '2.536', key: 'tot-u-2.5', category: 'Total' as const },
-      { label: 'Total. Plus de (3.5)', odd: '2.288', key: 'tot-o-3.5', category: 'Total' as const },
-      { label: 'Total. Moins de (3.5)', odd: '1.625', key: 'tot-u-3.5', category: 'Total' as const },
-      { label: 'Total. Plus de (4.5)', odd: '3.83', key: 'tot-o-4.5', category: 'Total' as const },
-      { label: 'Total. Moins de (4.5)', odd: '1.265', key: 'tot-u-4.5', category: 'Total' as const },
-      { label: 'Total. Plus de (8.5)', odd: '1.31', key: 'fifa-tot-o-8.5', category: 'Total' as const },
-      { label: 'Total. Moins de (8.5)', odd: '3.25', key: 'fifa-tot-u-8.5', category: 'Total' as const },
-      { label: 'Total. Plus de (9.5)', odd: '1.56', key: 'fifa-tot-o-9.5', category: 'Total' as const },
-      { label: 'Total. Moins de (9.5)', odd: '2.31', key: 'fifa-tot-u-9.5', category: 'Total' as const },
-      { label: 'Total. Plus de (10.5)', odd: '1.9', key: 'fifa-tot-o-10.5', category: 'Total' as const },
-      { label: 'Total. Moins de (10.5)', odd: '1.83', key: 'fifa-tot-u-10.5', category: 'Total' as const },
-      { label: 'Total. Plus de (11.5)', odd: '2.45', key: 'fifa-tot-o-11.5', category: 'Total' as const },
-      { label: 'Total. Moins de (11.5)', odd: '1.5', key: 'fifa-tot-u-11.5', category: 'Total' as const },
-      { label: 'Total 1. Plus de (1.5)', odd: '2.24', key: 't1-o-1.5', category: 'Total' as const },
-      { label: 'Total 1. Moins de (1.5)', odd: '1.65', key: 't1-u-1.5', category: 'Total' as const },
-      { label: 'Total 2. Plus de (1.5)', odd: '1.8', key: 't2-o-1.5', category: 'Total' as const },
-      { label: 'Total 2. Moins de (1.5)', odd: '2.01', key: 't2-u-1.5', category: 'Total' as const },
-      { label: 'Total Asiatique. Plus de (2.75)', odd: '1.66', key: 'ta-o-2.75', category: 'Total' as const },
-      { label: 'Total Asiatique. Moins de (2.75)', odd: '2.215', key: 'ta-u-2.75', category: 'Total' as const },
+      // Total pair (captures vidéo : 1.85 / 1.85)
+      { label: withP('Total pair. Oui'), odd: '1.85', key: 'tp-oui', category: 'Total pair' as const, badge: 'Oui' },
+      { label: withP('Total pair. Non'), odd: '1.85', key: 'tp-non', category: 'Total pair' as const, badge: 'Non' },
+      { label: withP('Individuel Total 1 Pair. Oui'), odd: '1.91', key: 'it1p-oui', category: 'Total pair' as const },
+      { label: withP('Individuel Total 1 Pair. Non'), odd: '1.9', key: 'it1p-non', category: 'Total pair' as const },
+      { label: withP('Individuel Total 2 Pair. Oui'), odd: '1.93', key: 'it2p-oui', category: 'Total pair' as const },
+      { label: withP('Individuel Total 2 Pair. Non'), odd: '1.88', key: 'it2p-non', category: 'Total pair' as const },
 
-      // Buts, BTTS, Résultat + Total, Mi-temps
-      { label: 'Deux équipes vont marquer - Oui', odd: '1.46', key: 'btts-oui', category: 'Buts' as const },
-      { label: 'Deux équipes vont marquer - Non', odd: '2.578', key: 'btts-non', category: 'Buts' as const },
-      { label: 'Chaque Equipe va marquer (2) Ou Plus - Oui', odd: '3.98', key: 'btts2-oui', category: 'Buts' as const },
-      { label: 'Chaque Equipe va marquer (2) Ou Plus - Non', odd: '1.22', key: 'btts2-non', category: 'Buts' as const },
-      { label: '1X2 + Chaque équipe va marquer. V1 et Oui', odd: '4.85', key: '1x2-btts-v1-o', category: 'Buts' as const },
-      { label: '1X2 + Chaque équipe va marquer. V2 et Oui', odd: '3.6', key: '1x2-btts-v2-o', category: 'Buts' as const },
-      { label: '1, Résultat + Total. V1 et TPlus de (2.5) - Oui', odd: '4.1', key: 'r1t-2.5-o', category: 'Buts' as const },
-      { label: '2, Résultat + Total. V2 et TPlus de (2.5) - Oui', odd: '2.91', key: 'r2t-2.5-o', category: 'Buts' as const },
-      { label: 'Prochain but. Equipe 1 (1)', odd: '2.11', key: 'nb-1-e1', category: 'Buts' as const },
-      { label: 'Prochain but. Equipe 2 (1)', odd: '1.77', key: 'nb-1-e2', category: 'Buts' as const },
-      { label: 'Comment le but sera marqué. But (1) Coup de pied', odd: '1.45', key: 'hgs-1', category: 'Buts' as const },
-      { label: 'Comment le but sera marqué. But (1) Tête', odd: '5.5', key: 'hgs-2', category: 'Buts' as const },
-      { label: 'But dans chaque mi-temps - Oui', odd: '1.49', key: 'gih-oui', category: 'Buts' as const },
-      { label: 'Score dans chaque mi-temps. 1>2', odd: '3.15', key: 'seh-12', category: 'Buts' as const },
-      { label: 'Score dans chaque mi-temps. 1<2', odd: '2.04', key: 'seh-21', category: 'Buts' as const },
-      { label: 'MT-Fin. V1V1', odd: '4.9', key: 'htft-11', category: 'Buts' as const },
-      { label: 'MT-Fin. V2V2', odd: '3.34', key: 'htft-22', category: 'Buts' as const },
+      // Total (Nomenclature stricte : Total. (X.5) Plus de / Moins de)
+      { label: withP('Total. (1.5) Plus de'), odd: '1.153', key: 'tot-o-1.5', category: 'Total' as const },
+      { label: withP('Total. (1.5) Moins de'), odd: '5.35', key: 'tot-u-1.5', category: 'Total' as const },
+      { label: withP('Total. (2.5) Plus de'), odd: '1.522', key: 'tot-o-2.5', category: 'Total' as const },
+      { label: withP('Total. (2.5) Moins de'), odd: '2.536', key: 'tot-u-2.5', category: 'Total' as const },
+      { label: withP('Total. (3.5) Plus de'), odd: '2.288', key: 'tot-o-3.5', category: 'Total' as const },
+      { label: withP('Total. (3.5) Moins de'), odd: '1.625', key: 'tot-u-3.5', category: 'Total' as const },
+      { label: withP('Total. (4.5) Plus de'), odd: '1.15', key: 'fifa-ht-tot-o-4.5', category: 'Total' as const },
+      { label: withP('Total. (4.5) Moins de'), odd: '4.67', key: 'fifa-ht-tot-u-4.5', category: 'Total' as const },
+      { label: withP('Total. (5.5) Plus de'), odd: '1.37', key: 'fifa-ht-tot-o-5.5', category: 'Total' as const },
+      { label: withP('Total. (5.5) Moins de'), odd: '2.84', key: 'fifa-ht-tot-u-5.5', category: 'Total' as const },
+      { label: withP('Total. (6.5) Plus de'), odd: '1.77', key: 'fifa-ht-tot-o-6.5', category: 'Total' as const },
+      { label: withP('Total. (6.5) Moins de'), odd: '1.94', key: 'fifa-ht-tot-u-6.5', category: 'Total' as const },
+      { label: withP('Total. (7.5) Plus de'), odd: '2.45', key: 'fifa-ht-tot-o-7.5', category: 'Total' as const },
+      { label: withP('Total. (7.5) Moins de'), odd: '1.49', key: 'fifa-ht-tot-u-7.5', category: 'Total' as const },
+      { label: withP('Total. (8.5) Plus de'), odd: '3.55', key: 'fifa-ht-tot-o-8.5', category: 'Total' as const },
+      { label: withP('Total. (8.5) Moins de'), odd: '1.25', key: 'fifa-ht-tot-u-8.5', category: 'Total' as const },
+      { label: withP('Total. (9.5) Plus de'), odd: '5.5', key: 'fifa-ht-tot-o-9.5', category: 'Total' as const },
+      { label: withP('Total. (9.5) Moins de'), odd: '1.1', key: 'fifa-ht-tot-u-9.5', category: 'Total' as const },
+      { label: withP('Total. (11.5) Plus de'), odd: '1.27', key: 'fifa-tot-o-11.5', category: 'Total' as const },
+      { label: withP('Total. (11.5) Moins de'), odd: '3.44', key: 'fifa-tot-u-11.5', category: 'Total' as const },
+      { label: withP('Total. (12.5) Plus de'), odd: '1.48', key: 'fifa-tot-o-12.5', category: 'Total' as const },
+      { label: withP('Total. (12.5) Moins de'), odd: '2.47', key: 'fifa-tot-u-12.5', category: 'Total' as const },
+      { label: withP('Total. (13.5) Plus de'), odd: '1.8', key: 'fifa-tot-o-13.5', category: 'Total' as const },
+      { label: withP('Total. (13.5) Moins de'), odd: '1.9', key: 'fifa-tot-u-13.5', category: 'Total' as const },
+      { label: withP('Total. (14.5) Plus de'), odd: '2.27', key: 'fifa-tot-o-14.5', category: 'Total' as const },
+      { label: withP('Total. (14.5) Moins de'), odd: '1.56', key: 'fifa-tot-u-14.5', category: 'Total' as const },
+      { label: withP('Total. (15.5) Plus de'), odd: '2.99', key: 'fifa-tot-o-15.5', category: 'Total' as const },
+      { label: withP('Total. (15.5) Moins de'), odd: '1.34', key: 'fifa-tot-u-15.5', category: 'Total' as const },
+      { label: withP('Total. (16.5) Plus de'), odd: '4.1', key: 'fifa-tot-o-16.5', category: 'Total' as const },
+      { label: withP('Total. (16.5) Moins de'), odd: '1.19', key: 'fifa-tot-u-16.5', category: 'Total' as const },
+      { label: withP('Total. (17.5) Plus de'), odd: '5.83', key: 'fifa-tot-o-17.5', category: 'Total' as const },
+      { label: withP('Total. (17.5) Moins de'), odd: '1.09', key: 'fifa-tot-u-17.5', category: 'Total' as const },
 
-      // Handicap
-      { label: 'Handicap 1 (0)', odd: '2.312', key: 'hc-1-0', category: 'Handicap' as const },
-      { label: 'Handicap 2 (0)', odd: '1.615', key: 'hc-2-0', category: 'Handicap' as const },
-      { label: 'Handicap 1 (-1.5)', odd: '5.72', key: 'hc-1--1.5', category: 'Handicap' as const },
-      { label: 'Handicap 2 (+1.5)', odd: '1.142', key: 'hc-2-+1.5', category: 'Handicap' as const },
-      { label: 'Handicap 1 (+1.5)', odd: '1.318', key: 'hc-1-+1.5', category: 'Handicap' as const },
-      { label: 'Handicap 2 (-1.5)', odd: '3.44', key: 'hc-2--1.5', category: 'Handicap' as const },
-      { label: 'Handicap Européen. (0:1) V1', odd: '6.05', key: 'eh-01-v1', category: 'Handicap' as const },
-      { label: 'Handicap Européen. (1:0) V2', odd: '3.68', key: 'eh-10-v2', category: 'Handicap' as const },
+      // Total 1 & Total 2 (Nomenclature stricte : Total 1. (X.5) Plus de / Moins de)
+      { label: withP('Total 1. (1.5) Plus de'), odd: isHalf ? '1.14' : '2.24', key: 't1-o-1.5', category: 'Total' as const },
+      { label: withP('Total 1. (1.5) Moins de'), odd: isHalf ? '4.85' : '1.65', key: 't1-u-1.5', category: 'Total' as const },
+      { label: withP('Total 1. (2.5) Plus de'), odd: '1.39', key: 't1-o-2.5', category: 'Total' as const },
+      { label: withP('Total 1. (2.5) Moins de'), odd: '2.76', key: 't1-u-2.5', category: 'Total' as const },
+      { label: withP('Total 1. (3.5) Plus de'), odd: '1.86', key: 't1-o-3.5', category: 'Total' as const },
+      { label: withP('Total 1. (3.5) Moins de'), odd: '1.84', key: 't1-u-3.5', category: 'Total' as const },
+      { label: withP('Total 1. (6.5) Plus de'), odd: '1.46', key: 't1-o-6.5', category: 'Total' as const },
+      { label: withP('Total 1. (6.5) Moins de'), odd: '2.52', key: 't1-u-6.5', category: 'Total' as const },
+      { label: withP('Total 1. (7.5) Plus de'), odd: '1.85', key: 't1-o-7.5', category: 'Total' as const },
+      { label: withP('Total 1. (7.5) Moins de'), odd: '1.85', key: 't1-u-7.5', category: 'Total' as const },
+      { label: withP('Total 1. (8.5) Plus de'), odd: '2.5', key: 't1-o-8.5', category: 'Total' as const },
+      { label: withP('Total 1. (8.5) Moins de'), odd: '1.47', key: 't1-u-8.5', category: 'Total' as const },
+      { label: withP('Total 2. (1.5) Plus de'), odd: isHalf ? '1.22' : '1.8', key: 't2-o-1.5', category: 'Total' as const },
+      { label: withP('Total 2. (1.5) Moins de'), odd: isHalf ? '3.82' : '2.01', key: 't2-u-1.5', category: 'Total' as const },
+      { label: withP('Total 2. (2.5) Plus de'), odd: '1.58', key: 't2-o-2.5', category: 'Total' as const },
+      { label: withP('Total 2. (2.5) Moins de'), odd: '2.23', key: 't2-u-2.5', category: 'Total' as const },
+      { label: withP('Total 2. (4.5) Plus de'), odd: '1.28', key: 't2-o-4.5', category: 'Total' as const },
+      { label: withP('Total 2. (4.5) Moins de'), odd: '3.35', key: 't2-u-4.5', category: 'Total' as const },
+      { label: withP('Total 2. (5.5) Plus de'), odd: '1.63', key: 't2-o-5.5', category: 'Total' as const },
+      { label: withP('Total 2. (5.5) Moins de'), odd: '2.14', key: 't2-u-5.5', category: 'Total' as const },
+      { label: withP('Total 2. (6.5) Plus de'), odd: '2.23', key: 't2-o-6.5', category: 'Total' as const },
+      { label: withP('Total 2. (6.5) Moins de'), odd: '1.58', key: 't2-u-6.5', category: 'Total' as const },
+
+      // Mi-temps & Périodes dédiées (Spécification 2)
+      { label: '1ère mi-temps. 1X2. V1', odd: '2.07', key: 'ht1-1x2-v1', category: 'Mi-temps' as const },
+      { label: '1ère mi-temps. 1X2. X', odd: '4.59', key: 'ht1-1x2-x', category: 'Mi-temps' as const },
+      { label: '1ère mi-temps. 1X2. V2', odd: '2.655', key: 'ht1-1x2-v2', category: 'Mi-temps' as const },
+      { label: '2ème mi-temps. 1X2. V1', odd: '2.07', key: 'ht2-1x2-v1', category: 'Mi-temps' as const },
+      { label: '2ème mi-temps. 1X2. X', odd: '4.59', key: 'ht2-1x2-x', category: 'Mi-temps' as const },
+      { label: '2ème mi-temps. 1X2. V2', odd: '2.655', key: 'ht2-1x2-v2', category: 'Mi-temps' as const },
+      { label: '1ère mi-temps. Total. (1.5) Plus de', odd: '2.45', key: 'ht1-tot-o-1.5', category: 'Mi-temps' as const },
+      { label: '1ère mi-temps. Total. (6.5) Plus de', odd: '1.77', key: 'ht1-tot-o-6.5', category: 'Mi-temps' as const },
+      { label: '1ère mi-temps. Total. (6.5) Moins de', odd: '1.94', key: 'ht1-tot-u-6.5', category: 'Mi-temps' as const },
+      { label: '2ème mi-temps. Total. (6.5) Plus de', odd: '1.77', key: 'ht2-tot-o-6.5', category: 'Mi-temps' as const },
+      { label: '2ème mi-temps. Total. (6.5) Moins de', odd: '1.94', key: 'ht2-tot-u-6.5', category: 'Mi-temps' as const },
+      { label: 'Score dans chaque mi-temps. 1 > 2', odd: '2.056', key: 'seh-12', category: 'Mi-temps' as const },
+      { label: 'Score dans chaque mi-temps. 1 = 2', odd: '8.34', key: 'seh-eq', category: 'Mi-temps' as const },
+      { label: 'Score dans chaque mi-temps. 1 < 2', odd: '2.12', key: 'seh-21', category: 'Mi-temps' as const },
+      { label: 'Equipe 1 va gagner au moins une mi-temps - Oui', odd: '1.25', key: 't1wah-oui', category: 'Mi-temps' as const },
+      { label: 'Equipe 1 va gagner au moins une mi-temps - Non', odd: '3.54', key: 't1wah-non', category: 'Mi-temps' as const },
+      { label: 'Equipe 2 va gagner au moins une mi-temps - Oui', odd: '1.77', key: 't2wah-oui', category: 'Mi-temps' as const },
+      { label: 'Equipe 2 va gagner au moins une mi-temps - Non', odd: '1.94', key: 't2wah-non', category: 'Mi-temps' as const },
+      { label: 'Equipe 1 va gagner les deux mi-temps - Oui', odd: '3.78', key: 't1wbh-oui', category: 'Mi-temps' as const },
+      { label: 'Equipe 1 va gagner les deux mi-temps - Non', odd: '1.22', key: 't1wbh-non', category: 'Mi-temps' as const },
+      { label: 'Equipe 2 va gagner les deux mi-temps - Oui', odd: '6.93', key: 't2wbh-oui', category: 'Mi-temps' as const },
+      { label: 'Equipe 2 va gagner les deux mi-temps - Non', odd: '1.06', key: 't2wbh-non', category: 'Mi-temps' as const },
+      { label: 'MT-Fin. V1V1', odd: '2.73', key: 'htft-11', category: 'Mi-temps' as const },
+      { label: 'MT-Fin. V2V1', odd: '5.5', key: 'htft-21', category: 'Mi-temps' as const },
+      { label: 'MT-Fin. V1V2', odd: '8.7', key: 'htft-12', category: 'Mi-temps' as const },
+      { label: 'MT-Fin. V2V2', odd: '4.63', key: 'htft-22', category: 'Mi-temps' as const },
+
+      // Buts, BTTS (captures vidéo : Chaque Equipe va marquer (5)-(8) Ou Plus, Prochain but, Nombre exact)
+      { label: withP('Deux équipes vont marquer - Oui'), odd: '1.46', key: 'btts-oui', category: 'Buts' as const },
+      { label: withP('Deux équipes vont marquer - Non'), odd: '2.578', key: 'btts-non', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (2) Ou Plus - Oui'), odd: '1.52', key: 'btts2-oui', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (2) Ou Plus - Non'), odd: '2.35', key: 'btts2-non', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (3) Ou Plus - Oui'), odd: '2.65', key: 'btts3-oui', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (3) Ou Plus - Non'), odd: '1.43', key: 'btts3-non', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (5) Ou Plus - Oui'), odd: '1.47', key: 'btts5-oui', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (5) Ou Plus - Non'), odd: '2.5', key: 'btts5-non', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (6) Ou Plus - Oui'), odd: '2.15', key: 'btts6-oui', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (6) Ou Plus - Non'), odd: '1.63', key: 'btts6-non', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (7) Ou Plus - Oui'), odd: '3.6', key: 'btts7-oui', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (7) Ou Plus - Non'), odd: '1.24', key: 'btts7-non', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (8) Ou Plus - Oui'), odd: '6.85', key: 'btts8-oui', category: 'Buts' as const },
+      { label: withP('Chaque Equipe va marquer (8) Ou Plus - Non'), odd: '1.06', key: 'btts8-non', category: 'Buts' as const },
+      { label: withP('Prochain but. Equipe 1 (1)'), odd: '1.68', key: 'nb-1-e1', category: 'Buts' as const },
+      { label: withP('Prochain but. Equipe 2 (1)'), odd: '2.05', key: 'nb-1-e2', category: 'Buts' as const },
+
+      // Handicap (captures vidéo : -3.5 à +1.5)
+      { label: withP('Handicap. 1 (-1.5)'), odd: '1.89', key: 'hc-1--1.5', category: 'Handicap' as const },
+      { label: withP('Handicap. 2 (+1.5)'), odd: '1.81', key: 'hc-2-+1.5', category: 'Handicap' as const },
+      { label: withP('Handicap. 1 (-2.5)'), odd: '2.45', key: 'hc-1--2.5', category: 'Handicap' as const },
+      { label: withP('Handicap. 2 (+2.5)'), odd: '1.49', key: 'hc-2-+2.5', category: 'Handicap' as const },
+      { label: withP('Handicap. 1 (-0.5)'), odd: '1.49', key: 'hc-1--0.5', category: 'Handicap' as const },
+      { label: withP('Handicap. 2 (+0.5)'), odd: '2.44', key: 'hc-2-+0.5', category: 'Handicap' as const },
+      { label: withP('Handicap. 1 (+0.5)'), odd: '1.31', key: 'hc-1-+0.5', category: 'Handicap' as const },
+      { label: withP('Handicap. 2 (-0.5)'), odd: '3.18', key: 'hc-2--0.5', category: 'Handicap' as const },
 
       // Score Exact directement dans les pronostics rapides !
-      { label: `Score exact : 1–0`, odd: '6.50', key: 'cs-1-0', category: 'Score' as const, scoreHome: 1, scoreAway: 0 },
-      { label: `Score exact : 2–0`, odd: '8.00', key: 'cs-2-0', category: 'Score' as const, scoreHome: 2, scoreAway: 0 },
-      { label: `Score exact : 2–1`, odd: '8.50', key: 'cs-2-1', category: 'Score' as const, scoreHome: 2, scoreAway: 1 },
-      { label: `Score exact : 3–0`, odd: '13.00', key: 'cs-3-0', category: 'Score' as const, scoreHome: 3, scoreAway: 0 },
-      { label: `Score exact : 3–1`, odd: '13.00', key: 'cs-3-1', category: 'Score' as const, scoreHome: 3, scoreAway: 1 },
-      { label: `Score exact : 1–1`, odd: '6.00', key: 'cs-1-1', category: 'Score' as const, scoreHome: 1, scoreAway: 1 },
-      { label: `Score exact : 0–0`, odd: '9.00', key: 'cs-0-0', category: 'Score' as const, scoreHome: 0, scoreAway: 0 },
-      { label: `Score exact : 2–2`, odd: '13.00', key: 'cs-2-2', category: 'Score' as const, scoreHome: 2, scoreAway: 2 },
-      { label: `Score exact : 0–1`, odd: '9.50', key: 'cs-0-1', category: 'Score' as const, scoreHome: 0, scoreAway: 1 },
-      { label: `Score exact : 0–2`, odd: '15.00', key: 'cs-0-2', category: 'Score' as const, scoreHome: 0, scoreAway: 2 },
-      { label: `Score exact : 1–2`, odd: '11.00', key: 'cs-1-2', category: 'Score' as const, scoreHome: 1, scoreAway: 2 },
-      { label: `Score exact : 1–3`, odd: '23.00', key: 'cs-1-3', category: 'Score' as const, scoreHome: 1, scoreAway: 3 },
+      { label: withP('Score exact. 1-0'), odd: '6.50', key: 'cs-1-0', category: 'Score' as const, scoreHome: 1, scoreAway: 0 },
+      { label: withP('Score exact. 2-0'), odd: '8.00', key: 'cs-2-0', category: 'Score' as const, scoreHome: 2, scoreAway: 0 },
+      { label: withP('Score exact. 2-1'), odd: '8.50', key: 'cs-2-1', category: 'Score' as const, scoreHome: 2, scoreAway: 1 },
+      { label: withP('Score exact. 3-0'), odd: '13.00', key: 'cs-3-0', category: 'Score' as const, scoreHome: 3, scoreAway: 0 },
+      { label: withP('Score exact. 3-1'), odd: '13.00', key: 'cs-3-1', category: 'Score' as const, scoreHome: 3, scoreAway: 1 },
+      { label: withP('Score exact. 1-1'), odd: '6.00', key: 'cs-1-1', category: 'Score' as const, scoreHome: 1, scoreAway: 1 },
+      { label: withP('Score exact. 0-0'), odd: '9.00', key: 'cs-0-0', category: 'Score' as const, scoreHome: 0, scoreAway: 0 },
+      { label: withP('Score exact. 2-2'), odd: '13.00', key: 'cs-2-2', category: 'Score' as const, scoreHome: 2, scoreAway: 2 },
+      { label: withP('Score exact. 0-1'), odd: '9.50', key: 'cs-0-1', category: 'Score' as const, scoreHome: 0, scoreAway: 1 },
+      { label: withP('Score exact. 0-2'), odd: '15.00', key: 'cs-0-2', category: 'Score' as const, scoreHome: 0, scoreAway: 2 },
+      { label: withP('Score exact. 1-2'), odd: '11.00', key: 'cs-1-2', category: 'Score' as const, scoreHome: 1, scoreAway: 2 },
+      { label: withP('Score exact. 1-3'), odd: '23.00', key: 'cs-1-3', category: 'Score' as const, scoreHome: 1, scoreAway: 3 },
     ];
-  }, [homeTeam, awayTeam]);
+  }, [homeTeam, awayTeam, predictionPeriod]);
 
   // Suggestions filtrées selon l'onglet actif
   const smartPredictions = useMemo(() => {
@@ -595,7 +674,8 @@ export default function StudioCreationScreen({ navigation }: any) {
   const [exactHome, setExactHome] = useState(0);
   const [exactAway, setExactAway] = useState(0);
 
-  const exactScoreLabel = (h: number, a: number) => `Score exact : ${h}–${a}`;
+  const exactScoreLabel = (h: number, a: number) =>
+    getPeriodPrefix(predictionPeriod, `Score exact. ${h}-${a}`);
 
   const applyExactScore = (h: number, a: number) => {
     setExactHome(h);
@@ -626,17 +706,25 @@ export default function StudioCreationScreen({ navigation }: any) {
   };
 
   // Synchronise et adapte l'intitulé du pronostic personnalisé et la cote
-  // automatiquement avec le pronostic rapide suggéré quand les équipes changent
+  // automatiquement avec le pronostic rapide suggéré quand les équipes ou la période changent
   useEffect(() => {
     if (!homeTeam) return;
 
     if (selectedPredKey && selectedPredKey !== 'custom') {
+      const matched = allSmartPredictions.find((p) => p.key === selectedPredKey);
+      if (matched) {
+        if (matched.label !== selectedOptionLabel) {
+          setSelectedOptionLabel(matched.label);
+        }
+        return;
+      }
       const details = getQuickPredictionDetails(
         selectedPredKey,
         homeTeam,
         awayTeam,
         exactHome,
-        exactAway
+        exactAway,
+        predictionPeriod
       );
       if (details.label !== selectedOptionLabel) {
         setSelectedOptionLabel(details.label);
@@ -645,12 +733,11 @@ export default function StudioCreationScreen({ navigation }: any) {
         setOdd(details.odd);
       }
     } else if (!selectedOptionLabel) {
-      // Si aucun pronostic n'est saisi, adapter au premier pronostic suggéré (Vainqueur Domicile)
       setSelectedPredKey('1');
-      setSelectedOptionLabel(`Vainqueur : ${homeTeam}`);
+      setSelectedOptionLabel(getPeriodPrefix(predictionPeriod, '1X2. V1'));
       setOdd('1.85');
     }
-  }, [homeTeam, awayTeam, selectedPredKey, exactHome, exactAway]);
+  }, [homeTeam, awayTeam, selectedPredKey, exactHome, exactAway, predictionPeriod, allSmartPredictions]);
 
   // Calculs dynamiques de cotes
   const totalOdds = addedEvents.reduce((acc, ev) => acc * (ev.odd || 1), 1);
@@ -763,6 +850,19 @@ export default function StudioCreationScreen({ navigation }: any) {
     setNewTeamLogo('');
   };
 
+  const parseElapsedMMSS = (input: string, isFifa: boolean): number => {
+    const clean = (input || '').trim();
+    const m = clean.match(/^(\d{1,3}):(\d{1,2})$/);
+    if (m) {
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    }
+    const num = parseInt(clean, 10);
+    if (!isNaN(num) && num >= 0) {
+      return num * 60;
+    }
+    return isFifa ? 125 : 1330; // 02:05 FIFA ou 22:10 Football par défaut
+  };
+
   const handleAddEvent = () => {
     if (!selectedLeague) {
       Alert.alert('Championnat requis', 'Veuillez sélectionner un championnat avant d’ajouter.');
@@ -772,7 +872,7 @@ export default function StudioCreationScreen({ navigation }: any) {
       Alert.alert('Équipes requises', 'Veuillez définir les équipes Domicile et Extérieur.');
       return;
     }
-    const numericOdd = parseFloat(odd) || 1.85;
+    const numericOdd = parseFloat(odd.replace(',', '.')) || 1.85;
     const isFifa =
       leagueCategory === 'fifa' ||
       selectedLeague.toUpperCase().includes('FIFA') ||
@@ -782,6 +882,12 @@ export default function StudioCreationScreen({ navigation }: any) {
     const finalTime = matchTime.trim() || getCurrentTimeFormatted();
     const finalDate = matchDate.trim() || getCurrentDateFormatted();
     const selectedDateTime = combineDateAndTime(finalDate, finalTime);
+    const normalizedPred = normalizeBetSelectionLabel(
+      selectedOptionLabel || getPeriodPrefix(predictionPeriod, '1X2. V1'),
+      homeTeam,
+      awayTeam
+    );
+    const evIsLive = isFifa ? true : isLiveBadge;
 
     const newEv: MatchEvent = {
       id: String(Date.now()),
@@ -793,16 +899,18 @@ export default function StudioCreationScreen({ navigation }: any) {
       matchDate: finalDate,
       homeTeam: { name: homeTeam, logo: homeTeamLogo },
       awayTeam: { name: awayTeam, logo: awayTeamLogo },
-      prediction: selectedOptionLabel || `Vainqueur : ${homeTeam}`,
+      prediction: normalizedPred,
       odd: numericOdd,
       actualScore: undefined,
       status: 'Accepté',
-      isLive: isFifa ? true : isLiveBadge,
+      isLive: evIsLive,
       isFifa,
+      elapsedSeconds: evIsLive ? parseElapsedMMSS(liveElapsedInput, isFifa) : undefined,
       gameCategory: 'sports',
     };
+    (newEv as any).liveStartedAt = Date.now();
     setAddedEvents([...addedEvents, newEv]);
-    Alert.alert('Événement Ajouté', `${homeTeam} vs ${awayTeam} ajouté au coupon.`);
+    Alert.alert('Événement Ajouté', `${homeTeam} vs ${awayTeam} (${normalizedPred}) ajouté au coupon.`);
   };
 
   const handleRemoveEvent = (id: string) => {
@@ -824,13 +932,19 @@ export default function StudioCreationScreen({ navigation }: any) {
 
     // Ajout automatique uniquement si le formulaire est entièrement rempli (aucun événement fictif)
     if (eventsToSave.length === 0 && selectedLeague && homeTeam && awayTeam) {
-      const numericOdd = parseFloat(odd) || 1.85;
+      const numericOdd = parseFloat(odd.replace(',', '.')) || 1.85;
       const isFifa =
         leagueCategory === 'fifa' ||
         selectedLeague.toUpperCase().includes('FIFA') ||
         selectedLeague.toUpperCase().includes('FC ') ||
         selectedLeagueId.toLowerCase().includes('fifa') ||
         selectedLeagueId.toLowerCase().includes('fc2');
+      const normalizedPred = normalizeBetSelectionLabel(
+        selectedOptionLabel || getPeriodPrefix(predictionPeriod, '1X2. V1'),
+        homeTeam,
+        awayTeam
+      );
+      const evIsLive = isFifa ? true : isLiveBadge;
       const autoEv: MatchEvent = {
         id: String(Date.now()),
         sport: isFifa ? 'FIFA' : 'Football',
@@ -841,14 +955,16 @@ export default function StudioCreationScreen({ navigation }: any) {
         matchDate: finalDate,
         homeTeam: { name: homeTeam, logo: homeTeamLogo },
         awayTeam: { name: awayTeam, logo: awayTeamLogo },
-        prediction: selectedOptionLabel || `Vainqueur : ${homeTeam}`,
+        prediction: normalizedPred,
         odd: numericOdd,
         actualScore: undefined,
         status: 'Accepté',
-        isLive: isFifa ? true : isLiveBadge,
+        isLive: evIsLive,
         isFifa,
+        elapsedSeconds: evIsLive ? parseElapsedMMSS(liveElapsedInput, isFifa) : undefined,
         gameCategory: 'sports',
       };
+      (autoEv as any).liveStartedAt = Date.now();
       eventsToSave = [autoEv];
       setAddedEvents(eventsToSave);
     }
@@ -862,7 +978,7 @@ export default function StudioCreationScreen({ navigation }: any) {
     const hasLive =
       isLiveBadge || eventsToSave.some((e) => e.isLive || e.isFifa || e.sport === 'FIFA');
     const calculatedOdds = eventsToSave.reduce((acc, ev) => acc * (ev.odd || 1), 1);
-    const calculatedPayout = Math.round(numericStake * calculatedOdds);
+    const calculatedPayout = Math.round(numericStake * calculatedOdds * 100) / 100;
 
     const newCoupon: BetSlip = {
       id: finalId,
@@ -873,7 +989,7 @@ export default function StudioCreationScreen({ navigation }: any) {
       type: eventsToSave.length > 1 ? 'Combiné' : 'Simple',
       eventsCount: eventsToSave.length,
       completedCount: 0,
-      totalOdds: Math.round(calculatedOdds * 100) / 100,
+      totalOdds: Math.round(calculatedOdds * 1000) / 1000,
       stake: numericStake,
       potentialPayout: calculatedPayout,
       status: 'Accepté',
@@ -889,20 +1005,29 @@ export default function StudioCreationScreen({ navigation }: any) {
             ev.sport === 'FIFA' ||
             (ev.league && (ev.league.toUpperCase().includes('FIFA') || ev.league.toUpperCase().includes('FC ')))
         );
+        const evHomeName = typeof ev.homeTeam === 'string' ? ev.homeTeam : ev.homeTeam?.name;
+        const evAwayName = typeof ev.awayTeam === 'string' ? ev.awayTeam : ev.awayTeam?.name;
+        const evLive = Boolean(evIsFifa || isLiveBadge || ev.isLive);
 
-        return {
+        const mappedEv: MatchEvent = {
           ...ev,
+          prediction: normalizeBetSelectionLabel(ev.prediction, evHomeName, evAwayName),
           date: evDate,
           startDate: evStartDate,
           matchTime: evTime,
           matchDate: evDateStr,
           status: 'Accepté' as const,
           isFifa: evIsFifa,
-          isLive: evIsFifa || isLiveBadge ? true : ev.isLive,
+          isLive: evLive,
+          elapsedSeconds: evLive
+            ? (ev.elapsedSeconds ?? parseElapsedMMSS(liveElapsedInput, evIsFifa))
+            : ev.elapsedSeconds,
         };
+        (mappedEv as any).liveStartedAt = (ev as any).liveStartedAt || Date.now();
+        return mappedEv;
       }),
       isForSale: enableCashout,
-      cashoutAmount: Math.round(numericStake * 0.95),
+      cashoutAmount: parseInt(customCashoutAmount, 10) || Math.round(numericStake * 0.94),
       shareCode: generateShareCode(),
       gameCategory: 'sports',
     };
@@ -1024,6 +1149,20 @@ export default function StudioCreationScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {isLiveBadge && (
+            <View style={{ marginTop: 10 }}>
+              <Text style={[styles.helperText, { marginTop: 0, marginBottom: 4 }]}>
+                Temps écoulé initial (MM:SS) — affiché dans « EN DIRECT • temps écoulé : XX:XX »
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 22:10"
+                value={liveElapsedInput}
+                onChangeText={setLiveElapsedInput}
+              />
+            </View>
+          )}
 
           {/* Horodatage de mise du coupon (Header financier & Historique) */}
           <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border }}>
@@ -1544,6 +1683,38 @@ export default function StudioCreationScreen({ navigation }: any) {
                 </View>
               </View>
 
+              {/* Sélecteur de période : Temps réglementaire | 1ère mi-temps | 2ème mi-temps */}
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+                {[
+                  { id: 'regular' as const, label: 'Temps réglementaire' },
+                  { id: 'first_half' as const, label: '1ère mi-temps' },
+                  { id: 'second_half' as const, label: '2ème mi-temps' },
+                ].map((pt) => {
+                  const active = predictionPeriod === pt.id;
+                  return (
+                    <TouchableOpacity
+                      key={pt.id}
+                      style={[
+                        styles.quickPredFilterPill,
+                        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 7 },
+                        active && { backgroundColor: '#D98218', borderColor: '#D98218' },
+                      ]}
+                      onPress={() => setPredictionPeriod(pt.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.quickPredFilterPillText,
+                          active && { color: '#FFFFFF', fontWeight: '700' },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {pt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               {/* Filtres par type dans les pronostics rapides */}
               <ScrollView
                 horizontal
@@ -1553,10 +1724,11 @@ export default function StudioCreationScreen({ navigation }: any) {
                 {[
                   { id: 'Tous', label: 'Tous' },
                   { id: '1X2', label: '1X2' },
-                  { id: 'Total pair', label: 'Total pair' },
-                  { id: 'Double chance', label: 'Double chance' },
+                  { id: 'Mi-temps', label: '⏱️ Mi-temps' },
                   { id: 'Total', label: 'Total' },
+                  { id: 'Double chance', label: 'Double chance' },
                   { id: 'Buts', label: 'Buts & BTTS' },
+                  { id: 'Total pair', label: 'Total pair' },
                   { id: 'Handicap', label: 'Handicap' },
                   { id: 'Score', label: '🎯 Score exact' },
                 ].map((ft) => (
@@ -1745,7 +1917,7 @@ export default function StudioCreationScreen({ navigation }: any) {
                 onPress={() => {
                   if (homeTeam) {
                     setSelectedPredKey('1');
-                    setSelectedOptionLabel(`Vainqueur : ${homeTeam}`);
+                    setSelectedOptionLabel(getPeriodPrefix(predictionPeriod, '1X2. V1'));
                     setOdd('1.85');
                   }
                 }}
@@ -1770,7 +1942,7 @@ export default function StudioCreationScreen({ navigation }: any) {
                 setSelectedPredKey('custom');
               }
             }}
-            placeholder={homeTeam ? `Ex: Vainqueur : ${homeTeam}` : 'Ex: Vainqueur : Real Madrid'}
+            placeholder="Ex: 1X2. V1 ou Total. (2.5) Plus de"
           />
 
           <View style={styles.oddRowWrap}>
@@ -1854,6 +2026,21 @@ export default function StudioCreationScreen({ navigation }: any) {
               <Text style={styles.helperText}>Affiche un bouton « Vendre pour X ₣ » sur le coupon.</Text>
             </View>
           </TouchableOpacity>
+
+          {enableCashout && (
+            <View style={{ marginTop: 8 }}>
+              <Text style={[styles.helperText, { marginTop: 0, marginBottom: 4 }]}>
+                Montant « Vendre pour X ₣ » (optionnel, ex: {Math.round(numericStake * 0.94)} ₣ par défaut)
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder={`Ex: ${Math.round(numericStake * 0.94)}`}
+                value={customCashoutAmount}
+                onChangeText={setCustomCashoutAmount}
+                keyboardType="numeric"
+              />
+            </View>
+          )}
 
           {/* Encart Statistiques */}
           <View style={styles.statBox}>

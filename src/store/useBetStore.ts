@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BetSlip, BetStatus, CustomLeague, CustomTeam, MatchEvent } from '../types/bet';
 import { generateRealisticPokerDraw, generateShareCode } from '../utils/pokerEngine';
-import { adaptEventResultToPrediction } from '../utils/scoreAdapter';
+import { adaptEventResultToPrediction, normalizeBetSelectionLabel } from '../utils/scoreAdapter';
 import { betApiService } from '../services/betApiService';
 import { combineDateAndTime, formatBetDate } from '../utils/dateFormatter';
 
@@ -11,6 +11,7 @@ interface BetState {
   balance: number;
   activeSlip: MatchEvent[];
   coupons: BetSlip[];
+  deletedCouponIds: string[];
   customLeagues: CustomLeague[];
   customTeams: CustomTeam[];
 
@@ -24,6 +25,7 @@ interface BetState {
   executeCashout: (couponId: string) => void;
   duplicateCoupon: (couponId: string) => MatchEvent[];
   deleteCoupon: (couponId: string) => void;
+  deleteCoupons: (couponIds: string[]) => void;
   setBalance: (amount: number) => void;
   deposit: (amount: number) => void;
   withdraw: (amount: number) => void;
@@ -37,31 +39,832 @@ interface BetState {
 
 const INITIAL_COUPONS: BetSlip[] = [
   {
-    id: '89694250971',
-    createdAt: '28.10.2026 (07:34 PM)',
+    id: '9036286027',
+    createdAt: '07.11.2026 (20:24)',
+    matchDate: '07.11.2026',
+    matchTime: '20:00',
     type: 'Simple',
     eventsCount: 1,
     completedCount: 0,
-    totalOdds: 1.345,
+    totalOdds: 1.275,
+    stake: 500,
+    potentialPayout: 637.5,
+    status: 'Accepté',
+    isLive: true,
+    gameCategory: 'sports',
+    sport: 'Football',
+    league: 'Football . Espagne. La Liga',
+    shareCode: 'LL903628',
+    isForSale: true,
+    cashoutAmount: 470,
+    events: [
+      {
+        id: 'ev-fb-9036286027-1',
+        sport: 'Football',
+        league: 'Football . Espagne. La Liga',
+        date: '07.11.2026 (20:00)',
+        matchDate: '07.11.2026',
+        matchTime: '20:00',
+        homeTeam: {
+          name: 'Valencia',
+          logo: 'https://media.api-sports.io/football/teams/532.png',
+        },
+        awayTeam: {
+          name: 'Real Madrid',
+          logo: 'https://media.api-sports.io/football/teams/541.png',
+        },
+        prediction: '1X2. V2',
+        odd: 1.275,
+        status: 'Accepté',
+        isLive: true,
+        elapsedSeconds: 1330,
+        durationSeconds: 5400,
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89736611593',
+    createdAt: '29.10.2026 (16:04)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 1.59,
+    stake: 50000,
+    potentialPayout: 79500,
+    actualPayout: 79500,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'esports',
+    sport: 'FIFA',
+    league: 'FIFA. FC 26. 5x5 Rush. Superligue',
+    shareCode: 'FA897366',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-fifa-89736611593-1',
+        sport: 'FIFA',
+        league: 'FIFA. FC 26. 5x5 Rush. Superligue',
+        date: '29.10.2026 (16:04)',
+        homeTeam: { name: 'Manchester City' },
+        awayTeam: { name: 'Real Madrid' },
+        prediction: '1X2. V1',
+        odd: 1.59,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '3:1',
+        halftimeScore: '3:1 (1:0, 2:1)',
+        gameCategory: 'esports',
+      },
+    ],
+  },
+  {
+    id: '89736180539',
+    createdAt: '29.10.2026 (15:55)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 5.8,
     stake: 90,
-    potentialPayout: 121.05,
+    potentialPayout: 522,
+    actualPayout: 522,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'poker',
+    shareCode: 'CP8973618',
+    isForSale: false,
+    drawNumber: 'PB232803',
+    badge: 'POKE',
+    league: 'TvBet. POKER',
+    sport: 'TvBet. POKER',
+    pokerResult: {
+      board: 'A♣, 3♠, 2♠, 9♦, K♣',
+      hands: [
+        { id: 1, cards: '9♣, 8♣' },
+        { id: 2, cards: 'J♣, 5♣' },
+        { id: 3, cards: '3♣, 6♦' },
+        { id: 4, cards: '2♥, J♥' },
+        { id: 5, cards: 'A♣, 10♣' },
+        { id: 6, cards: 'Q♣, 4♥' },
+      ],
+      winnerLabel: '5 (Paire)',
+      combinationName: 'Combinaison gagnante. Une Paire',
+    },
+    events: [
+      {
+        id: 'ev-poker-89736180539-1',
+        sport: 'TvBet. POKER',
+        league: 'TvBet. POKER',
+        date: '29.10.2026 (15:55)',
+        homeTeam: { name: 'TvBet. POKER' },
+        awayTeam: { name: 'PB232803' },
+        prediction: 'Combinaison gagnante. Une Paire',
+        odd: 5.8,
+        status: 'Gain',
+        isLive: false,
+        gameCategory: 'poker',
+        roundCode: 'PB232803',
+        badge: 'POKE',
+      },
+    ],
+  },
+  {
+    id: '89704557249',
+    createdAt: '28.10.2026 (21:54)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 1.98,
+    stake: 500000,
+    potentialPayout: 990000,
+    actualPayout: 990000,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'sports',
+    sport: 'Football',
+    league: 'Football . UEFA Ligue des Champions',
+    shareCode: 'FB897045',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-fb-89704557249-1',
+        sport: 'Football',
+        league: 'Football . UEFA Ligue des Champions',
+        date: '28.10.2026 (21:54)',
+        homeTeam: { name: 'Barcelone' },
+        awayTeam: { name: 'Bayern Munich' },
+        prediction: '1X2. V1',
+        odd: 1.98,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '2:1',
+        halftimeScore: '2:1 (1:0, 1:1)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89656364623',
+    createdAt: '28.10.2026 (05:28)',
+    type: 'Combiné',
+    eventsCount: 4,
+    completedCount: 3,
+    totalOdds: 4.401,
+    stake: 200000,
+    potentialPayout: 880239,
+    actualPayout: 880239,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'sports',
+    sport: 'Football',
+    league: 'Serie A',
+    badge: 'Serie A',
+    shareCode: 'CB896563',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-seriea-1',
+        sport: 'Football',
+        league: 'Football . Italie. Série A',
+        badge: 'Serie A',
+        date: '28 oct. 2026 (18:30)',
+        homeTeam: {
+          name: 'Venise FC',
+          logo: 'https://media.api-sports.io/football/teams/517.png',
+        },
+        awayTeam: {
+          name: 'Inter Milan',
+          logo: 'https://media.api-sports.io/football/teams/505.png',
+        },
+        prediction: '1X2. V2',
+        odd: 1.363,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '0:2',
+        halftimeScore: '0:2 (0:0,0:2)',
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-seriea-2',
+        sport: 'Football',
+        league: 'Football . Italie. Série A',
+        badge: 'Serie A',
+        date: '28 oct. 2026 (20:45)',
+        homeTeam: {
+          name: 'Genoa',
+          logo: 'https://media.api-sports.io/football/teams/495.png',
+        },
+        awayTeam: {
+          name: 'Juventus',
+          logo: 'https://media.api-sports.io/football/teams/496.png',
+        },
+        prediction: 'Au Moins une Equipe va marquer. Plus de (1.5) - Oui',
+        odd: 1.65,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '2:0',
+        halftimeScore: '2:0 (2:0,0:0)',
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-seriea-3',
+        sport: 'Football',
+        league: 'Football . Angleterre. Coupe de la Ligue',
+        date: '28 oct. 2026 (20:30)',
+        homeTeam: {
+          name: 'Manchester City',
+          logo: 'https://media.api-sports.io/football/teams/50.png',
+        },
+        awayTeam: {
+          name: 'Brighton & Hove Albion',
+          logo: 'https://media.api-sports.io/football/teams/51.png',
+        },
+        prediction: '1X + Total Equipe 2. 1X Et Plus de (0.5) - Oui',
+        odd: 1.9,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '3:2',
+        halftimeScore: '3:2 (1:1,1:1,0:0,1:0)',
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-seriea-bonus-4',
+        sport: 'Bonus',
+        league: 'Bonus',
+        date: '28 oct. 2026',
+        homeTeam: { name: 'Bonus' },
+        awayTeam: { name: '' },
+        prediction: 'Bonus, Bonus pari combiné',
+        odd: 1.03,
+        status: 'Gain',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89642570109',
+    createdAt: '27.10.2026 (21:06)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 1.885,
+    stake: 100000,
+    potentialPayout: 188500,
+    actualPayout: 188500,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'sports',
+    sport: 'Football',
+    league: 'Serie A',
+    badge: 'Serie A',
+    shareCode: 'FB896425',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-seriea-5',
+        sport: 'Football',
+        league: 'Football . Italie. Série A',
+        badge: 'Serie A',
+        date: '27.10.2026 (21:06)',
+        homeTeam: { name: 'Fiorentina' },
+        awayTeam: { name: 'AS Roma' },
+        prediction: '1X2. V1',
+        odd: 1.885,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '5:1',
+        halftimeScore: '5:1 (3:1, 2:0)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89854491023',
+    createdAt: '31 oct. 2026 (23:35)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 0,
+    totalOdds: 1.92,
+    stake: 5000,
+    potentialPayout: 9600,
     status: 'Accepté',
     isLive: true,
     gameCategory: 'esports',
-    shareCode: 'FF8969',
+    sport: 'FIFA',
+    league: 'FIFA. FC 25. 3x3. Ligue de conférence',
+    shareCode: 'RM898544',
+    isForSale: true,
+    events: [
+      {
+        id: 'ev-fifa-roma-oly-8985',
+        sport: 'FIFA',
+        league: 'FIFA. FC 25. 3x3. Ligue de conférence',
+        date: '31 oct. 2026 (23:35)',
+        homeTeam: { name: 'Roma', logo: 'https://media.api-sports.io/football/teams/497.png' },
+        awayTeam: { name: 'Olympiacos', logo: 'https://media.api-sports.io/football/teams/553.png' },
+        prediction: 'Total pair. Oui',
+        odd: 1.92,
+        status: 'Accepté',
+        isLive: true,
+        actualScore: '2:2',
+        scoreFinal: '2:2',
+        halftimeScore: '2:2 (2:2)',
+        scoreDetail: '2:2 (2:2)',
+        elapsedSeconds: 195,
+        durationSeconds: 360,
+        gameCategory: 'esports',
+      },
+    ],
+  },
+  {
+    id: '89809879727',
+    createdAt: '30.10.2026 (22:27)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 0,
+    totalOdds: 5.8,
+    stake: 90,
+    potentialPayout: 522,
+    status: 'Accepté',
+    isLive: true,
+    gameCategory: 'poker',
+    shareCode: 'PK898098',
+    isForSale: false,
+    drawNumber: 'PB233537',
+    badge: 'POKE',
+    league: 'TvBet. POKER',
+    sport: 'TvBet. POKER',
+    events: [
+      {
+        id: 'ev-poker-89809879727-1',
+        sport: 'TvBet. POKER',
+        league: 'TvBet. POKER',
+        date: '30 oct. 2026 (22:30)',
+        homeTeam: { name: 'TvBet. POKER' },
+        awayTeam: { name: 'PB233537' },
+        prediction: 'Combinaison gagnante. Une Paire',
+        odd: 5.8,
+        status: 'Accepté',
+        isLive: true,
+        gameCategory: 'poker',
+        roundCode: 'PB233537',
+        badge: 'POKE',
+      },
+    ],
+  },
+  {
+    id: '89810937599',
+    createdAt: '30.10.2026 (22:51)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 1.74,
+    stake: 90,
+    potentialPayout: 156.6,
+    actualPayout: 156.6,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'poker',
+    shareCode: 'PK898109',
+    isForSale: false,
+    drawNumber: 'PB233545',
+    badge: 'POKE',
+    league: 'TvBet. POKER',
+    sport: 'TvBet. POKER',
+    pokerResult: {
+      board: '9♣, 4♥, 8♠, K♥, 3♦',
+      hands: [
+        { id: 1, cards: '6♦, A♣' },
+        { id: 2, cards: 'A♠, 6♣' },
+        { id: 3, cards: 'K♠, 7♥' },
+        { id: 4, cards: '2♠, 4♦' },
+        { id: 5, cards: '9♥, 9♠' },
+        { id: 6, cards: '5♠, 10♣' },
+      ],
+      winnerLabel: '5 (Brelan)',
+      combinationName: 'Combinaison gagnante. Brelan',
+    },
+    events: [
+      {
+        id: 'ev-poker-89810937599-1',
+        sport: 'TvBet. POKER',
+        league: 'TvBet. POKER',
+        date: '30 oct. 2026 (22:50)',
+        homeTeam: { name: 'TvBet. POKER' },
+        awayTeam: { name: 'PB233545' },
+        prediction: 'Combinaison gagnante. Brelan',
+        odd: 1.74,
+        status: 'Gain',
+        isLive: false,
+        gameCategory: 'poker',
+        roundCode: 'PB233545',
+        badge: 'POKE',
+        pokerResult: {
+          board: '9♣, 4♥, 8♠, K♥, 3♦',
+          hands: [
+            { id: 1, cards: '6♦, A♣' },
+            { id: 2, cards: 'A♠, 6♣' },
+            { id: 3, cards: 'K♠, 7♥' },
+            { id: 4, cards: '2♠, 4♦' },
+            { id: 5, cards: '9♥, 9♠' },
+            { id: 6, cards: '5♠, 10♣' },
+          ],
+          winnerLabel: '5 (Brelan)',
+          combinationName: 'Combinaison gagnante. Brelan',
+        },
+      },
+    ],
+  },
+  {
+    id: '89800294973',
+    createdAt: '30.10.2026 (19:25)',
+    type: 'Combiné',
+    eventsCount: 11,
+    completedCount: 0,
+    totalOdds: 36.768,
+    stake: 500,
+    potentialPayout: 18384.49,
+    status: 'Accepté',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'CB898002',
+    isForSale: false,
+    league: 'Principaux événements : 3',
+    events: [
+      {
+        id: 'ev-barca-alaves-8980',
+        sport: 'Football',
+        league: 'Football . Espagne. La Liga',
+        date: '31 oct. 2026 (21:00)',
+        badge: 'LaLiga',
+        homeTeam: {
+          name: 'Barcelone',
+          logo: 'https://media.api-sports.io/football/teams/529.png',
+        },
+        awayTeam: {
+          name: 'Deportivo Alavés',
+          logo: 'https://media.api-sports.io/football/teams/542.png',
+        },
+        prediction: 'Total 1. (2.5) Plus de',
+        odd: 1.4,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-milan-inter-8980',
+        sport: 'Football',
+        league: 'Football . Italie. Série A',
+        date: '31 oct. 2026 (20:45)',
+        badge: 'Serie A',
+        homeTeam: {
+          name: 'Milan',
+          logo: 'https://media.api-sports.io/football/teams/489.png',
+        },
+        awayTeam: {
+          name: 'Inter Milan',
+          logo: 'https://media.api-sports.io/football/teams/505.png',
+        },
+        prediction: 'Total. (2.5) Plus de',
+        odd: 1.698,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-bologna-monza-8980',
+        sport: 'Football',
+        league: 'Football . Italie. Série A',
+        date: '31 oct. 2026 (15:00)',
+        badge: 'Serie A',
+        homeTeam: {
+          name: 'Bologna1909',
+          logo: 'https://media.api-sports.io/football/teams/500.png',
+        },
+        awayTeam: {
+          name: 'Monza 1912',
+          logo: 'https://media.api-sports.io/football/teams/1579.png',
+        },
+        prediction: 'Double chance. 1X',
+        odd: 1.206,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-udinese-roma-8980',
+        sport: 'Football',
+        league: 'Football . Italie. Série A',
+        date: '31 oct. 2026 (18:00)',
+        badge: 'Serie A',
+        homeTeam: {
+          name: 'Udinese Calcio',
+          logo: 'https://media.api-sports.io/football/teams/494.png',
+        },
+        awayTeam: {
+          name: 'Roma',
+          logo: 'https://media.api-sports.io/football/teams/497.png',
+        },
+        prediction: 'Deux équipes vont marquer. Oui',
+        odd: 1.69,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-mancity-brighton-8980',
+        sport: 'Football',
+        league: 'Football . Angleterre. Premier League',
+        date: '31 oct. 2026 (16:00)',
+        homeTeam: {
+          name: 'Manchester City',
+          logo: 'https://media.api-sports.io/football/teams/50.png',
+        },
+        awayTeam: {
+          name: 'Brighton & Hove Albion',
+          logo: 'https://media.api-sports.io/football/teams/51.png',
+        },
+        prediction: 'Deux équipes vont marquer. Oui',
+        odd: 1.57,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-ajax-az-8980',
+        sport: 'Football',
+        league: 'Football . Pays-Bas. Eredivisie',
+        date: '31 oct. 2026 (21:00)',
+        homeTeam: {
+          name: 'Ajax',
+          logo: 'https://media.api-sports.io/football/teams/194.png',
+        },
+        awayTeam: {
+          name: 'AZ Alkmaar',
+          logo: 'https://media.api-sports.io/football/teams/197.png',
+        },
+        prediction: 'Deux équipes vont marquer. Oui',
+        odd: 1.38,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-leverkusen-stuttgart-8980',
+        sport: 'Football',
+        league: 'Football . Allemagne. Bundesliga',
+        date: '31 oct. 2026 (15:30)',
+        homeTeam: {
+          name: 'Bayer 04 Leverkusen',
+          logo: 'https://media.api-sports.io/football/teams/168.png',
+        },
+        awayTeam: {
+          name: 'VfB Stuttgart',
+          logo: 'https://media.api-sports.io/football/teams/172.png',
+        },
+        prediction: 'Deux équipes vont marquer. Oui',
+        odd: 1.33,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-psg-lens-8980',
+        sport: 'Football',
+        league: 'Football . France. Ligue 1',
+        date: '31 oct. 2026 (17:00)',
+        homeTeam: {
+          name: 'Paris Saint-Germain',
+          logo: 'https://media.api-sports.io/football/teams/85.png',
+        },
+        awayTeam: {
+          name: 'Lens',
+          logo: 'https://media.api-sports.io/football/teams/116.png',
+        },
+        prediction: 'Total 1. (1.5) Plus de',
+        odd: 1.35,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-real-valencia-8980',
+        sport: 'Football',
+        league: 'Football . Espagne. La Liga',
+        date: '31 oct. 2026 (21:00)',
+        badge: 'LaLiga',
+        homeTeam: {
+          name: 'Real Madrid',
+          logo: 'https://media.api-sports.io/football/teams/541.png',
+        },
+        awayTeam: {
+          name: 'Valencia',
+          logo: 'https://media.api-sports.io/football/teams/532.png',
+        },
+        prediction: 'Double chance. 1X',
+        odd: 1.36,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-liverpool-chelsea-8980',
+        sport: 'Football',
+        league: 'Football . Angleterre. Premier League',
+        date: '31 oct. 2026 (17:30)',
+        homeTeam: {
+          name: 'Liverpool',
+          logo: 'https://media.api-sports.io/football/teams/40.png',
+        },
+        awayTeam: {
+          name: 'Chelsea',
+          logo: 'https://media.api-sports.io/football/teams/49.png',
+        },
+        prediction: 'Total. (1.5) Plus de',
+        odd: 1.304,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-bonus-8980',
+        sport: 'Bonus',
+        league: 'Bonus',
+        date: '31 oct. 2026',
+        homeTeam: { name: 'Bonus' },
+        awayTeam: { name: '' },
+        prediction: 'Bonus, Bonus pari combiné',
+        odd: 1.1,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89755801725',
+    createdAt: '29.10.2026 (22:23)',
+    type: 'Combiné',
+    eventsCount: 2,
+    completedCount: 0,
+    totalOdds: 1.921,
+    stake: 500,
+    potentialPayout: 960.92,
+    status: 'Accepté',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'LL8975',
     isForSale: true,
     canSell: true,
-    sellPrice: '102.09',
-    cashoutAmount: 102.09,
+    sellPrice: 460,
+    cashoutAmount: 460,
+    league: 'LaLiga',
+    events: [
+      {
+        id: 'ev-villarreal-espanyol-8975',
+        sport: 'Football',
+        league: 'Football . Espagne. La Liga',
+        date: '30.10.2026 (21:00)',
+        roundCode: 'Tour 11',
+        badge: 'LaLiga',
+        homeTeam: {
+          name: 'Villarreal',
+          logo: 'https://media.api-sports.io/football/teams/533.png',
+        },
+        awayTeam: {
+          name: 'Espanyol',
+          logo: 'https://media.api-sports.io/football/teams/540.png',
+        },
+        prediction: '1X2. V1',
+        odd: 1.41,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-spain-winner-8975',
+        sport: 'Football',
+        league: 'Football . Espagne. Vainqueur',
+        date: '30.10.2026 (21:00)',
+        badge: 'LaLiga',
+        homeTeam: {
+          name: 'Spain. La Liga. 2026/27. Winner',
+        },
+        awayTeam: {
+          name: '',
+        },
+        prediction: 'Qui va gagner. Barcelone - Oui',
+        odd: 1.363,
+        status: 'Accepté',
+        isLive: false,
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89711034853',
+    createdAt: '29.10.2026 (00:28)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 1.45,
+    stake: 90,
+    potentialPayout: 130.5,
+    actualPayout: 130.5,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'SP8971',
+    isForSale: false,
+    league: 'LaLiga',
+    events: [
+      {
+        id: 'ev-madrid-getafe-8971',
+        sport: 'Football',
+        league: 'Football . Espagne. La Liga',
+        date: '29.10.2026 (00:00)',
+        badge: 'LaLiga',
+        homeTeam: {
+          name: 'Real Madrid',
+          logo: 'https://media.api-sports.io/football/teams/541.png',
+        },
+        awayTeam: {
+          name: 'Getafe',
+          logo: 'https://media.api-sports.io/football/teams/546.png',
+        },
+        prediction: '1X2. V1',
+        odd: 1.45,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '2:0',
+        halftimeScore: '2:0 (1:0,1:0)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89694684045',
+    createdAt: '28.10.2026 (19:40)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 2.625,
+    stake: 1000,
+    potentialPayout: 2625,
+    status: 'Perdu',
+    isLive: false,
+    gameCategory: 'esports',
+    shareCode: 'FF896946',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-fifa-chelsea-arsenal-8969',
+        sport: 'FIFA',
+        league: 'FIFA. FC 26. 5x5 Rush. Superligue',
+        date: '28.10.2026 (19:40)',
+        homeTeam: {
+          name: 'Chelsea',
+          logo: 'https://media.api-sports.io/football/teams/49.png',
+        },
+        awayTeam: {
+          name: 'Arsenal',
+          logo: 'https://media.api-sports.io/football/teams/42.png',
+        },
+        prediction: '1X2. V1',
+        odd: 2.625,
+        status: 'Perte',
+        isLive: false,
+        actualScore: '1:3',
+        halftimeScore: '1:3 (1:3)',
+        gameCategory: 'esports',
+      },
+    ],
+  },
+  {
+    id: '89694250971',
+    createdAt: '28.10.2026 (19:34)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 1.345,
+    stake: 90,
+    potentialPayout: 121.05,
+    actualPayout: 121.05,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'esports',
+    shareCode: 'FF8969',
+    isForSale: false,
     events: [
       {
         id: 'ev-fifa-bayern-napoli-8969',
         sport: 'FIFA',
-        league: 'FC 26. 5x5 Rush. Superligue',
-        date: '28.10.2026 (07:30 PM)',
+        league: 'FIFA. FC 26. 5x5 Rush. Superligue',
+        date: '28.10.2026 (19:30)',
         homeTeam: {
           name: 'Bayern Munich',
-          logo: 'generic-player',
+          logo: 'https://media.api-sports.io/football/teams/157.png',
         },
         awayTeam: {
           name: 'Napoli',
@@ -69,18 +872,244 @@ const INITIAL_COUPONS: BetSlip[] = [
         },
         prediction: '1X2. V1',
         odd: 1.345,
-        status: 'Accepté',
-        isLive: true,
-        actualScore: '3:1',
-        halftimeScore: '3:1 (3:1)',
-        elapsed: 223,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '6:1',
+        halftimeScore: '6:1 (6:1)',
         gameCategory: 'esports',
       },
     ],
   },
   {
+    id: '89680022549',
+    createdAt: '28.10.2026 (15:50)',
+    type: 'Combiné',
+    eventsCount: 2,
+    completedCount: 2,
+    totalOdds: 2.334,
+    stake: 1000,
+    potentialPayout: 2334,
+    status: 'Perdu',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'ML8968',
+    isForSale: false,
+    league: 'Serie A',
+    events: [
+      {
+        id: 'ev-venise-inter-8968',
+        sport: 'Football',
+        league: 'Football . Italie. Série A',
+        date: '28.10.2026 (18:30)',
+        roundCode: 'Tour 9',
+        badge: 'Serie A',
+        homeTeam: {
+          name: 'Venise FC',
+          logo: 'https://media.api-sports.io/football/teams/517.png',
+        },
+        awayTeam: {
+          name: 'Inter Milan',
+          logo: 'https://media.api-sports.io/football/teams/505.png',
+        },
+        prediction: '1X2. V2',
+        odd: 1.37,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '0:2',
+        halftimeScore: '0:2 (0:0,0:2)',
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-milan-bologna-8968',
+        sport: 'Football',
+        league: 'Football . Italie. Série A',
+        date: '28.10.2026 (18:30)',
+        roundCode: 'Tour 9',
+        badge: 'Serie A',
+        homeTeam: {
+          name: 'Milan',
+          logo: 'https://media.api-sports.io/football/teams/489.png',
+        },
+        awayTeam: {
+          name: 'Bologna1909',
+          logo: 'https://media.api-sports.io/football/teams/500.png',
+        },
+        prediction: '1X2. V1',
+        odd: 1.704,
+        status: 'Perte',
+        isLive: false,
+        actualScore: '2:4',
+        halftimeScore: '2:4 (2:1,0:3)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89527149789',
+    createdAt: '25.10.2026 (17:20)',
+    type: 'Combiné',
+    eventsCount: 2,
+    completedCount: 2,
+    totalOdds: 8.998,
+    stake: 500,
+    potentialPayout: 4499,
+    status: 'Perdu',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'ML8952',
+    isForSale: false,
+    league: 'LaLiga',
+    events: [
+      {
+        id: 'ev-sevilla-valencia-8952',
+        sport: 'Football',
+        league: 'Football . Espagne. La Liga',
+        date: '25.10.2026 (18:00)',
+        badge: 'LaLiga',
+        homeTeam: {
+          name: 'Sevilla',
+          logo: 'https://media.api-sports.io/football/teams/536.png',
+        },
+        awayTeam: {
+          name: 'Valencia',
+          logo: 'https://media.api-sports.io/football/teams/532.png',
+        },
+        prediction: '1X2. V1',
+        odd: 2.45,
+        status: 'Perte',
+        isLive: false,
+        actualScore: '1:2',
+        halftimeScore: '1:2 (0:1,1:1)',
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-sociedad-betis-8952',
+        sport: 'Football',
+        league: 'Football . Espagne. La Liga',
+        date: '25.10.2026 (20:00)',
+        badge: 'LaLiga',
+        homeTeam: {
+          name: 'Real Sociedad',
+          logo: 'https://media.api-sports.io/football/teams/548.png',
+        },
+        awayTeam: {
+          name: 'Real Betis',
+          logo: 'https://media.api-sports.io/football/teams/543.png',
+        },
+        prediction: 'Total. (2.5) Plus de',
+        odd: 3.67,
+        status: 'Perte',
+        isLive: false,
+        actualScore: '0:1',
+        halftimeScore: '0:1 (0:0,0:1)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '89485827375',
+    createdAt: '25.10.2026 (07:44)',
+    type: 'Simple',
+    eventsCount: 1,
+    completedCount: 1,
+    totalOdds: 6,
+    stake: 5000,
+    potentialPayout: 30000,
+    status: 'Perdu',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'ML8948',
+    isForSale: false,
+    events: [
+      {
+        id: 'ev-foot-8948',
+        sport: 'Football',
+        league: 'Football . Match amical',
+        date: '25.10.2026 (08:00)',
+        homeTeam: {
+          name: 'Ajax',
+          logo: 'https://media.api-sports.io/football/teams/194.png',
+        },
+        awayTeam: {
+          name: 'Benfica',
+          logo: 'https://media.api-sports.io/football/teams/211.png',
+        },
+        prediction: 'Score exact: 3:0',
+        odd: 6,
+        status: 'Perte',
+        isLive: false,
+        actualScore: '1:1',
+        halftimeScore: '1:1 (0:1,1:0)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
+    id: '88964599389',
+    createdAt: '17.10.2026 (08:52)',
+    type: 'Combiné',
+    eventsCount: 2,
+    completedCount: 2,
+    totalOdds: 3.021,
+    stake: 500000,
+    potentialPayout: 1510760,
+    actualPayout: 1510760,
+    status: 'Payé',
+    isLive: false,
+    gameCategory: 'sports',
+    shareCode: 'ML8896',
+    isForSale: false,
+    league: 'LaLiga',
+    events: [
+      {
+        id: 'ev-bayern-leipzig-8896',
+        sport: 'Football',
+        league: 'Football . Allemagne. Bundesliga',
+        date: '17.10.2026 (16:30)',
+        badge: 'LaLiga',
+        homeTeam: {
+          name: 'Bayern Munich',
+          logo: 'https://media.api-sports.io/football/teams/157.png',
+        },
+        awayTeam: {
+          name: 'RasenBallsport Leipzig',
+          logo: 'https://media.api-sports.io/football/teams/173.png',
+        },
+        prediction: 'Total. (4.5) Plus de',
+        odd: 1.79,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '6:1',
+        halftimeScore: '6:1 (3:0,3:1)',
+        gameCategory: 'sports',
+      },
+      {
+        id: 'ev-espanyol-atletico-8896',
+        sport: 'Football',
+        league: 'Football . Espagne. La Liga',
+        date: '17.10.2026 (20:00)',
+        badge: 'LaLiga',
+        homeTeam: {
+          name: 'Espanyol',
+          logo: 'https://media.api-sports.io/football/teams/540.png',
+        },
+        awayTeam: {
+          name: 'Atlético de Madrid',
+          logo: 'https://media.api-sports.io/football/teams/530.png',
+        },
+        prediction: '1X2. V2',
+        odd: 1.688,
+        status: 'Gain',
+        isLive: false,
+        actualScore: '0:1',
+        halftimeScore: '0:1 (0:0,0:1)',
+        gameCategory: 'sports',
+      },
+    ],
+  },
+  {
     id: '88909739359',
-    createdAt: '16.10.2026 (09:59 AM)',
+    createdAt: '16.10.2026 (09:59)',
     type: 'Combiné',
     eventsCount: 2,
     completedCount: 2,
@@ -97,29 +1126,29 @@ const INITIAL_COUPONS: BetSlip[] = [
       {
         id: 'ev-frankfurt-cologne-8890',
         sport: 'Football',
-        league: 'Allemagne. Bundesliga',
-        date: '16.10.2026 (07:30 PM)',
+        league: 'Football . Allemagne. Bundesliga',
+        date: '16.10.2026 (19:30)',
         homeTeam: {
           name: 'Eintracht Frankfurt',
-          logo: 'jersey:stripes:#111111:#E11D48:DE',
+          logo: 'https://media.api-sports.io/football/teams/169.png',
         },
         awayTeam: {
           name: 'Cologne',
-          logo: 'jersey:solid:#FFFFFF:#CBD5E1:DE',
+          logo: 'https://media.api-sports.io/football/teams/192.png',
         },
         prediction: 'Total. (4) Moins de',
         odd: 1.59,
         status: 'Gain',
         isLive: false,
         actualScore: '1:0',
-        halftimeScore: '(0:0,1:0)',
+        halftimeScore: '1:0 (0:0,1:0)',
         gameCategory: 'sports',
       },
       {
         id: 'ev-deportivo-levante-8890',
         sport: 'Football',
-        league: 'Espagne. La Liga',
-        date: '16.10.2026 (08:00 PM)',
+        league: 'Football . Espagne. La Liga',
+        date: '16.10.2026 (20:00)',
         homeTeam: {
           name: 'Deportivo de A Coruna',
           logo: 'https://media.api-sports.io/football/teams/544.png',
@@ -133,127 +1162,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         status: 'Gain',
         isLive: false,
         actualScore: '1:1',
-        halftimeScore: '(0:0,1:1)',
-        gameCategory: 'sports',
-      },
-    ],
-  },
-  {
-    id: '89680022549',
-    createdAt: '28.10.2026 (03:50 PM)',
-    type: 'Combiné',
-    eventsCount: 2,
-    completedCount: 0,
-    totalOdds: 2.334,
-    stake: 1000,
-    potentialPayout: 2334.48,
-    status: 'Accepté',
-    isLive: false,
-    gameCategory: 'sports',
-    shareCode: 'ML8968',
-    isForSale: true,
-    canSell: true,
-    sellPrice: 750,
-    cashoutAmount: 750,
-    events: [
-      {
-        id: 'ev-venise-inter-8968',
-        sport: 'Football',
-        league: 'Italie. Série A',
-        date: '28.10.2026 (06:30 PM)',
-        roundCode: 'Tour 9',
-        homeTeam: {
-          name: 'Venise FC',
-          logo: 'https://media.api-sports.io/football/teams/517.png',
-        },
-        awayTeam: {
-          name: 'Inter Milan',
-          logo: 'https://media.api-sports.io/football/teams/505.png',
-        },
-        prediction: '1X2. V2',
-        odd: 1.37,
-        status: 'Accepté',
-        isLive: false,
-        gameCategory: 'sports',
-      },
-      {
-        id: 'ev-milan-bologna-8968',
-        sport: 'Football',
-        league: 'Italie. Série A',
-        date: '28.10.2026 (06:30 PM)',
-        roundCode: 'Tour 9',
-        homeTeam: {
-          name: 'Milan',
-          logo: 'https://media.api-sports.io/football/teams/489.png',
-        },
-        awayTeam: {
-          name: 'Bologna1909',
-          logo: 'https://media.api-sports.io/football/teams/500.png',
-        },
-        prediction: '1X2. V1',
-        odd: 1.704,
-        status: 'Accepté',
-        isLive: false,
-        gameCategory: 'sports',
-      },
-    ],
-  },
-  {
-    id: '88964599389',
-    createdAt: '17.10.2026 (11:20 AM)',
-    type: 'Combiné',
-    eventsCount: 2,
-    completedCount: 2,
-    totalOdds: 3.021,
-    stake: 500000,
-    potentialPayout: 1510760,
-    actualPayout: 1510760,
-    status: 'Payé',
-    isLive: false,
-    gameCategory: 'sports',
-    shareCode: 'ML8896',
-    isForSale: false,
-    events: [
-      {
-        id: 'ev-bayern-leipzig-8896',
-        sport: 'Football',
-        league: 'Allemagne. Bundesliga',
-        date: '17.10.2026 (05:30 PM)',
-        homeTeam: {
-          name: 'Bayern Munich',
-          logo: 'https://media.api-sports.io/football/teams/157.png',
-        },
-        awayTeam: {
-          name: 'RasenBallsport Leipzig',
-          logo: 'https://media.api-sports.io/football/teams/173.png',
-        },
-        prediction: 'Total. (4.5) Plus de',
-        odd: 1.79,
-        status: 'Gain',
-        isLive: false,
-        actualScore: '6:1',
-        halftimeScore: '(3:0,3:1)',
-        gameCategory: 'sports',
-      },
-      {
-        id: 'ev-espanyol-atletico-8896',
-        sport: 'Football',
-        league: 'Espagne. La Liga',
-        date: '17.10.2026 (01:00 PM)',
-        homeTeam: {
-          name: 'Espanyol',
-          logo: 'https://media.api-sports.io/football/teams/540.png',
-        },
-        awayTeam: {
-          name: 'Atlético de Madrid',
-          logo: 'https://media.api-sports.io/football/teams/530.png',
-        },
-        prediction: '1X2. V2',
-        odd: 1.688,
-        status: 'Gain',
-        isLive: false,
-        actualScore: '0:1',
-        halftimeScore: '(0:0,0:1)',
+        halftimeScore: '1:1 (0:0,1:1)',
         gameCategory: 'sports',
       },
     ],
@@ -1234,13 +2143,14 @@ const INITIAL_TEAMS: CustomTeam[] = [
 export const useBetStore = create<BetState>()(
   persist(
     (set, get) => ({
-      balance: 64801550,
+      balance: 26522743.89,
       activeSlip: [],
       coupons: INITIAL_COUPONS.map((c) => ({
         ...c,
         userId: c.userId || 'user-demo-1',
         ticketNumber: c.ticketNumber || c.id,
       })),
+      deletedCouponIds: [],
       customLeagues: INITIAL_LEAGUES,
       customTeams: INITIAL_TEAMS,
 
@@ -1290,9 +2200,17 @@ export const useBetStore = create<BetState>()(
           const evTime = ev.matchTime || coupon.matchTime || combined.isoString.substring(11, 16);
           const evDate = ev.matchDate || coupon.matchDate;
           const evCombined = combineDateAndTime(ev.startDate || ev.date || evDate, evTime);
+          const evHomeName = typeof ev.homeTeam === 'string' ? ev.homeTeam : ev.homeTeam?.name;
+          const evAwayName = typeof ev.awayTeam === 'string' ? ev.awayTeam : ev.awayTeam?.name;
+          const isPokerOrBonus =
+            String(ev.sport || '').toUpperCase().includes('POKER') ||
+            String(ev.sport || '').toUpperCase() === 'BONUS';
 
           return {
             ...ev,
+            prediction: isPokerOrBonus
+              ? ev.prediction
+              : normalizeBetSelectionLabel(ev.prediction, evHomeName, evAwayName),
             date: ev.date || evCombined.formatted,
             startDate: ev.startDate || evCombined.isoString,
             matchTime: ev.matchTime || evTime,
@@ -1324,6 +2242,11 @@ export const useBetStore = create<BetState>()(
         const finalDate = matchPayload.matchDate || matchPayload.date || matchPayload.startDate;
         const finalTime = matchPayload.matchTime || (matchPayload.startDate ? matchPayload.startDate.substring(11, 16) : undefined);
         const combined = combineDateAndTime(finalDate, finalTime);
+        const homeObj = matchPayload.homeTeam || (matchPayload.team1 ? { name: matchPayload.team1 } : { name: 'Équipe 1' });
+        const awayObj = matchPayload.awayTeam || (matchPayload.team2 ? { name: matchPayload.team2 } : { name: 'Équipe 2' });
+        const homeName = typeof homeObj === 'string' ? homeObj : homeObj?.name;
+        const awayName = typeof awayObj === 'string' ? awayObj : awayObj?.name;
+        const rawPred = matchPayload.prediction || matchPayload.betType || '1X2. V1';
 
         const newEv: MatchEvent = {
           id: matchPayload.id || `ev-${Date.now()}`,
@@ -1333,9 +2256,9 @@ export const useBetStore = create<BetState>()(
           startDate: matchPayload.startDate || combined.isoString,
           matchTime: matchPayload.matchTime || finalTime || combined.isoString.substring(11, 16),
           matchDate: matchPayload.matchDate || combined.formatted.substring(0, 10),
-          homeTeam: matchPayload.homeTeam || (matchPayload.team1 ? { name: matchPayload.team1 } : { name: 'Équipe 1' }),
-          awayTeam: matchPayload.awayTeam || (matchPayload.team2 ? { name: matchPayload.team2 } : { name: 'Équipe 2' }),
-          prediction: matchPayload.prediction || matchPayload.betType || 'V1',
+          homeTeam: homeObj,
+          awayTeam: awayObj,
+          prediction: normalizeBetSelectionLabel(rawPred, homeName, awayName),
           odd: typeof matchPayload.odd === 'number' ? matchPayload.odd : (parseFloat(matchPayload.odds) || 1.85),
           status: matchPayload.status || 'Accepté',
           isLive: Boolean(matchPayload.isLive),
@@ -1438,10 +2361,7 @@ export const useBetStore = create<BetState>()(
               }
               return { ...e, actualScore: score, status, halftimeScore: half };
             });
-            const completedEventsCount = newEvents.filter(
-              (e) => e.status !== 'Accepté' && e.status !== 'En cours'
-            ).length;
-            const allCompleted = completedEventsCount === newEvents.length;
+            const allCompleted = newEvents.every((e) => e.status !== 'Accepté' && e.status !== 'En cours');
             const allWon = newEvents.every((e) => e.status === 'Gain' || e.status === 'Payé');
             const anyLost = newEvents.some((e) => e.status === 'Perdu');
 
@@ -1454,7 +2374,7 @@ export const useBetStore = create<BetState>()(
               ...c,
               events: newEvents,
               status: newCouponStatus,
-              completedCount: completedEventsCount,
+              completedCount: allCompleted ? c.eventsCount : c.completedCount,
               actualPayout: allWon ? c.potentialPayout : (anyLost ? 0 : c.actualPayout),
             };
           }),
@@ -1482,14 +2402,14 @@ export const useBetStore = create<BetState>()(
         let payout = 0;
         set((state) => {
           const coupon = state.coupons.find((c) => c.id === couponId);
-          if (!coupon || !coupon.cashoutAmount) return state;
+          if (!coupon) return state;
 
-          payout = coupon.cashoutAmount;
+          payout = coupon.cashoutAmount || Math.round((Number(coupon.stake) || 500) * 0.94);
           return {
             balance: state.balance + payout,
             coupons: state.coupons.map((c) =>
               c.id === couponId
-                ? { ...c, status: 'Vendu', isForSale: false, actualPayout: payout }
+                ? { ...c, status: 'Vendu', isForSale: false, isLive: false, actualPayout: payout }
                 : c
             ),
           };
@@ -1503,15 +2423,32 @@ export const useBetStore = create<BetState>()(
       duplicateCoupon: (couponId: string) => {
         const coupon = get().coupons.find((c) => c.id === couponId);
         if (!coupon) return [];
-        set({ activeSlip: [...coupon.events] });
-        return coupon.events;
+        const realEvents = coupon.events.filter(
+          (e) => String(e.sport || '').toUpperCase() !== 'BONUS'
+        );
+        set({ activeSlip: [...realEvents] });
+        return realEvents;
       },
 
       deleteCoupon: (couponId: string) => {
+        const idStr = String(couponId);
         set((state) => ({
-          coupons: state.coupons.filter((c) => c.id !== couponId),
+          coupons: state.coupons.filter((c) => String(c.id) !== idStr),
+          deletedCouponIds: Array.from(new Set([...(state.deletedCouponIds || []), idStr])),
         }));
         betApiService.deleteBetOnBackend(couponId);
+      },
+
+      deleteCoupons: (couponIds: string[]) => {
+        if (!couponIds || couponIds.length === 0) return;
+        const idSet = new Set(couponIds.map((id) => String(id)));
+        set((state) => ({
+          coupons: state.coupons.filter((c) => !idSet.has(String(c.id))),
+          deletedCouponIds: Array.from(
+            new Set([...(state.deletedCouponIds || []), ...Array.from(idSet)])
+          ),
+        }));
+        couponIds.forEach((id) => betApiService.deleteBetOnBackend(id));
       },
 
       setBalance: (amount: number) => {
@@ -1611,10 +2548,31 @@ export const useBetStore = create<BetState>()(
       storage: createJSONStorage(() => AsyncStorage),
       merge: (persistedState: any, currentState) => {
         const merged = { ...currentState, ...(persistedState || {}) };
+        const deletedSet = new Set<string>(
+          Array.isArray(persistedState?.deletedCouponIds)
+            ? persistedState.deletedCouponIds.map((id: any) => String(id))
+            : []
+        );
+        merged.deletedCouponIds = Array.from(deletedSet);
         if (Array.isArray(persistedState?.coupons)) {
-          const existingIds = new Set(persistedState.coupons.map((c: BetSlip) => String(c.id)));
-          const missingDefaults = INITIAL_COUPONS.filter((c) => !existingIds.has(String(c.id)));
-          merged.coupons = [...missingDefaults, ...persistedState.coupons];
+          const initialMap = new Map(INITIAL_COUPONS.map((c) => [String(c.id), c]));
+          const updatedPersisted = persistedState.coupons
+            .filter((c: BetSlip) => !deletedSet.has(String(c.id)))
+            .map((c: BetSlip) => {
+              const initRef = initialMap.get(String(c.id));
+              if (initRef) {
+                return {
+                  ...initRef,
+                  status: c.status || initRef.status,
+                };
+              }
+              return c;
+            });
+          const existingIds = new Set(updatedPersisted.map((c: BetSlip) => String(c.id)));
+          const missingDefaults = INITIAL_COUPONS.filter(
+            (c) => !existingIds.has(String(c.id)) && !deletedSet.has(String(c.id))
+          );
+          merged.coupons = [...missingDefaults, ...updatedPersisted];
         }
         return merged;
       },

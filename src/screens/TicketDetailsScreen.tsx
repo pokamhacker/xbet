@@ -1,895 +1,2095 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  SafeAreaView,
+  Platform,
+  StatusBar,
   Alert,
   Image,
-  Platform,
-  RefreshControl,
-  StatusBar,
+  Animated,
 } from 'react-native';
-
-import * as Haptics from 'expo-haptics';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography } from '../theme/theme';
-import { useResponsive } from '../utils/responsive';
+import Svg, { Path, Rect } from 'react-native-svg';
+import { BackArrowIcon } from '../components/common/BackArrowIcon';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
+import { useNavigation } from '@react-navigation/native';
+
+// Stores & types
 import { useBetStore } from '../store/useBetStore';
-import { TicketDivider } from '../components/TicketDivider';
-import { TicketPerforation } from '../components/TicketPerforation';
-import { MatchEventCard } from '../components/MatchEventCard';
-import { WonMatchEventCard } from '../components/WonMatchEventCard';
-import { TvBetPokerCard } from '../components/TvBetPokerCard';
-import { BetOptionsBottomSheet } from '../components/BetOptionsBottomSheet';
-import { MatchEvent } from '../types/bet';
 import { useCouponStore } from '../store/couponStore';
-import { NotificationBell } from '../components/common/NotificationBell';
 import { useThemeStore } from '../stores/themeStore';
-import { SaveCouponModal } from '../components/modals/SaveCouponModal';
-import { ToggleCardIcon } from '../components/icons/ToggleCardIcon';
-import { BetLayersIcon } from '../components/icons/BetLayersIcon';
-import { formatBetDate } from '../utils/dateFormatter';
-import { DuplicateCouponButton } from '../components/DuplicateCouponButton';
+import { BetSlip, MatchEvent } from '../types/bet';
+import { resolveMatchNavigationTarget } from '../data/mockData';
+import {
+  adaptEventResultToPrediction,
+  normalizeBetSelectionLabel,
+  computeAdaptiveLiveScore,
+} from '../utils/scoreAdapter';
+import { TeamLogo } from '../components/common/TeamLogo';
+import {
+  ASSET_ICONS,
+  OfficialBellIcon,
+  OfficialLayersIcon,
+  OfficialThreeDotsIcon,
+} from './history/HistoryListScreen';
+import {
+  formatBetDate,
+  formatFrenchEventDate,
+  formatFootballHeader,
+  getEventLiveProgress,
+  formatSecondsToMMSS,
+} from '../utils/dateFormatter';
+import { formatCleanOdds } from '../utils/oddsFormatter';
+import { renderCardsWithSuits, generateWinningPokerDraw } from '../utils/pokerGenerator';
 
-export default function TicketDetailsScreen({ route, navigation }: any) {
-  const couponId = route?.params?.couponId || route?.params?.ticketId;
-  const { coupons, executeCashout, duplicateCoupon } = useBetStore();
-  const { duplicateFromCoupon } = useCouponStore();
-  const { currentTheme } = useThemeStore();
-  const { insets, isSmallDevice, isTablet, isLandscape, font, moderateScale, scale, contentContainerStyle } = useResponsive();
-  const androidBottomPad = Platform.OS === 'android' ? 12 : 0;
-  const bottomInset = insets.bottom > 0 ? Math.max(insets.bottom, androidBottomPad) : (Platform.OS === 'ios' ? 20 : androidBottomPad);
-  const bottomBarHeight = 56 + bottomInset;
+// ============================================================================
+// Types
+// ============================================================================
+// Helper de formatage de devise (symbole ₣ identique à l'interface Historique de pari)
+const formatCurrency = (val: number | string | undefined): string => {
+  if (val === undefined || val === null) return '0 ₣';
+  const num = typeof val === 'number' ? val : parseFloat(String(val).replace(',', '.'));
+  if (isNaN(num)) return `${val} ₣`;
+  const formatted = Number.isInteger(num)
+    ? num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+    : num.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return `${formatted} ₣`;
+};
 
-  const [optionsVisible, setOptionsVisible] = useState(false);
-  const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
-  const [savedCouponCode, setSavedCouponCode] = useState('');
+// Helper de formatage de date spécifique Poker (ex: 30 oct. 2026 (22:30))
+const formatPokerEventDate = (dateStr?: string): string => {
+  if (!dateStr) return '30 oct. 2026 (22:30)';
+  if (
+    dateStr.includes('oct.') ||
+    dateStr.includes('nov.') ||
+    dateStr.includes('déc.') ||
+    dateStr.includes('janv.') ||
+    dateStr.includes('févr.') ||
+    dateStr.includes('mars.') ||
+    dateStr.includes('avr.') ||
+    dateStr.includes('mai') ||
+    dateStr.includes('juin') ||
+    dateStr.includes('juil.') ||
+    dateStr.includes('août') ||
+    dateStr.includes('sept.')
+  ) {
+    return dateStr;
+  }
+  const m = dateStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s*\(?(\d{2}:\d{2})\)?)?/);
+  if (m) {
+    const months = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+    const monthIdx = parseInt(m[2], 10) - 1;
+    const monthName = months[monthIdx] || 'oct.';
+    const time = m[4] ? ` (${m[4]})` : '';
+    return `${m[1]} ${monthName} ${m[3]}${time}`;
+  }
+  return dateStr;
+};
 
-  const handleSaveCoupon = () => {
-    const code = coupon.shareCode || 'E9CN9';
-    setSavedCouponCode(code);
-    setOptionsVisible(false);
-    setIsSaveModalVisible(true);
+export interface BetDetailEvent {
+  id?: string;
+  matchId?: string;
+  sport?: string;
+  league: string;
+  date: string;
+  rawDate?: any;
+  startDate?: any;
+  matchDate?: string;
+  matchTime?: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeLogo?: string;
+  awayLogo?: string;
+  scoreFinal?: string;
+  scoreDetail?: string;
+  market: string;
+  odd: string;
+  status: 'Accepté' | 'Gain' | 'Perte' | 'Payé' | 'Perdu' | 'en_cours' | 'gagne' | 'perdu';
+  isOutright?: boolean;
+  outrightTitle?: string;
+  isPoker?: boolean;
+  isFifa?: boolean;
+  isBonus?: boolean;
+  isLive?: boolean;
+  durationSeconds?: number;
+  elapsedSeconds?: number;
+  badge?: string;
+  roundCode?: string;
+  drawNumber?: string;
+  pokerDraw?: {
+    board?: string;
+    hands?: Array<{ id: number; cards: string }>;
+    winnerLabel?: string;
   };
+}
 
-  // Pull-to-refresh state & callback
-  const [refreshing, setRefreshing] = useState(false);
+// Icône vectorielle Bonus (Cadeau avec 3 étoiles au-dessus, identique à video_gagnant.mp4)
+const BonusGiftIcon: React.FC<{ size?: number; color?: string }> = ({
+  size = 24,
+  color = '#6E849B',
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    {/* Étoile centrale */}
+    <Path
+      d="M12 2L12.9 3.9L15 4.2L13.5 5.6L13.9 7.6L12 6.6L10.1 7.6L10.5 5.6L9 4.2L11.1 3.9L12 2Z"
+      fill={color}
+    />
+    {/* Étoile gauche */}
+    <Path
+      d="M6 4.5L6.6 5.8L8 6L7 7L7.2 8.4L6 7.7L4.8 8.4L5 7L4 6L5.4 5.8L6 4.5Z"
+      fill={color}
+    />
+    {/* Étoile droite */}
+    <Path
+      d="M18 4.5L18.6 5.8L20 6L19 7L19.2 8.4L18 7.7L16.8 8.4L17 7L16 6L17.4 5.8L18 4.5Z"
+      fill={color}
+    />
+    {/* Couvercle de la boîte */}
+    <Rect x="3" y="9.5" width="18" height="3.2" rx="1" fill={color} />
+    {/* Corps de la boîte (coupé au centre par le ruban) */}
+    <Path
+      d="M4.5 14H10.8V20.5H6C5.17 20.5 4.5 19.83 4.5 19V14ZM13.2 14H19.5V19C19.5 19.83 18.83 20.5 18 20.5H13.2V14Z"
+      fill={color}
+    />
+  </Svg>
+);
 
-  const onRefresh = React.useCallback(async () => {
-    try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (e) {
-      // Ignore sur web / périphériques non supportés
-    }
-    setRefreshing(true);
+export interface Props {
+  route?: any;
+  navigation?: any;
+  ticket?: any;
+  onBack?: () => void;
+  onMore?: () => void;
+}
 
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 800);
+// ============================================================================
+// Composant Principal : TicketDetailsScreen
+// ============================================================================
+export default function TicketDetailsScreen({
+  route,
+  navigation: propNavigation,
+  ticket: propTicket,
+  onBack,
+  onMore,
+}: Props) {
+  const nav = useNavigation<any>();
+  const navigation = propNavigation || nav;
+  const insets = useSafeAreaInsets();
+  const { currentTheme } = useThemeStore();
+  const isDark = Boolean(currentTheme?.isDark);
+
+  const {
+    coupons,
+    executeCashout,
+    duplicateCoupon,
+    updateCouponStatus,
+    validateCouponWithResult,
+  } = useBetStore();
+  const { duplicateFromCoupon } = useCouponStore();
+
+  // Scroll tracking pour le repli fluide de l'en-tête
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Horloge temps réel pour la progression dynamique des événements EN DIRECT
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  // Trouver le coupon actif ou prendre le premier par défaut
-  const coupon = coupons.find((c) => c.id === couponId || (c as any).ticketNumber === couponId || (couponId === '1' && c.id === '482910481')) || coupons[0];
+  // 1. Résolution dynamique du coupon
+  const couponId = route?.params?.couponId || route?.params?.ticketId || route?.params?.id;
+  const passedCoupon = route?.params?.coupon || route?.params?.ticket || propTicket;
 
-  if (!coupon) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: currentTheme.background }]}>
-        <View style={[styles.mainContainer, { backgroundColor: currentTheme.background, marginBottom: bottomBarHeight }]}>
-          <View style={[styles.header, { backgroundColor: currentTheme.headerBackground, borderBottomColor: currentTheme.border }]}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-              <Ionicons name="arrow-back" size={24} color={currentTheme.isDark ? currentTheme.textPrimary : currentTheme.primary} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: currentTheme.textPrimary }]}>Détails du pari</Text>
-            <View style={{ width: 24 }} />
-          </View>
-          <View style={styles.emptyWrap}>
-            <Text style={[styles.emptyText, { color: currentTheme.textSecondary }]}>Pari introuvable ou supprimé.</Text>
-          </View>
-        </View>
-      </SafeAreaView>
+  const currentCoupon: BetSlip = useMemo(() => {
+    if (passedCoupon && (passedCoupon.id || passedCoupon.ticketNumber)) {
+      return passedCoupon;
+    }
+    if (couponId) {
+      const found = coupons.find(
+        (c) =>
+          String(c.id) === String(couponId) ||
+          String((c as any).ticketNumber) === String(couponId)
+      );
+      if (found) return found;
+    }
+    return coupons[0] || ({} as BetSlip);
+  }, [coupons, couponId, passedCoupon]);
+
+  // Statuts normalisés
+  const rawStatus = String(currentCoupon?.status || 'Accepté');
+  const isPaid =
+    rawStatus === 'Payé' ||
+    rawStatus === 'Gagné' ||
+    rawStatus === 'Gain' ||
+    rawStatus.toLowerCase() === 'paid';
+  const isLost = rawStatus === 'Perdu' || rawStatus.toLowerCase() === 'lost';
+  const isAccepted = !isPaid && !isLost;
+
+  // Couleurs dynamiques selon le thème actif
+  const primaryActionColor = isDark
+    ? '#FFFFFF'
+    : (currentTheme?.activeIcon || currentTheme?.primary || '#557089');
+  const payeColor = currentTheme?.status?.paye || currentTheme?.status?.gagne || '#3BB54A';
+  const accepteColor = currentTheme?.status?.accepte || '#4A83C4';
+  const perduColor = currentTheme?.status?.perdu || '#E74C3C';
+
+  // Détection Poker pour le coupon global
+  const isPokerCoupon =
+    currentCoupon?.gameCategory === 'poker' ||
+    String(currentCoupon?.sport || '').toUpperCase().includes('POKER') ||
+    String(currentCoupon?.league || '').toUpperCase().includes('POKER') ||
+    currentCoupon?.badge === 'POKE' ||
+    currentCoupon?.events?.some(
+      (e) =>
+        e.gameCategory === 'poker' ||
+        String(e.sport || '').toUpperCase().includes('POKER') ||
+        String(e.league || '').toUpperCase().includes('POKER')
     );
-  }
 
-  const ticket = coupon;
-  const betData = coupon;
-  const isTicketLive = Boolean(
-    betData?.isLive ||
-    betData?.events?.some((e) => e.isLive) ||
-    (betData as any)?.selections?.some((s: any) => s.isLive)
+  const isLive = Boolean(currentCoupon?.isLive || (isPokerCoupon && isAccepted));
+  const statusLabel = isPaid ? 'Payé' : isLost ? 'Perdu' : 'Accepté';
+  const statusColor = isPaid
+    ? payeColor
+    : isLost
+    ? perduColor
+    : accepteColor;
+
+  // Formatage du type
+  const isCombine =
+    (currentCoupon?.events && currentCoupon.events.length > 1) ||
+    (currentCoupon?.eventsCount && currentCoupon.eventsCount > 1) ||
+    currentCoupon?.type === 'Combiné' ||
+    String(currentCoupon?.type || '').toLowerCase().includes('combin');
+  const typeLabel = isCombine ? 'Combiné' : 'Simple';
+
+  // Ligues / Badges
+  const leagueBadge =
+    currentCoupon?.league ||
+    currentCoupon?.badge ||
+    (isPokerCoupon ? 'POKER' : currentCoupon?.events?.[0]?.league?.split('.')?.pop()?.trim()) ||
+    'LaLiga';
+
+  // Événements normalisés
+  const events: BetDetailEvent[] = useMemo(() => {
+    const rawEvents: MatchEvent[] = currentCoupon?.events || [];
+    if (rawEvents.length === 0) {
+      return [
+        {
+          id: 'ev-1',
+          matchId: 'match-vil-esp',
+          sport: 'Football',
+          league: formatFootballHeader('Football', currentCoupon?.league || 'Angleterre. Premier League'),
+          date: currentCoupon?.matchTime
+            ? formatFrenchEventDate(currentCoupon.matchDate || '31.10.2026', currentCoupon.matchTime)
+            : '31 oct. 2026 (21:00)',
+          homeTeam: 'Villarreal',
+          awayTeam: 'Espanyol',
+          market: '1X2. V1',
+          odd: formatCleanOdds(currentCoupon?.totalOdds || 1.41),
+          status: isPaid ? 'Gain' : isLost ? 'Perte' : 'Accepté',
+        },
+      ];
+    }
+
+    return rawEvents.map((ev, idx) => {
+      const homeName =
+        typeof ev.homeTeam === 'string'
+          ? ev.homeTeam
+          : (ev.homeTeam as any)?.name || 'Équipe 1';
+      const awayName =
+        typeof ev.awayTeam === 'string'
+          ? ev.awayTeam
+          : (ev.awayTeam as any)?.name || 'Équipe 2';
+      const homeLogo =
+        typeof ev.homeTeam === 'object' ? (ev.homeTeam as any)?.logo : undefined;
+      const awayLogo =
+        typeof ev.awayTeam === 'object' ? (ev.awayTeam as any)?.logo : undefined;
+
+      const evStatusRaw = String(ev.status || currentCoupon?.status || 'Accepté');
+      const evPaid =
+        evStatusRaw === 'Payé' ||
+        evStatusRaw === 'Gagné' ||
+        evStatusRaw === 'Gain' ||
+        evStatusRaw.toLowerCase() === 'paid';
+      const evLost = evStatusRaw === 'Perdu' || evStatusRaw.toLowerCase() === 'lost';
+      const evStatus: BetDetailEvent['status'] = evPaid
+        ? 'Gain'
+        : evLost
+        ? 'Perte'
+        : 'Accepté';
+
+      const sportUpper = String(ev.sport || currentCoupon?.sport || '').toUpperCase();
+      const leagueUpper = String(ev.league || currentCoupon?.league || '').toUpperCase();
+      const predStr = String(ev.prediction || '');
+
+      const isBonus =
+        sportUpper === 'BONUS' ||
+        leagueUpper === 'BONUS' ||
+        homeName.toUpperCase() === 'BONUS' ||
+        predStr.toLowerCase().includes('bonus pari combin');
+
+      const isPoker =
+        !isBonus &&
+        (ev.gameCategory === 'poker' ||
+          currentCoupon?.gameCategory === 'poker' ||
+          sportUpper.includes('POKER') ||
+          leagueUpper.includes('POKER') ||
+          ev.badge === 'POKE');
+
+      const isFifa =
+        !isBonus &&
+        !isPoker &&
+        (sportUpper.includes('FIFA') ||
+          leagueUpper.includes('FIFA') ||
+          homeName.toUpperCase().includes('FIFA') ||
+          awayName.toUpperCase().includes('FIFA'));
+
+      // Détecter un pari de type vainqueur / outright (ex: Espagne Vainqueur)
+      const leagueStr = String(ev.league || '');
+      const isOutright =
+        !isBonus &&
+        !isPoker &&
+        (leagueStr.toLowerCase().includes('vainqueur') ||
+          leagueStr.toLowerCase().includes('winner') ||
+          homeName.toLowerCase().includes('winner') ||
+          (homeName === awayName && homeName.length > 0) ||
+          !awayName ||
+          awayName === 'Équipe 2');
+
+      const outrightTitle = isOutright
+        ? leagueStr.includes('La Liga')
+          ? 'Spain. La Liga. 2026/27. Winner'
+          : `${leagueStr}. Winner`
+        : undefined;
+
+      const formattedDate = formatFrenchEventDate(
+        ev.matchDate || ev.date || ev.startDate || '31.10.2026',
+        ev.matchTime
+      );
+
+      // Génération ou récupération des données du tirage Poker
+      let pokerDrawData: BetDetailEvent['pokerDraw'] = undefined;
+      const roundCode = (ev as any).roundCode || currentCoupon?.drawNumber || (currentCoupon as any)?.roundCode || 'PB232803';
+
+      if (isPoker) {
+        const pResult = (ev as any).pokerResult || currentCoupon?.pokerResult;
+        if (pResult && pResult.hands && pResult.hands.length > 0) {
+          pokerDrawData = {
+            board: pResult.board,
+            hands: pResult.hands.map((h: any, i: number) => ({
+              id: h.id || i + 1,
+              cards: h.cards,
+            })),
+            winnerLabel: pResult.winnerLabel || 'Main 1 (Une Paire)',
+          };
+        } else if (evPaid) {
+          const gen = generateWinningPokerDraw(ev.prediction || 'Une Paire', ev.id || roundCode);
+          pokerDrawData = {
+            board: gen.table,
+            hands: [
+              { id: 1, cards: gen.hand1 },
+              { id: 2, cards: gen.hand2 },
+              { id: 3, cards: gen.hand3 },
+              { id: 4, cards: gen.hand4 },
+              { id: 5, cards: gen.hand5 },
+              { id: 6, cards: gen.hand6 },
+            ],
+            winnerLabel: `Main ${gen.winnerHand} (${gen.combinationName})`,
+          };
+        }
+      }
+
+      const rawScoreFinal =
+        (ev as any).scoreFinal || (ev as any).score || ev.finalScore || ev.actualScore;
+      const rawScoreDetail = (ev as any).scoreDetail || ev.halftimeScore;
+
+      const adaptedFallback =
+        !isPoker && !isBonus && !isOutright && (evPaid || evLost) && !rawScoreFinal && !rawScoreDetail
+          ? adaptEventResultToPrediction(ev, evPaid)
+          : undefined;
+
+      const resolvedScoreFinal = rawScoreFinal || adaptedFallback?.actualScore?.replace('-', ':');
+      const resolvedScoreDetail =
+        rawScoreDetail ||
+        (adaptedFallback?.actualScore && adaptedFallback?.halftimeScore
+          ? `${adaptedFallback.actualScore.replace('-', ':')} ${adaptedFallback.halftimeScore}`
+          : undefined);
+
+      return {
+        id: ev.id || `ev-${idx}`,
+        matchId: (ev as any).matchId || ev.id || `match-${idx}`,
+        sport: ev.sport || (isPoker ? 'TvBet. POKER' : isFifa ? 'FIFA' : 'Football'),
+        league: isPoker
+          ? (ev.league || 'TvBet. POKER')
+          : isFifa
+          ? (ev.league ? (ev.league.startsWith('FIFA') ? ev.league : `FIFA. ${ev.league}`) : 'FIFA. 5x5 Rush. Superligue')
+          : formatFootballHeader(ev.sport, ev.league),
+        date: formattedDate,
+        rawDate: ev.date || (ev as any).rawDate,
+        startDate: ev.startDate || (ev as any).startDate,
+        matchDate: ev.matchDate,
+        matchTime: ev.matchTime,
+        homeTeam: homeName,
+        awayTeam: awayName,
+        homeLogo,
+        awayLogo,
+        scoreFinal: resolvedScoreFinal,
+        scoreDetail: resolvedScoreDetail,
+        market: isBonus || isPoker
+          ? (ev.prediction || (isPoker ? 'Combinaison gagnante. Une Paire' : 'Bonus, Bonus pari combiné'))
+          : normalizeBetSelectionLabel(ev.prediction, homeName, awayName),
+        odd: formatCleanOdds(ev.odd || 1.41),
+        status: evStatus,
+        isOutright,
+        outrightTitle,
+        isPoker,
+        isFifa,
+        isBonus,
+        isLive: Boolean((ev as any).isLive || currentCoupon?.isLive),
+        durationSeconds: (ev as any).durationSeconds ?? (ev as any).duration ?? (ev as any).matchDuration,
+        elapsedSeconds: (ev as any).elapsedSeconds,
+        badge: ev.badge || (ev as any).badge,
+        roundCode,
+        pokerDraw: pokerDrawData,
+      };
+    });
+  }, [currentCoupon, isPaid, isLost]);
+
+  // Nombre d'événements et terminés (ex: Événements : 4 | 3 sur 3 terminés lorsqu'il y a un Bonus)
+  const hasBonusEvent = events.some((e) => e.isBonus);
+  const nonBonusEvents = events.filter((e) => !e.isBonus);
+  const totalEventsCount = currentCoupon?.eventsCount || events.length;
+  const matchEventsTotal = hasBonusEvent
+    ? Math.max(1, totalEventsCount - 1)
+    : totalEventsCount;
+  const completedEventsCount = Math.min(
+    matchEventsTotal,
+    currentCoupon?.completedCount ??
+      nonBonusEvents.filter((e) => e.status === 'Gain' || e.status === 'Perte').length
   );
 
-  const isWon =
-    coupon.status === 'Payé' ||
-    coupon.status === 'Gagné' ||
-    coupon.status === 'Gain' ||
-    (coupon.completedCount === coupon.eventsCount &&
-      coupon.events.length > 0 &&
-      coupon.events.every((e) => e.status === 'Gain' || e.status === 'Gagné'));
+  // Insets et positionnement dynamique au-dessus de la PersistentBottomBar
+  const bottomBarHeight =
+    56 + (insets.bottom > 0 ? insets.bottom : Platform.OS === 'ios' ? 20 : 0);
 
-  const isLost = coupon.status === 'Perdu';
+  // Visibilité de la barre fixe "Vendre pour XXX ₣" ou "Dupliquer le coupon de pari"
+  const showDuplicateFooter = isAccepted && !isPokerCoupon;
+  const sellPriceNumber =
+    (currentCoupon as any)?.sellPrice ||
+    currentCoupon?.cashoutAmount ||
+    Math.round(Number(currentCoupon?.stake || 500) * 0.94);
+  const sellPriceFormatted = sellPriceNumber.toLocaleString('fr-FR');
+  const showSellButton = Boolean(
+    isAccepted &&
+      !isPokerCoupon &&
+      (currentCoupon?.isForSale ||
+        currentCoupon?.isLive ||
+        events.some((e) => e.isLive || e.isFifa))
+  );
 
-  // Standardisation des statuts pour fermeture stricte du ticket
-  const isTicketFinished =
-    coupon.status === 'Payé' ||
-    coupon.status === 'Gagné' ||
-    coupon.status === 'Gain' ||
-    coupon.status === 'Perdu' ||
-    coupon.status === 'Annulé' ||
-    coupon.status === 'Vendu' ||
-    (coupon.status as string) === 'Remboursé' ||
-    (coupon as any).isSettled === true ||
-    isWon ||
-    isLost;
+  // Mise et Gains formatés avec le symbole F (ex: 90 F, 522 F, 156.6 F comme sur les captures)
+  const stakeFormatted = formatCurrency(currentCoupon?.stake ?? 90);
+  const potentialPayoutFormatted = formatCurrency(currentCoupon?.potentialPayout ?? 522);
+  const actualPayoutFormatted = formatCurrency(
+    currentCoupon?.actualPayout ?? currentCoupon?.potentialPayout ?? 156.6
+  );
 
-  const handleNotificationPress = () => {
+  // Ticket date & numéro (affiche l'heure de mise du coupon en priorité)
+  const ticketDate = currentCoupon?.createdAt
+    ? formatBetDate(currentCoupon.createdAt)
+    : currentCoupon?.matchTime && currentCoupon?.matchDate
+    ? `${currentCoupon.matchDate} (${currentCoupon.matchTime})`
+    : '29.10.2026 (22:23)';
+  const ticketNumber = currentCoupon?.id || (currentCoupon as any)?.ticketNumber || '89755801725';
+
+  // 2. Handlers d'action
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else if (navigation?.canGoBack && navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      try {
+        navigation?.navigate?.('MainTabs', { screen: 'Historique' });
+      } catch (e) {
+        try {
+          navigation?.navigate?.('Historique');
+        } catch (err) {
+          // Fallback no-op
+        }
+      }
+    }
+  };
+
+  const handleDuplicate = () => {
+    if (currentCoupon) {
+      const rawEventsToCopy =
+        currentCoupon.events && currentCoupon.events.length > 0
+          ? currentCoupon.events.filter(
+              (e) => String(e.sport || '').toUpperCase() !== 'BONUS'
+            )
+          : events
+              .filter((ev) => !ev.isBonus)
+              .map((ev, i) => ({
+                id: `ev-dup-${Date.now()}-${i}`,
+                sport: ev.sport || 'Football',
+                league: ev.league || 'LaLiga',
+                date: ev.date || '30.10.2026 (21:00)',
+                homeTeam: { name: ev.homeTeam || 'Barcelone', logo: ev.homeLogo },
+                awayTeam: { name: ev.awayTeam || 'Alavés', logo: ev.awayLogo },
+                prediction: ev.market || '1X2. V1',
+                odd: Number(ev.odd) || 1.4,
+                status: 'Accepté' as const,
+              }));
+
+      duplicateCoupon(currentCoupon.id);
+      duplicateFromCoupon({
+        ...currentCoupon,
+        events: rawEventsToCopy,
+      });
+
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      } catch {
+        // noop
+      }
+    }
+
+    try {
+      navigation.navigate('MainTabs', { screen: 'CouponTab' });
+    } catch {
+      try {
+        navigation.navigate('CouponTab');
+      } catch {
+        navigation.navigate('Coupon');
+      }
+    }
+  };
+
+  const handleMore = () => {
+    if (onMore) {
+      onMore();
+      return;
+    }
     Alert.alert(
-      'Notification activée',
-      `Vous recevrez des alertes en direct pour les résultats du coupon № ${coupon.id}.`
+      `Pari № ${ticketNumber}`,
+      'Que souhaitez-vous faire ?',
+      [
+        ...(!isPaid
+          ? [
+              {
+                text: 'Valider le coupon (Gain / Payé)',
+                onPress: () => {
+                  validateCouponWithResult(currentCoupon.id, true);
+                  Alert.alert('Succès', 'Le coupon a été validé et payé.');
+                },
+              },
+            ]
+          : [
+              {
+                text: 'Marquer comme Accepté (En cours)',
+                onPress: () => {
+                  updateCouponStatus(currentCoupon.id, 'Accepté');
+                  Alert.alert('Statut mis à jour', 'Le coupon est maintenant en statut Accepté.');
+                },
+              },
+            ]),
+        {
+          text: 'Dupliquer le coupon',
+          onPress: handleDuplicate,
+        },
+        {
+          text: 'Copier le numéro de coupon',
+          onPress: async () => {
+            try {
+              await Clipboard.setStringAsync(ticketNumber);
+              Alert.alert('Copié', 'Numéro de coupon copié dans le presse-papier.');
+            } catch {
+              // noop
+            }
+          },
+        },
+        {
+          text: 'Enregistrer le coupon',
+          onPress: () => {
+            Alert.alert('Enregistré', 'Coupon sauvegardé dans vos favoris.');
+          },
+        },
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+      ]
     );
   };
 
   const handleCashout = () => {
-    const rawAmount = coupon.sellPrice || coupon.cashoutAmount || Math.round(coupon.stake * 0.95);
-    const amountStr = typeof rawAmount === 'number' ? rawAmount.toLocaleString('fr-FR') : rawAmount;
     Alert.alert(
       'Confirmer la vente (Cashout)',
-      `Vendre ce coupon immédiatement pour ${amountStr} ₣ ?`,
+      `Vendre ce coupon immédiatement pour ${sellPriceFormatted} ₣ ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Vendre',
           style: 'default',
           onPress: () => {
-            executeCashout(coupon.id);
-            Alert.alert('Vente effectuée', `Votre compte a été crédité de ${amountStr} ₣.`);
+            executeCashout(currentCoupon.id);
+            Alert.alert(
+              'Vente effectuée',
+              `Votre compte a été crédité de ${sellPriceFormatted} ₣.`
+            );
           },
         },
       ]
     );
   };
 
-  const handleSellCoupon = handleCashout;
+  const handlePressEvent = (ev: BetDetailEvent) => {
+    if (ev.isBonus) {
+      return;
+    }
+    if (ev.isPoker) {
+      navigation?.navigate?.('PokerLiveMatch', {
+        matchId: ev.matchId || ev.id,
+        event: {
+          id: ev.id,
+          sport: 'TvBet. POKER',
+          league: ev.league || 'TvBet. POKER',
+          homeTeam: { name: 'TvBet. POKER' },
+          awayTeam: { name: ev.roundCode || 'PB232803' },
+          prediction: ev.market,
+          odd: Number(ev.odd) || 5.8,
+          roundCode: ev.roundCode || 'PB232803',
+          date: ev.date,
+          status: ev.status === 'Gain' ? 'Payé' : ev.status === 'Perte' ? 'Perdu' : 'Accepté',
+          pokerResult: ev.pokerDraw ? {
+            board: ev.pokerDraw.board,
+            hands: ev.pokerDraw.hands,
+            winnerLabel: ev.pokerDraw.winnerLabel,
+          } : undefined,
+        },
+      });
+      return;
+    }
 
-  const handleDuplicateCoupon = () => {
-    duplicateCoupon(coupon.id);
-    duplicateFromCoupon(coupon);
-    navigation.navigate('MainTabs', { screen: 'CouponTab' });
+    if (ev.isFifa) {
+      const resolvedFifaScore =
+        ev.scoreFinal ||
+        (ev.scoreDetail ? ev.scoreDetail.split('(')[0].trim() : undefined);
+      navigation?.navigate?.('FifaLiveMatch', {
+        event: {
+          id: ev.id,
+          sport: 'FIFA',
+          league: ev.league,
+          homeTeam: { name: ev.homeTeam, logo: ev.homeLogo },
+          awayTeam: { name: ev.awayTeam, logo: ev.awayLogo },
+          score: resolvedFifaScore,
+          actualScore: resolvedFifaScore,
+          finalScore: resolvedFifaScore,
+          halftimeScore: ev.scoreDetail,
+          scoreDetail: ev.scoreDetail,
+          date: ev.date,
+          rawDate: ev.rawDate,
+          startDate: ev.startDate,
+          matchDate: ev.matchDate,
+          matchTime: ev.matchTime,
+          durationSeconds: ev.durationSeconds,
+          elapsedSeconds: ev.elapsedSeconds,
+          prediction: ev.market,
+          odd: Number(ev.odd) || 1.92,
+          status: ev.status === 'Gain' ? 'Payé' : ev.status === 'Perte' ? 'Perdu' : 'Accepté',
+          isLive: ev.isLive,
+        },
+      });
+      return;
+    }
+
+    const liveState = getEventLiveProgress(ev, currentTime);
+    const isFinishedOrResolved =
+      liveState.isFinished ||
+      ev.status === 'Gain' ||
+      ev.status === 'Perte' ||
+      ev.status === 'Payé' ||
+      ev.status === 'Perdu' ||
+      isPaid ||
+      isLost;
+    const targetScreen = isFinishedOrResolved
+      ? 'MatchStatistics'
+      : resolveMatchNavigationTarget(ev.status, ev.status === 'Gain');
+    const resolvedScore =
+      ev.scoreFinal ||
+      (ev.scoreDetail ? ev.scoreDetail.split('(')[0].trim() : undefined);
+    const eventPayload = {
+      id: ev.id || ev.matchId,
+      matchId: ev.matchId,
+      sport: ev.sport || 'Football',
+      league: ev.league,
+      date: ev.date,
+      roundCode: ev.roundCode,
+      homeTeam: { name: ev.homeTeam, logo: ev.homeLogo },
+      awayTeam: { name: ev.awayTeam, logo: ev.awayLogo },
+      prediction: ev.market,
+      odd: Number(ev.odd) || 1.5,
+      status: ev.status === 'Gain' ? 'Payé' : ev.status === 'Perte' ? 'Perdu' : 'Accepté',
+      isWon: ev.status === 'Gain',
+      actualScore: resolvedScore,
+      finalScore: resolvedScore,
+      halftimeScore: ev.scoreDetail || resolvedScore,
+      score: resolvedScore,
+    };
+
+    navigation?.navigate?.(targetScreen, {
+      matchId: ev.matchId,
+      event: eventPayload,
+      match: eventPayload,
+    });
   };
 
-  const isSimple = coupon.type === 'Simple' || (coupon.events && coupon.events.length > 0 ? coupon.events.length <= 1 : coupon.eventsCount <= 1);
-  const isCombine = !isSimple;
+  // Suivi du scroll pour afficher la barre collante Cotes / Mise / Gains (identique aux vidéos)
+  const [isStickyVisible, setIsStickyVisible] = useState(false);
 
-  const canSell = coupon.canSell !== undefined ? coupon.canSell : (coupon.isForSale && coupon.status === 'Accepté');
-  const sellPrice = coupon.sellPrice || (coupon.cashoutAmount ? coupon.cashoutAmount.toLocaleString('fr-FR') : (coupon.stake ? Math.round(coupon.stake * 0.95).toLocaleString('fr-FR') : '15000'));
-  const couponWithSell = {
-    ...coupon,
-    canSell,
-    sellPrice,
-  };
-
-  // Masquage conditionnel : le bouton Dupliquer ne doit plus apparaître si le statut est Payé, Gagné ou Perdu
-  const canDuplicate = !isWon && !isLost && !isTicketFinished;
-  const canSellCoupon = couponWithSell.canSell && !isTicketFinished;
-  const showBottomDock = Boolean(canSellCoupon || canDuplicate);
-
-  const screenBg = currentTheme.background || '#EEF2F6';
-  const cardBg = currentTheme.cardBackground || '#FFFFFF';
+  const stickyBarOpacity = scrollY.interpolate({
+    inputRange: [70, 105],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: screenBg }]}>
-      <StatusBar
-        barStyle={currentTheme.isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={currentTheme.headerBackground || '#FFFFFF'}
-        translucent={Platform.OS === 'android'}
-      />
-      <View style={[styles.mainContainer, { backgroundColor: screenBg }]}>
-        {/* 1. Header en haut */}
-        <View style={[styles.header, { backgroundColor: currentTheme.headerBackground, borderBottomColor: currentTheme.border }]}>
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Retour"
-          >
-            <Ionicons name="arrow-back" size={24} color={currentTheme.isDark ? currentTheme.textPrimary : currentTheme.primary} />
-          </TouchableOpacity>
+    <SafeAreaView
+      style={[
+        styles.safeContainer,
+        { backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground },
+      ]}
+      edges={['top']}
+    >
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-          <View style={styles.headerTitleContainer} pointerEvents="none">
-            <Text style={[styles.headerTitle, { color: currentTheme.textPrimary }]}>Détails du pari</Text>
-          </View>
+      {/* ================================================================== */}
+      {/* 1. HEADER SUPÉRIEUR FIXE                                           */}
+      {/* ================================================================== */}
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={handleBack}
+          style={styles.headerBtn}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityLabel="Retour"
+        >
+          <BackArrowIcon size={26} color={primaryActionColor} />
+        </TouchableOpacity>
 
-          <View style={styles.headerActions}>
-            {coupon.status === 'Accepté' && (
-              <NotificationBell
-                size={20}
-                tintColor={currentTheme.isDark ? currentTheme.textSecondary : currentTheme.primary}
-                onPress={handleNotificationPress}
-              />
-            )}
+        <View style={styles.headerTitleWrap}>
+          <Text style={[styles.headerTitle, { color: currentTheme.textPrimary }]}>
+            Informations sur le pari
+          </Text>
+        </View>
+
+        <View style={styles.headerActions}>
+          {isAccepted && (
             <TouchableOpacity
               style={styles.headerActionBtn}
-              onPress={() => setOptionsVisible(true)}
-              accessibilityLabel="Options du coupon"
+              onPress={() => Alert.alert('Notifications', 'Notifications activées pour ce pari.')}
             >
-              <Ionicons name="ellipsis-vertical" size={22} color={currentTheme.isDark ? currentTheme.textSecondary : currentTheme.primary} />
+              <OfficialBellIcon size={21} color={primaryActionColor} />
             </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={handleMore}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <OfficialThreeDotsIcon size={19} color={primaryActionColor} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ================================================================== */}
+      {/* 1B. BARRE COLLANTE COTES / MISE / GAINS AU SCROLL (COMME LA VIDÉO) */}
+      {/* ================================================================== */}
+      <Animated.View
+        pointerEvents={isStickyVisible ? 'auto' : 'none'}
+        style={[
+          styles.stickyFinancialBar,
+          {
+            opacity: stickyBarOpacity,
+            backgroundColor: currentTheme.cardBackground,
+          },
+        ]}
+      >
+        <View style={styles.financialRow}>
+          <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Cotes:</Text>
+          <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>
+            {formatCleanOdds(currentCoupon?.totalOdds || 1.921)}
+          </Text>
+        </View>
+
+        <View style={styles.financialRow}>
+          <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Mise:</Text>
+          <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>{stakeFormatted}</Text>
+        </View>
+
+        {isAccepted && (
+          <View style={styles.financialRow}>
+            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Gains potentiels:</Text>
+            <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>{potentialPayoutFormatted}</Text>
+          </View>
+        )}
+
+        {isPaid && (
+          <View style={styles.financialRow}>
+            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Gains:</Text>
+            <Text style={[styles.financialValueBold, { color: payeColor }]}>
+              {actualPayoutFormatted}
+            </Text>
+          </View>
+        )}
+
+        {isLost && (
+          <View style={styles.financialRow}>
+            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Statut:</Text>
+            <Text style={[styles.financialValueBold, { color: perduColor }]}>
+              Perdu
+            </Text>
+          </View>
+        )}
+      </Animated.View>
+
+      {/* ================================================================== */}
+      {/* 2. CONTENU DÉFILANT                                               */}
+      {/* ================================================================== */}
+      <Animated.ScrollView
+        style={[styles.scrollView, { backgroundColor: currentTheme.background }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: bottomBarHeight + (showDuplicateFooter ? 85 : 28) },
+        ]}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          {
+            useNativeDriver: false,
+            listener: (event: any) => {
+              const offsetY = event.nativeEvent.contentOffset.y;
+              if (offsetY > 75 && !isStickyVisible) {
+                setIsStickyVisible(true);
+              } else if (offsetY <= 75 && isStickyVisible) {
+                setIsStickyVisible(false);
+              }
+            },
+          }
+        )}
+        scrollEventThrottle={16}
+      >
+        {/* ================================================================ */}
+        {/* BLOC RÉSUMÉ SUPÉRIEUR (FOND BLANC DYNAMIQUE THÈME)                */}
+        {/* ================================================================ */}
+        <View style={[styles.summaryCard, { backgroundColor: currentTheme.cardBackground }]}>
+          {/* En-tête du ticket : Avatar + Type + Date + Badge ligue */}
+          <View style={styles.summaryHeaderRow}>
+            <View style={styles.avatarWrap}>
+              <View
+                style={[
+                  styles.avatarCircle,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E9EFF6' },
+                ]}
+              >
+                <Image
+                  source={
+                    isPokerCoupon
+                      ? ASSET_ICONS.poker
+                      : currentCoupon?.sport === 'FIFA'
+                      ? ASSET_ICONS.fifa
+                      : isCombine
+                      ? ASSET_ICONS.combine
+                      : ASSET_ICONS.football
+                  }
+                  style={[
+                    isPokerCoupon
+                      ? styles.avatarIconPoker
+                      : currentCoupon?.sport === 'FIFA'
+                      ? styles.avatarIconFifa
+                      : isCombine
+                      ? styles.avatarIconCombine
+                      : styles.avatarIcon,
+                    isDark && { tintColor: currentTheme.textSecondary },
+                  ]}
+                  resizeMode="contain"
+                />
+              </View>
+
+              {/* Badge de vérification superposé en bas à droite (adapté à tous les thèmes) */}
+              <View
+                style={[
+                  styles.statusMiniDot,
+                  {
+                    backgroundColor: isPaid
+                      ? (currentTheme.status?.paye || currentTheme.status?.gagne || '#52B76E')
+                      : isLost
+                      ? (currentTheme.status?.perdu || '#E74C3C')
+                      : (currentTheme.status?.accepte || currentTheme.primary || '#4A8FE7'),
+                    borderColor: currentTheme.cardBackground || '#FFFFFF',
+                    borderWidth: 1.8,
+                  },
+                ]}
+              >
+                {(isAccepted || isPaid) && (
+                  <Svg width={10.5} height={10.5} viewBox="0 0 12 12" fill="none" style={{ width: 10.5, height: 10.5 }}>
+                    <Path
+                      d="M2.5 6.2L5 8.6L9.6 3.6"
+                      stroke="#FFFFFF"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </Svg>
+                )}
+                {isLost && (
+                  <Svg width={9} height={9} viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}>
+                    <Rect x="2.5" y="5" width="7" height="2" rx="1" fill="#FFFFFF" />
+                  </Svg>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.summaryMetaCol}>
+              <Text style={[styles.summaryDateText, { color: currentTheme.textSecondary }]}>
+                {ticketDate}
+              </Text>
+              <Text style={[styles.summaryTypeText, { color: currentTheme.textPrimary }]}>
+                {typeLabel}
+              </Text>
+              <Text style={[styles.summaryNumberText, { color: currentTheme.textPrimary }]}>
+                № {ticketNumber}
+              </Text>
+            </View>
+
+            {/* Badge • En direct rouge ou Serie A en haut à droite */}
+            {(!isPaid &&
+              !isLost &&
+              (currentCoupon?.isLive ||
+                events.some(
+                  (e) =>
+                    e.isLive ||
+                    e.isFifa ||
+                    e.sport === 'FIFA' ||
+                    getEventLiveProgress(e, currentTime).isLive
+                ))) ? (
+              <View style={styles.liveRedBadge}>
+                <Text style={styles.liveRedBadgeText}>• En direct</Text>
+              </View>
+            ) : currentCoupon?.badge === 'Serie A' ? (
+              <View style={styles.leagueBadge}>
+                <Text style={styles.leagueBadgeText}>Serie A</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Séparateur fin */}
+          <View
+            style={[
+              styles.thinDivider,
+              { backgroundColor: currentTheme.divider || currentTheme.border },
+            ]}
+          />
+
+          {/* Ligne Événements si Combiné (Pixel-Perfect selon capture de référence) */}
+          {(isCombine || totalEventsCount > 1) && (
+            <View style={styles.eventsRowContainer}>
+              <View style={styles.eventsLeftGroup}>
+                <View style={{ marginRight: 10 }}>
+                  <OfficialLayersIcon
+                    size={18}
+                    color={isDark ? currentTheme.textSecondary : '#557089'}
+                  />
+                </View>
+                <Text style={[styles.eventsCountText, { color: currentTheme.textPrimary }]}>
+                  Événements : {totalEventsCount}
+                </Text>
+              </View>
+              <Text style={[styles.eventsFinishedText, { color: currentTheme.textPrimary }]}>
+                {completedEventsCount} sur {matchEventsTotal} terminés
+              </Text>
+            </View>
+          )}
+
+          {/* Lignes Financières */}
+          <View style={styles.financialRow}>
+            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Cotes:</Text>
+            <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>
+              {formatCleanOdds(currentCoupon?.totalOdds || 1.921)}
+            </Text>
+          </View>
+
+          <View style={styles.financialRow}>
+            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Mise:</Text>
+            <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>
+              {stakeFormatted}
+            </Text>
+          </View>
+
+          {/* Ligne Gains potentiels (si Accepté) ou Gains (si Payé) */}
+          {isAccepted && (
+            <View style={styles.financialRow}>
+              <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>
+                Gains potentiels:
+              </Text>
+              <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>
+                {potentialPayoutFormatted}
+              </Text>
+            </View>
+          )}
+
+          {isPaid && (
+            <View style={styles.financialRow}>
+              <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Gains:</Text>
+              <Text style={[styles.financialValueBold, { color: payeColor }]}>
+                {actualPayoutFormatted}
+              </Text>
+            </View>
+          )}
+
+          {/* Ligne Statut parfaitement alignée (sans boîte verte décalée) */}
+          <View style={styles.financialRow}>
+            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Statut:</Text>
+            <Text style={[styles.financialValueStatus, { color: statusColor }]}>
+              {statusLabel}
+            </Text>
           </View>
         </View>
 
-        {/* 2. ScrollView contenant la carte du ticket */}
-        <ScrollView
+        {/* ================================================================ */}
+        {/* CARTES DES ÉVÉNEMENTS / SÉLECTIONS                                */}
+        {/* ================================================================ */}
+        {events.map((ev, index) => {
+          const isEventGain = ev.status === 'Gain' || ev.status === 'gagne';
+          const isEventPerte = ev.status === 'Perte' || ev.status === 'perdu';
+          const eventStatusLabel = isEventGain ? 'Gain' : isEventPerte ? 'Perte' : 'Accepté';
+          const eventStatusColor = isEventGain ? payeColor : isEventPerte ? perduColor : accepteColor;
+          // Calcul d'avancement EN DIRECT et temps écoulé adapté à la durée
+          const liveProgress = getEventLiveProgress(ev, currentTime);
+          const isFifaEvent = Boolean(
+            ev.isFifa ||
+              ev.sport === 'FIFA' ||
+              String(ev.league || '').toLowerCase().includes('fifa')
+          );
+          const isEventLive =
+            Boolean(ev.isLive || currentCoupon?.isLive || liveProgress.isLive || isFifaEvent) &&
+            !isPaid &&
+            !isLost &&
+            !isEventGain &&
+            !isEventPerte;
+          const hasEventStarted =
+            liveProgress.hasStarted || isEventLive || isPaid || isLost || isEventGain || isEventPerte;
+          const showElapsedRow =
+            (liveProgress.hasStarted || isEventLive) &&
+            !isPaid &&
+            !isLost &&
+            !isEventGain &&
+            !isEventPerte;
+          const elapsedSec = liveProgress.elapsedSeconds;
 
-          style={[styles.scrollView, { backgroundColor: screenBg }]}
-          contentContainerStyle={[
-            styles.contentScrollView,
-            styles.scrollContent,
-            contentContainerStyle,
-            {
-              paddingBottom: (showBottomDock ? 110 : 24) + bottomBarHeight,
-            },
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[currentTheme.primary]}
-              tintColor={currentTheme.primary}
-              progressBackgroundColor={currentTheme.cardBackground}
-            />
-          }
-        >
-          {/* Carte blanche de ticket avec perforations et bordures arrondies */}
-          <View style={[styles.mainTicketCard, { backgroundColor: cardBg }]}>
-            {/* --- Bloc supérieur : date + type + numéro de coupon --- */}
-            <View style={styles.summarySection}>
-              <View style={styles.topDateRow}>
-                <Text style={[styles.createdDate, styles.ticketDateText, { color: currentTheme.textSecondary }]}>
-                  {formatBetDate(coupon.createdAt || '27.09.2026 (08:30)')}
-                </Text>
+          const displayDate = isEventLive
+            ? ev.matchDate && ev.matchTime
+              ? `${ev.matchDate} (${ev.matchTime})`
+              : formatBetDate(ev.rawDate || ev.date)
+            : formatFrenchEventDate(ev.rawDate || ev.date);
 
-                {/* Badge En Direct */}
-                {isTicketLive && (
-                  <View style={styles.liveHeaderBadge}>
-                    <View style={styles.liveDot} />
-                    <Text style={styles.liveHeaderBadgeText}>En direct</Text>
+          const liveAdaptiveScore =
+            isEventLive && !ev.isPoker && !ev.isBonus && !ev.isOutright
+              ? computeAdaptiveLiveScore({
+                  marketLabel: ev.market,
+                  elapsedSeconds: elapsedSec,
+                  durationSeconds: liveProgress.durationSeconds,
+                  isFifa: isFifaEvent,
+                  existingScoreFinal: ev.scoreFinal,
+                  existingScoreDetail: ev.scoreDetail,
+                })
+              : null;
+
+          const effectiveScoreFinal = ev.scoreFinal || liveAdaptiveScore?.scoreFinal;
+          const effectiveScoreDetail = ev.scoreDetail || liveAdaptiveScore?.scoreDetail;
+
+          // Rendu dédié pour la carte Bonus (identique à video_gagnant.mp4 et WhatsApp_Video)
+          if (ev.isBonus) {
+            return (
+              <View
+                key={ev.id || index}
+                style={[styles.eventCard, { backgroundColor: currentTheme.cardBackground }]}
+              >
+                <View style={styles.bonusCardHeader}>
+                  <View style={styles.eventSportIconWrap}>
+                    <BonusGiftIcon size={24} color={currentTheme.textSecondary} />
                   </View>
-                )}
+                  <Text style={[styles.bonusHeaderTitle, { color: currentTheme.textSecondary }]}>
+                    Bonus
+                  </Text>
+                </View>
+
+                <View style={styles.bonusCenterBox}>
+                  <Text style={[styles.bonusCenterTitle, { color: currentTheme.textPrimary }]}>
+                    {ev.market || 'Bonus, Bonus pari combiné'}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.thinDividerNoMargin,
+                    { backgroundColor: currentTheme.divider || currentTheme.border },
+                  ]}
+                />
+
+                <View style={styles.bonusFooterBox}>
+                  <Text style={[styles.eventMarketName, { color: currentTheme.textPrimary }]}>
+                    Bonus
+                  </Text>
+                  <Text style={[styles.eventOddText, { color: currentTheme.textPrimary }]}>
+                    {ev.odd}
+                  </Text>
+                </View>
+              </View>
+            );
+          }
+
+          return (
+            <TouchableOpacity
+              key={ev.id || index}
+              activeOpacity={0.88}
+              onPress={() => handlePressEvent(ev)}
+              style={[styles.eventCard, { backgroundColor: currentTheme.cardBackground }]}
+            >
+              {/* En-tête de carte d'événement */}
+              <View style={styles.eventCardHeader}>
+                <View style={styles.eventSportIconWrap}>
+                  <Image
+                    source={
+                      ev.isPoker
+                        ? ASSET_ICONS.poker
+                        : ev.sport === 'FIFA' || ev.isFifa
+                        ? ASSET_ICONS.fifa
+                        : ASSET_ICONS.football
+                    }
+                    style={[
+                      ev.isPoker ? styles.eventPokerIcon : styles.eventSportIcon,
+                      { tintColor: currentTheme.textSecondary || '#6E849B' },
+                    ]}
+                    resizeMode="contain"
+                  />
+                </View>
+
+                <View style={styles.eventLeagueInfoCol}>
+                  <Text
+                    style={[styles.eventLeagueText, { color: currentTheme.textSecondary || '#6E849B' }]}
+                    numberOfLines={1}
+                  >
+                    {ev.isPoker
+                      ? (ev.league || 'TvBet. POKER')
+                      : ev.isFifa
+                      ? (ev.league?.startsWith('FIFA') ? ev.league : `FIFA. ${ev.league || '5x5 Rush. Superligue'}`)
+                      : formatFootballHeader(ev.sport, ev.league)}
+                  </Text>
+                  <Text style={[styles.eventDateText, { color: currentTheme.textSecondary || '#6E849B' }]}>
+                    {displayDate}
+                  </Text>
+                </View>
+
+                {/* Badge • En direct rouge ou Serie A en haut à droite */}
+                {isEventLive ? (
+                  <View style={styles.liveRedBadge}>
+                    <Text style={styles.liveRedBadgeText}>• En direct</Text>
+                  </View>
+                ) : ev.badge === 'Serie A' ? (
+                  <View style={styles.leagueBadge}>
+                    <Text style={styles.leagueBadgeText}>Serie A</Text>
+                  </View>
+                ) : null}
               </View>
 
-              <View style={styles.typeHeaderRow}>
-                <Text style={[styles.typeBold, { color: currentTheme.textPrimary }]}>
-                  {coupon.type || (isCombine ? 'Combiné' : 'Simple')}
-                </Text>
-                <Text
-                  style={[styles.idNumberText, { color: currentTheme.textPrimary }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.85}
-                >
-                  {' '} № {coupon.id}
-                </Text>
-              </View>
-            </View>
+              {/* Zone d'affrontement centrale */}
+              {ev.isPoker ? (
+                // Bloc Poker
+                <View style={styles.eventPokerContainer}>
+                  {isAccepted ? (
+                    <Text style={[styles.eventPokerTitleLive, { color: currentTheme.textPrimary }]}>
+                      POKER
+                    </Text>
+                  ) : (
+                    <>
+                      <Text style={[styles.eventPokerTitle, { color: currentTheme.textPrimary }]}>
+                        POKER
+                      </Text>
+                      {Boolean(ev.pokerDraw) && (
+                        <View style={styles.eventPokerHandsBox}>
+                          {ev.pokerDraw?.hands?.map((h: any, hIdx: number) => (
+                            <Text key={h.id || hIdx} style={styles.eventPokerHandLine}>
+                              <Text
+                                style={[
+                                  styles.eventPokerHandLabel,
+                                  { color: isDark ? currentTheme.textSecondary : '#557089' },
+                                ]}
+                              >
+                                Main {h.id || hIdx + 1}:{' '}
+                              </Text>
+                              {renderCardsWithSuits(
+                                h.cards,
+                                [
+                                  styles.eventPokerCardText,
+                                  { color: isDark ? currentTheme.textPrimary : '#557089' },
+                                ],
+                                styles.eventPokerRedCardText
+                              )}
+                            </Text>
+                          ))}
+                          <Text style={styles.eventPokerTableLine}>
+                            <Text
+                              style={[
+                                styles.eventPokerHandLabel,
+                                { color: isDark ? currentTheme.textSecondary : '#557089' },
+                              ]}
+                            >
+                              Table :{' '}
+                            </Text>
+                            {renderCardsWithSuits(
+                              ev.pokerDraw?.board || '',
+                              [
+                                styles.eventPokerCardText,
+                                { color: isDark ? currentTheme.textPrimary : '#557089' },
+                              ],
+                              styles.eventPokerRedCardText
+                            )}
+                          </Text>
+                          {Boolean(ev.pokerDraw?.winnerLabel) && (
+                            <Text
+                              style={[
+                                styles.eventPokerWinnerLine,
+                                { color: isDark ? currentTheme.textSecondary : '#557089' },
+                              ]}
+                            >
+                              Gagnant :{' '}
+                              {ev.pokerDraw?.winnerLabel
+                                ? ev.pokerDraw.winnerLabel.replace(/^Main\s+/i, '')
+                                : ''}
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                    </>
+                  )}
+                </View>
+              ) : ev.isOutright ? (
+                // Pari long terme / vainqueur (centré)
+                <View style={styles.eventOutrightContainer}>
+                  <Text style={[styles.eventOutrightText, { color: currentTheme.textPrimary }]}>
+                    {ev.outrightTitle || ev.homeTeam}
+                  </Text>
+                </View>
+              ) : (
+                // Match avec 2 équipes et VS / Score + détail mi-temps centré en dessous
+                <View style={styles.eventMatchBlock}>
+                  <View style={styles.eventFaceoffContainer}>
+                    {/* Équipe 1 (Gauche) */}
+                    <View style={styles.teamLeftContainer}>
+                      <Text
+                        style={[styles.teamNameLeft, { color: currentTheme.textPrimary }]}
+                        numberOfLines={2}
+                      >
+                        {ev.homeTeam}
+                      </Text>
+                      <TeamLogo
+                        teamName={ev.homeTeam}
+                        logoUrl={ev.homeLogo}
+                        size={34}
+                      />
+                    </View>
 
-            {/* Séparateur 1 : Entre le bloc supérieur et le résumé du ticket */}
-            <TicketDivider
-              backgroundColor={screenBg}
-              dotColor={currentTheme.isDark ? currentTheme.border : '#CBD5E1'}
-              notchSize={12}
-            />
+                    {/* Centre : VS ou Score (0:0 en direct ou score final) */}
+                    <View style={styles.centerScoreContainer}>
+                      {effectiveScoreFinal && hasEventStarted ? (
+                        <Text style={[styles.mainScoreText, { color: currentTheme.textPrimary }]}>
+                          {effectiveScoreFinal}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.vsText, { color: currentTheme.textPrimary }]}>
+                          VS
+                        </Text>
+                      )}
+                    </View>
 
-            {/* --- Bloc résumé financier : cote / mise / gains / statut --- */}
-            <View style={[styles.summarySection, styles.summarySectionBottom]}>
-              {(ticket.type === 'Combiné' || isCombine) && (
-                <View style={styles.eventCountRow}>
-                  {/* Côté gauche : Logo cvv1 officiel 1xBet + Libellé + Nombre */}
-                  <View style={styles.eventCountLeft}>
-                    <Image
-                      source={require('../../assets/icons/cvv1.png')}
-                      style={styles.combineEventIcon}
-                      resizeMode="contain"
-                    />
+                    {/* Équipe 2 (Droite) */}
+                    <View style={styles.teamRightContainer}>
+                      <TeamLogo
+                        teamName={ev.awayTeam}
+                        logoUrl={ev.awayLogo}
+                        size={34}
+                      />
+                      <Text
+                        style={[styles.teamNameRight, { color: currentTheme.textPrimary }]}
+                        numberOfLines={2}
+                      >
+                        {ev.awayTeam}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Détail du score centré sous les logos (ex: 0:0 (0:0), 2:2 (2:2) ou 0:2 (0:0,0:2)) */}
+                  {Boolean(effectiveScoreDetail) && hasEventStarted && (
                     <Text
-                      style={[styles.eventCountLabel, { color: currentTheme.textPrimary }]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.85}
+                      style={[
+                        styles.detailScoreBelowText,
+                        { color: currentTheme.textSecondary },
+                      ]}
                     >
-                      Nombre d'événements :
+                      {effectiveScoreDetail}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {/* Séparateur fin */}
+              <View
+                style={[
+                  styles.thinDividerNoMargin,
+                  { backgroundColor: currentTheme.divider || currentTheme.border },
+                ]}
+              />
+
+              {/* Pied de carte d'événement */}
+              <View style={styles.eventFooterBox}>
+                <View style={styles.eventMarketRow}>
+                  <Text
+                    style={[styles.eventMarketName, { color: currentTheme.textPrimary }]}
+                    numberOfLines={2}
+                  >
+                    {ev.market}
+                  </Text>
+                  <Text style={[styles.eventOddText, { color: currentTheme.textPrimary }]}>
+                    {ev.odd}
+                  </Text>
+                </View>
+
+                {/* Ligne EN DIRECT + temps écoulé : s'affiche dès l'heure de début de l'événement */}
+                {showElapsedRow && (
+                  <View style={styles.eventLiveElapsedRow}>
+                    <Text
+                      style={[
+                        styles.eventLiveElapsedLeft,
+                        { color: currentTheme.textSecondary || '#6E849B' },
+                      ]}
+                    >
+                      EN DIRECT
+                    </Text>
+                    <Text
+                      style={[
+                        styles.eventLiveElapsedRight,
+                        { color: currentTheme.textPrimary },
+                      ]}
+                    >
+                      temps écoulé : {formatSecondsToMMSS(elapsedSec)}
                     </Text>
                   </View>
-
-                  {/* Côté droit : État d'avancement */}
-                  <Text
-                    style={[styles.eventCountStatus, { color: currentTheme.textPrimary }]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.85}
-                  >
-                    {(ticket as any).finishedEventsCount || ticket.completedCount || 0} sur {ticket.eventsCount || (ticket as any).selections?.length || ticket.events?.length || 2} terminés
-                  </Text>
-                </View>
-              )}
-
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: currentTheme.textSecondary }]}>Cote :</Text>
-                <Text style={[styles.boldValue, { color: currentTheme.textPrimary }]}>{coupon.totalOdds}</Text>
-              </View>
-
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: currentTheme.textSecondary }]}>Mise :</Text>
-                <Text style={[styles.boldValue, { color: currentTheme.textPrimary }]}>
-                  {Number(coupon.stake).toLocaleString('fr-FR').replace(/\s/g, ' ')} ₣
-                </Text>
-              </View>
-
-              {/* Ligne Gain : affiché en vert si Gagné, ou Gains potentiels si en cours. Si Perdu, aucun gain n'est affiché */}
-              {!isLost && (
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: currentTheme.textSecondary }]}>
-                    {isWon ? 'Gain :' : 'Gains potentiels :'}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.boldValue,
-                      {
-                        color: isWon
-                          ? (currentTheme.status?.paye || currentTheme.colors?.accentGreen || '#22C55E')
-                          : currentTheme.textPrimary,
-                      },
-                    ]}
-                  >
-                    {isWon
-                      ? `${Number(coupon.actualPayout || coupon.potentialPayout || (coupon.stake * (coupon.totalOdds || 1))).toLocaleString('fr-FR').replace(/\s/g, ' ')} ₣`
-                      : `${Number(coupon.potentialPayout).toLocaleString('fr-FR').replace(/\s/g, ' ')} ₣`}
-                  </Text>
-                </View>
-              )}
-
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: currentTheme.textSecondary }]}>Statut :</Text>
-                {isWon ? (
-                  <View style={styles.statusPayeWrap}>
-                    <View style={[styles.statusValidationCirclePaye, { backgroundColor: currentTheme.status.paye }]}>
-                      <Ionicons name="checkmark" size={11} color="#FFFFFF" />
-                    </View>
-                    <Text style={[styles.statusPayeText, { color: currentTheme.status.paye }]}>Payé</Text>
-                  </View>
-                ) : isLost ? (
-                  <View style={styles.statusBadgeLostWrap}>
-                    <View style={styles.statusValidationCircleLost}>
-                      <Ionicons name="close" size={11} color="#FFFFFF" />
-                    </View>
-                    <Text style={styles.statusLostText}>Perdu</Text>
-                  </View>
-                ) : (
-                  <View style={styles.statusBadgeAcceptWrap}>
-                    <View style={[styles.statusValidationCircle, { backgroundColor: currentTheme.status?.accepte || currentTheme.primary }]}>
-                      <Ionicons name="checkmark" size={11} color="#FFFFFF" />
-                    </View>
-                    <Text style={[styles.statusAcceptText, { color: currentTheme.status?.accepte || currentTheme.primary }]}>Accepté</Text>
-                  </View>
                 )}
-              </View>
-            </View>
 
-            {/* 3. Liste des Sélections / Événements Sportifs et Barres de séparation adaptatives */}
-            {coupon.events && coupon.events.length > 0 && (
-              <>
-                {/* Séparateur 2 : Entre le résumé du ticket et le 1er match (uniquement si au moins 1 événement) */}
-                <TicketDivider
-                  backgroundColor={screenBg}
-                  dotColor={currentTheme.isDark ? currentTheme.border : '#CBD5E1'}
-                  notchSize={12}
-                />
-
-                {coupon.events.map((event, index) => {
-                  const isPokerEvent =
-                    event.gameCategory === 'poker' ||
-                    (event.league && event.league.toUpperCase().includes('POKER')) ||
-                    (event.sport && event.sport.toUpperCase().includes('POKER')) ||
-                    event.badge === 'POKE';
-
-                  return (
-                    <React.Fragment key={event.id}>
-                      {isPokerEvent ? (
-                        <TvBetPokerCard
-                          event={event}
-                          isWon={isWon}
-                        />
-                      ) : isWon ? (
-                        <WonMatchEventCard
-                          event={event}
-                        />
-                      ) : (
-                        <MatchEventCard
-                          event={event}
-                          isWon={isWon}
-                        />
-                      )}
-
-                      {/* Séparateur uniquement ENTRE les matchs (si plus d'un événement, index < length - 1) */}
-                      {index < coupon.events.length - 1 && (
-                        <TicketDivider
-                          backgroundColor={screenBg}
-                          dotColor={currentTheme.isDark ? currentTheme.border : '#CBD5E1'}
-                          notchSize={12}
-                        />
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </>
-            )}
-          </View>
-        </ScrollView>
-
-        {/* Dock fixe ancré au bas de l'écran */}
-        {showBottomDock && (
-          <View style={[styles.bottomDockWrapper, { bottom: bottomBarHeight }]}>
-            <View
-              style={[
-                styles.bottomDockContainer,
-                {
-                  backgroundColor: currentTheme.isDark
-                    ? (currentTheme.cardBackground || '#212D3B')
-                    : '#FFFFFF',
-                  borderTopColor: currentTheme.isDark
-                    ? (currentTheme.border || '#2C3A4B')
-                    : '#EFF2F6',
-                  shadowOpacity: currentTheme.isDark ? 0 : 0.05,
-                  elevation: currentTheme.isDark ? 0 : 6,
-                },
-              ]}
-            >
-              {/* 1. Bouton Vendre le coupon (si actif) */}
-              {canSellCoupon && (
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={handleSellCoupon}
-                  style={[
-                    styles.sellButton,
-                    { backgroundColor: currentTheme.cashoutButton?.bg || (currentTheme.isDark ? '#22C55E' : '#1E4BB5') },
-                  ]}
-                >
+                <View style={styles.eventStatusRow}>
+                  <Text style={[styles.eventStatusLabel, { color: currentTheme.textSecondary }]}>
+                    Statut:
+                  </Text>
                   <Text
                     style={[
-                      styles.sellButtonText,
-                      { color: currentTheme.cashoutButton?.text || '#FFFFFF' },
+                      styles.eventStatusValue,
+                      { color: eventStatusColor },
                     ]}
                   >
-                    Vendre pour : {couponWithSell.sellPrice || '15000'} ₣
+                    {eventStatusLabel}
                   </Text>
-                </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Informations supplémentaires pour Poker */}
+              {ev.isPoker && Boolean(ev.roundCode) && (
+                <>
+                  <View
+                    style={[
+                      styles.thinDividerNoMargin,
+                      { backgroundColor: currentTheme.divider || currentTheme.border },
+                    ]}
+                  />
+                  <View style={styles.extraInfoBox}>
+                    <Text style={[styles.extraInfoTitle, { color: primaryActionColor }]}>
+                      Informations supplémentaires
+                    </Text>
+                    <Text style={[styles.extraInfoValue, { color: currentTheme.textPrimary }]}>
+                      {ev.roundCode}
+                    </Text>
+                  </View>
+                </>
               )}
+            </TouchableOpacity>
+          );
+        })}
+      </Animated.ScrollView>
 
-              {/* 2. Bouton Dupliquer le coupon - Masqué si statut Payé / Gagné / Perdu */}
-              {canDuplicate && (
-                <DuplicateCouponButton
-                  onPress={handleDuplicateCoupon}
-                  theme={currentTheme}
-                />
-              )}
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* Options Bottom Sheet */}
-      <BetOptionsBottomSheet
-        visible={optionsVisible}
-        coupon={coupon}
-        onClose={() => setOptionsVisible(false)}
-        onViewDetail={() => setOptionsVisible(false)}
-        onSaveCoupon={handleSaveCoupon}
-      />
-
-      {/* Save Coupon Modal */}
-      <SaveCouponModal
-        visible={isSaveModalVisible}
-        couponCode={savedCouponCode}
-        onClose={() => setIsSaveModalVisible(false)}
-      />
+      {/* ================================================================== */}
+      {/* 3. FOOTER FIXE AU-DESSUS DE LA BOTTOM BAR (Vendre / Dupliquer)     */}
+      {/* ================================================================== */}
+      {showDuplicateFooter && (
+        <View
+          style={[
+            styles.fixedFooter,
+            {
+              bottom: bottomBarHeight,
+              backgroundColor: currentTheme.cardBackground,
+              borderTopColor: currentTheme.border,
+            },
+          ]}
+        >
+          {showSellButton ? (
+            <TouchableOpacity
+              style={[
+                styles.duplicateBtn,
+                { backgroundColor: '#2B4C9B' },
+              ]}
+              activeOpacity={0.85}
+              onPress={handleCashout}
+            >
+              <Text
+                style={[
+                  styles.duplicateBtnText,
+                  { color: '#FFFFFF', fontWeight: '600', fontSize: 15.5 },
+                ]}
+              >
+                Vendre pour {sellPriceFormatted} ₣
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.duplicateBtn,
+                { backgroundColor: currentTheme.duplicateButton?.bg || '#D6E6F7' },
+              ]}
+              activeOpacity={0.85}
+              onPress={handleDuplicate}
+            >
+              <Text
+                style={[
+                  styles.duplicateBtnText,
+                  { color: currentTheme.duplicateButton?.text || '#2E73B8' },
+                ]}
+              >
+                Dupliquer le coupon de pari
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
-export { TicketDetailsScreen as BetDetailTicketScreen };
+// Re-exports pour compatibilité
+export const BetDetailTicketScreen = TicketDetailsScreen;
+export const BetDetailsScreen = TicketDetailsScreen;
+export const BetDetailScreen = TicketDetailsScreen;
 
+// ============================================================================
+// STYLES PIXEL-PERFECT (Melbet Thème)
+// ============================================================================
 const styles = StyleSheet.create({
-  safeArea: {
+  safeContainer: {
     flex: 1,
-    backgroundColor: '#EEF2F6',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
+    backgroundColor: '#FFFFFF',
   },
-  mainContainer: {
+  scrollView: {
     flex: 1,
-    width: '100%',
-    height: '100%',
-    paddingHorizontal: 0,
-    position: 'relative',
+    backgroundColor: '#F0F3F8',
+    
   },
-  contentScrollView: {
-    flexGrow: 1,
-    width: '100%',
+  scrollContent: {
+    paddingBottom: 32,
   },
-  container: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: '#EEF2F6',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  screenRoot: {
-    width: '100%',
-    flex: 1,
-    backgroundColor: '#EEF2F6',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  contentWrapper: {
-    width: '100%',
-    flex: 1,
-    backgroundColor: '#EEF2F6',
-    overflow: 'hidden',
-    position: 'relative',
-  },
+
+  // 1. Header
   header: {
     height: 52,
-    width: '100%',
     backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEF2F6',
-    zIndex: 10,
+    paddingHorizontal: 12,
   },
   headerBtn: {
-    padding: 6,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1A2B49',
-    letterSpacing: -0.2,
-    fontFamily: Typography.fontFamily,
-  },
-  headerTitleContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
+  headerTitleWrap: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  typeHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 2,
-    paddingHorizontal: 4,
-  },
-  typeBold: {
+  headerTitle: {
     fontSize: 16.5,
-    fontWeight: '700',
-    color: '#101E33',
-    fontFamily: Typography.fontFamily,
+    fontWeight: '600',
+    color: '#557089',
+    textAlign: 'center',
   },
-  idNumberText: {
-    fontSize: 15.5,
-    fontWeight: '700',
-    color: '#101E33',
-    fontFamily: Typography.fontFamily,
+  headerSubtitle: {
+    fontSize: 11,
+    color: '#7A8FA6',
+    marginTop: 1,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'flex-end',
+    width: 70,
+    gap: 14,
   },
   headerActionBtn: {
-    padding: 6,
-  },
-  emptyWrap: {
-    flex: 1,
+    padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
   },
-  emptyText: {
-    fontSize: 15,
-    color: '#64748B',
+  headerBellIcon: {
+    width: 21,
+    height: 21,
+    tintColor: '#557089',
   },
-  scrollView: {
-    flex: 1,
-    width: '100%',
+  headerThreeDotsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#557089',
+    letterSpacing: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 8, // Réduit de 16px/12px à 8px pour coller davantage aux bords
-    paddingTop: 10,
-    paddingBottom: 20,
-  },
-  // 2. CARTE PRINCIPALE (Sans bordure parasite pour un visuel épuré)
-  whiteMainCard: {
-    width: '100%',
+
+  // 1B. Barre collante Cotes / Mise / Gains au scroll
+  stickyFinancialBar: {
+    position: 'absolute',
+    top: 52,
+    left: 0,
+    right: 0,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 14,
-    borderWidth: 0,
-    borderColor: 'transparent',
-    elevation: 0,
-    shadowColor: 'transparent',
-    shadowOpacity: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 6,
+    zIndex: 50,
   },
-  mainTicketCard: {
-    width: '100%',
+
+  // 2. Bloc Résumé Supérieur
+  summaryCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 0,
-    borderColor: 'transparent',
-    overflow: 'hidden',
-    elevation: 0,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    marginBottom: 16,
-  },
-  // 3. LIGNES D'INFORMATIONS (Cote, Mise, Gains, Statut)
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 4, // Alignement propre du texte interne
-  },
-  summarySection: {
-    paddingHorizontal: 10, // Réduction du padding interne gauche/droite (passé de 16px à 10px)
+    paddingHorizontal: 16,
     paddingTop: 14,
-    paddingBottom: 14,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    marginBottom: 2,
   },
-  summarySectionBottom: {
-    paddingTop: 12,
-    paddingBottom: 14,
-  },
-  topDateRow: {
+  summaryHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-    paddingHorizontal: 4,
   },
-  ticketDateText: {
+  avatarWrap: {
+    position: 'relative',
+    width: 52,
+    height: 52,
+    marginRight: 14,
+  },
+  avatarCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#E9EFF6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarIcon: {
+    width: 28,
+    height: 28,
+  },
+  avatarIconPoker: {
+    width: 28,
+    height: 28,
+    tintColor: '#5C7690',
+  },
+  avatarIconFifa: {
+    width: 30,
+    height: 20,
+    tintColor: '#5C7690',
+  },
+  avatarIconCombine: {
+    width: 28,
+    height: 28,
+  },
+  statusMiniDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  minusDotText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 12,
+  },
+  summaryMetaCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  summaryDateText: {
     fontSize: 12.5,
+    color: '#6E849B',
     fontWeight: '400',
-    color: '#7B8A9E',
-    fontFamily: Typography.fontFamily,
+    marginBottom: 1,
   },
-  liveHeaderBadge: {
-    backgroundColor: '#E53E3E',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 5,
-    marginLeft: 8,
-    gap: 4,
+  summaryTypeText: {
+    fontSize: 16.5,
+    fontWeight: '700',
+    color: '#1D2B3A',
+    lineHeight: 20,
+    marginBottom: 2,
   },
-  liveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#FFFFFF',
+  summaryNumberText: {
+    fontSize: 14.5,
+    color: '#1D2B3A',
+    fontWeight: '600',
+    marginTop: 1,
   },
-  liveHeaderBadgeText: {
+
+  // Badge Ligue Bleu (Serie A uniquement)
+  leagueBadge: {
+    backgroundColor: '#527BFF',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    alignSelf: 'flex-start',
+  },
+  leagueBadgeText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: -0.1,
+    fontWeight: '600',
   },
-  createdDate: {
-    fontSize: 12.5,
-    fontWeight: '400',
-    color: '#7B8A9E',
-    fontFamily: Typography.fontFamily,
+
+  thinDivider: {
+    height: 1,
+    backgroundColor: '#F0F4F8',
+    marginVertical: 10,
   },
-  summaryRow: {
+  thinDividerNoMargin: {
+    height: 1,
+    backgroundColor: '#F0F4F8',
+  },
+
+  // Lignes financières
+  financialRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 6,
-    paddingHorizontal: 4, // Alignement propre du texte interne
+    paddingVertical: 3,
   },
-  summaryLabel: {
-    fontSize: 13.5,
-    color: '#64748B',
-    fontFamily: Typography.fontFamily,
+  financialLabel: {
+    fontSize: 14,
+    color: '#6E849B',
     fontWeight: '400',
   },
-  boldValue: {
+  financialValueBold: {
     fontSize: 14.5,
-    fontWeight: '700',
-    color: '#101E33',
-    fontFamily: Typography.fontFamily,
+    color: '#1D2B3A',
+    fontWeight: '600',
   },
-  wonPayoutText: {
-    color: '#16A34A',
+  financialValueStatus: {
     fontSize: 14.5,
-    fontWeight: '700',
-    fontFamily: Typography.fontFamily,
+    fontWeight: '500',
   },
-  statusPayeWrap: {
+
+  eventsRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  statusValidationCirclePaye: {
-    width: 17,
-    height: 17,
-    borderRadius: 8.5,
-    backgroundColor: '#16A34A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 6,
-  },
-  statusPayeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#16A34A',
-    fontFamily: Typography.fontFamily,
-  },
-  statusBadgeLostWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusValidationCircleLost: {
-    width: 17,
-    height: 17,
-    borderRadius: 8.5,
-    backgroundColor: '#E53935',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 6,
-  },
-  statusLostText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#E53935',
-    fontFamily: Typography.fontFamily,
-  },
-  statusBadgeAcceptWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusValidationCircle: {
-    width: 17,
-    height: 17,
-    borderRadius: 8.5,
-    backgroundColor: '#2A75E6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 6,
-  },
-  statusAcceptText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2A75E6',
-    fontFamily: Typography.fontFamily,
-  },
-  lostPayoutText: {
-    color: '#E53935',
-    fontSize: 14.5,
-    fontWeight: '700',
-    fontFamily: Typography.fontFamily,
-  },
-  eventCountRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 4,
-    paddingHorizontal: 4,
-    gap: 8,
+    paddingVertical: 7,
   },
-  eventCountLeft: {
+  eventsLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 1,
   },
-  combineEventIcon: {
+  layersIcon: {
+    width: 18,
+    height: 18,
+    marginRight: 9,
+    tintColor: '#557089',
+  },
+  eventsCountText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0D253F',
+  },
+  eventsFinishedText: {
+    fontSize: 15.5,
+    fontWeight: '400',
+    color: '#0D253F',
+  },
+
+  // 3. Cartes d'Événements
+  eventCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    marginHorizontal: 10,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  eventCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  eventSportIconWrap: {
+    width: 26,
+    height: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  eventSportIcon: {
+    width: 26,
+    height: 26,
+    tintColor: '#6E849B',
+  },
+  eventPokerIcon: {
     width: 22,
     height: 22,
-    marginRight: 8,
+    tintColor: '#6E849B',
   },
-  eventCountLabel: {
-    fontSize: 16,
-    color: '#101E33',
-    fontFamily: Typography.fontFamily,
-    fontWeight: '700',
+  eventLeagueInfoCol: {
+    flex: 1,
+    justifyContent: 'center',
   },
-  eventCountValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#101E33',
-    fontFamily: Typography.fontFamily,
+  eventLeagueText: {
+    fontSize: 13,
+    color: '#6E849B',
+    fontWeight: '400',
   },
-  eventCountStatus: {
-    fontSize: 16,
-    color: '#64748B',
-    fontFamily: Typography.fontFamily,
-    fontWeight: '700',
-    textAlign: 'right',
+  eventDateText: {
+    fontSize: 12.5,
+    color: '#6E849B',
+    fontWeight: '400',
+    marginTop: 2,
   },
-  cashoutContainer: {
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    paddingBottom: 14,
-  },
-  cashoutBtn: {
+
+  // Carte Bonus (identique à video_gagnant.mp4 et WhatsApp_Video)
+  bonusCardHeader: {
     flexDirection: 'row',
-    backgroundColor: '#059669',
-    borderRadius: 8,
-    paddingVertical: 13,
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  bonusHeaderTitle: {
+    fontSize: 13,
+    color: '#6E849B',
+    fontWeight: '400',
+  },
+  bonusCenterBox: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cashoutBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 13.5,
-    letterSpacing: 0.3,
-    fontFamily: Typography.fontFamily,
+  bonusCenterTitle: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#1D2B3A',
+    textAlign: 'center',
   },
-  bottomDockWrapper: {
+  bonusFooterBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+
+  // Zone Poker (Pixel-Perfect comme sur les captures)
+  eventPokerContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eventPokerTitleLive: {
+    fontSize: 14.5,
+    fontWeight: '500',
+    color: '#1D2B3A',
+    textAlign: 'center',
+    paddingVertical: 14,
+  },
+  eventPokerTitle: {
+    fontSize: 14.5,
+    fontWeight: '500',
+    color: '#1D2B3A',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  eventPokerRoundText: {
+    fontSize: 12,
+    color: '#7B8794',
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  eventPokerHandsBox: {
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 2,
+  },
+  eventPokerHandLine: {
+    fontSize: 12.5,
+    color: '#557089',
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  eventPokerHandLabel: {
+    fontWeight: '400',
+    color: '#557089',
+  },
+  eventPokerCardText: {
+    fontWeight: '500',
+    color: '#557089',
+  },
+  eventPokerRedCardText: {
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  eventPokerTableLine: {
+    fontSize: 12.5,
+    fontWeight: '400',
+    color: '#557089',
+    lineHeight: 20,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  eventPokerWinnerLine: {
+    fontSize: 12.5,
+    fontWeight: '400',
+    color: '#557089',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  // Zone d'affrontement (Match standard)
+  eventMatchBlock: {
+    paddingBottom: 10,
+  },
+  eventFaceoffContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  teamLeftContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  teamNameLeft: {
+    fontSize: 13.5,
+    fontWeight: '500',
+    color: '#1D2B3A',
+    marginRight: 8,
+    textAlign: 'right',
+    flexShrink: 1,
+  },
+  teamRightContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  teamNameRight: {
+    fontSize: 13.5,
+    fontWeight: '500',
+    color: '#1D2B3A',
+    marginLeft: 8,
+    textAlign: 'left',
+    flexShrink: 1,
+  },
+  centerScoreContainer: {
+    marginHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 38,
+  },
+  vsText: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#1D2B3A',
+  },
+  mainScoreText: {
+    fontSize: 19,
+    fontWeight: '500',
+    color: '#1D2B3A',
+  },
+  detailScoreBelowText: {
+    fontSize: 12,
+    color: '#6E849B',
+    fontWeight: '400',
+    textAlign: 'center',
+    marginTop: 6,
+  },
+
+  // Zone outright / vainqueur
+  eventOutrightContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eventOutrightText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#1D2B3A',
+    textAlign: 'center',
+  },
+
+  // Pied de carte d'événement
+  eventFooterBox: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  eventMarketRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  eventMarketName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1D2B3A',
+    flex: 1,
+    marginRight: 10,
+  },
+  eventOddText: {
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#1D2B3A',
+  },
+  eventLiveElapsedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  eventLiveElapsedLeft: {
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+  },
+  eventLiveElapsedRight: {
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  eventLiveElapsedRightBold: {
+    fontWeight: '600',
+  },
+  eventStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  eventStatusLabel: {
+    fontSize: 13.5,
+    color: '#6E849B',
+    fontWeight: '400',
+  },
+  eventStatusValue: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Badge • En direct rouge
+  liveRedBadge: {
+    backgroundColor: '#E04F44',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  liveRedBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Section Informations supplémentaires (Poker)
+  extraInfoBox: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  extraInfoTitle: {
+    fontSize: 13.5,
+    fontWeight: '500',
+    color: '#3B79C4',
+    marginBottom: 2,
+  },
+  extraInfoValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1D2B3A',
+  },
+
+  // 4. Fixed Footer (au-dessus de la PersistentBottomBar)
+  fixedFooter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#EEF2F6',
     zIndex: 100,
   },
-  bottomDockContainer: {
-    width: '100%',
-    maxWidth: 600,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 14,
-    borderTopWidth: 1,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -3 },
-  },
-  sellButton: {
-    backgroundColor: '#1E4BB5',
-    borderRadius: 12,
-    height: 48,
-    alignItems: 'center',
+  duplicateBtn: {
+    backgroundColor: '#D6E6F7',
+    height: 44,
+    borderRadius: 10,
     justifyContent: 'center',
-    width: '100%',
-    marginBottom: 8,
-  },
-  sellButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    fontFamily: Typography.fontFamily,
-  },
-  duplicateButton: {
-    borderRadius: 12,
-    height: 48,
     alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
   },
-  duplicateButtonText: {
-    color: '#2563EB',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    fontFamily: Typography.fontFamily,
+  duplicateBtnText: {
+    color: '#2E73B8',
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
