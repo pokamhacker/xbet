@@ -149,11 +149,8 @@ function purgeLegacyRailwayAccounts(db: Database.Database): void {
         'user_1793204267288_690bb111',
         'user_1792268443511_9d999819',
         'user_1791125553652_3f3846c2',
-        'user_1792152632858_9b7c5e1d',
-        'user-1789492287827',
-        'test_user_1',
-        'user-demo-1'
-      ) OR username LIKE 'joueur_test_%' OR username LIKE 'joueur_jwt_%' OR username = 'user';
+        'user_1792152632858_9b7c5e1d'
+      );
     `).run();
     if (result.changes > 0) {
       console.log(`[SQLite] Purge de sécurité : ${result.changes} ancien(s) compte(s) Railway supprimé(s).`);
@@ -248,7 +245,7 @@ function seedUsersSnapshot(db: Database.Database): void {
     ]);
 
     const insertUser = db.prepare(`
-      INSERT OR IGNORE INTO users (
+      INSERT OR REPLACE INTO users (
         id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
         blocked_reason, bound_device_id, last_device_id, session_token, created_at, updated_at
       ) VALUES (
@@ -297,6 +294,44 @@ function seedUsersSnapshot(db: Database.Database): void {
     tx();
     if (restoredCount > 0) {
       console.log(`[SQLite] ${restoredCount} compte(s) restauré(s) depuis users_snapshot.json.`);
+    }
+
+    // Si aucun compte USER n'existe après snapshot, initialiser au moins 2 comptes opérationnels
+    const userCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'USER'").get() as { count: number };
+    if (!userCount || userCount.count === 0) {
+      console.log('[SQLite] Aucun compte joueur présent. Création automatique des comptes de secours joueur1 et client_vip.');
+      const passHash1 = bcrypt.hashSync('Pass2026##?', 10);
+      const passHash2 = bcrypt.hashSync('Vip2026##?', 10);
+      insertUser.run({
+        id: 'usr_joueur1_seed',
+        username: 'joueur1',
+        password_hash: passHash1,
+        raw_password: 'Pass2026##?',
+        allowed_features: defaultFeaturesJson,
+        role: 'USER',
+        balance: 50000,
+        is_blocked: 0,
+        blocked_reason: null,
+        bound_device_id: null,
+        last_device_id: null,
+        session_token: null,
+        created_at: new Date().toISOString(),
+      });
+      insertUser.run({
+        id: 'usr_client_vip_seed',
+        username: 'client_vip',
+        password_hash: passHash2,
+        raw_password: 'Vip2026##?',
+        allowed_features: defaultFeaturesJson,
+        role: 'USER',
+        balance: 100000,
+        is_blocked: 0,
+        blocked_reason: null,
+        bound_device_id: null,
+        last_device_id: null,
+        session_token: null,
+        created_at: new Date().toISOString(),
+      });
     }
   } catch (err) {
     console.warn('[SQLite] Avertissement lors de la restauration de users_snapshot.json :', err);

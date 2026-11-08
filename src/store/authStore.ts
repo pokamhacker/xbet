@@ -80,6 +80,30 @@ const DEFAULT_ACCOUNTS: UserAccount[] = [
     allowedFeatures: DEFAULT_ALLOWED_FEATURES,
     createdAt: '01.01.2026 (00:00)',
   },
+  {
+    id: 'usr_joueur1_seed',
+    username: 'joueur1',
+    passwordHash: 'Pass2026##?',
+    rawPassword: 'Pass2026##?',
+    balance: 50000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '08.11.2026 (00:00)',
+  },
+  {
+    id: 'usr_client_vip_seed',
+    username: 'client_vip',
+    passwordHash: 'Vip2026##?',
+    rawPassword: 'Vip2026##?',
+    balance: 100000,
+    role: 'USER',
+    isActive: true,
+    currentDeviceId: null,
+    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
+    createdAt: '08.11.2026 (00:00)',
+  },
 ];
 
 const DEVICE_STORAGE_KEY = 'xbet_local_device_unique_id';
@@ -138,12 +162,7 @@ export const useAuthStore = create<AuthState>()(
           ]);
 
           accountsUpdated = accountsUpdated.filter(
-            (a) =>
-              a.role === 'ADMIN' ||
-              (!LEGACY_DEMO_IDS.has(a.id) &&
-                !a.username.toLowerCase().startsWith('joueur_test_') &&
-                !a.username.toLowerCase().startsWith('joueur_jwt_') &&
-                a.username.toLowerCase() !== 'user')
+            (a) => a.role === 'ADMIN' || !LEGACY_DEMO_IDS.has(a.id)
           );
 
           DEFAULT_ACCOUNTS.forEach((defAcc) => {
@@ -356,33 +375,55 @@ export const useAuthStore = create<AuthState>()(
               for (const pending of localPendingUsers) {
                 const pwd = pending.rawPassword || pending.passwordHash;
                 if (pwd && !pwd.startsWith('$2')) {
-                  fetch(createEndpoint, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({
-                      id: pending.id,
-                      username: pending.username.trim().toLowerCase(),
-                      password: pwd,
-                      initialBalance: Number(pending.balance) || 0,
-                      allowedFeatures: pending.allowedFeatures || DEFAULT_ALLOWED_FEATURES,
-                      role: 'USER',
-                      isBlocked: !pending.isActive,
-                      blockedReason: pending.blockedReason || null,
-                      boundDeviceId: pending.boundDeviceId || null,
-                      adminKey: 'Bolingo2024##?',
-                    }),
-                  }).catch(() => {});
+                  try {
+                    await fetch(createEndpoint, {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify({
+                        id: pending.id,
+                        username: pending.username.trim().toLowerCase(),
+                        password: pwd,
+                        initialBalance: Number(pending.balance) || 0,
+                        allowedFeatures: pending.allowedFeatures || DEFAULT_ALLOWED_FEATURES,
+                        role: 'USER',
+                        isBlocked: !pending.isActive,
+                        blockedReason: pending.blockedReason || null,
+                        boundDeviceId: pending.boundDeviceId || null,
+                        adminKey: 'Bolingo2024##?',
+                      }),
+                    });
+                  } catch (_) {}
                 }
               }
             }
 
-            const mergedList = [
-              ...(localAdmin ? [localAdmin] : []),
-              ...localPendingUsers,
-              ...remoteAccounts.filter(
-                (a) => !localAdmin || (a.id !== localAdmin.id && a.username.toLowerCase() !== localAdmin.username.toLowerCase())
-              ),
-            ];
+            // Fusionner les comptes en préservant tous les utilisateurs locaux valides
+            const byIdOrUsername = new Map<string, UserAccount>();
+
+            if (localAdmin) {
+              byIdOrUsername.set(localAdmin.username.toLowerCase(), localAdmin);
+            }
+
+            // Ajouter d'abord les comptes locaux (USER)
+            for (const loc of localAccounts) {
+              if (loc.role === 'USER') {
+                byIdOrUsername.set(loc.username.toLowerCase(), loc);
+              }
+            }
+
+            // Enrichir avec les données distantes (statut bloqué, solde à jour, etc.)
+            for (const rem of remoteAccounts) {
+              const uLower = rem.username.toLowerCase();
+              if (uLower === 'bookmekerstudio' || uLower === 'admin') continue;
+              const existing = byIdOrUsername.get(uLower);
+              byIdOrUsername.set(uLower, {
+                ...(existing || {}),
+                ...rem,
+                rawPassword: existing?.rawPassword || rem.rawPassword || '',
+              });
+            }
+
+            const mergedList = Array.from(byIdOrUsername.values());
 
             // Si un utilisateur est en cours de session ou simulation, synchroniser son profil avec les données fraîches
             let updatedCurrentUser = currentUser;

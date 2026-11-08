@@ -1120,8 +1120,10 @@ export default function TicketDetailsScreen({
                 })
               : null;
 
-          const effectiveScoreFinal = ev.scoreFinal || liveAdaptiveScore?.scoreFinal;
-          const effectiveScoreDetail = ev.scoreDetail || liveAdaptiveScore?.scoreDetail;
+          const effectiveScoreFinal =
+            ev.scoreFinal || liveAdaptiveScore?.mainScore || liveAdaptiveScore?.scoreFinal;
+          const effectiveScoreDetail =
+            ev.scoreDetail || liveAdaptiveScore?.detailedScore || liveAdaptiveScore?.scoreDetail;
 
           // Rendu dédié pour la carte Bonus (identique à video_gagnant.mp4 et WhatsApp_Video)
           if (ev.isBonus) {

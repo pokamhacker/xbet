@@ -597,6 +597,13 @@ export function adaptEventResultToPrediction(
     : (isFifa ? buildFromHalves(2, 4, 3, 4) : buildFromHalves(0, 1, 1, 1));
 }
 
+export interface AdaptiveLiveScoreResult {
+  mainScore: string;
+  detailedScore: string;
+  scoreFinal: string;
+  scoreDetail: string;
+}
+
 /**
  * Calcule le score EN DIRECT adaptatif ("0:0" et "0:0 (0:0)" en 1ère mi-temps ou "1:2 (0:1, 1:1)" en 2ème mi-temps)
  * fidèle à la capture officielle `image_reference_ticket_en_direct.png`
@@ -608,10 +615,7 @@ export function computeAdaptiveLiveScore(params: {
   isFifa?: boolean;
   existingScoreFinal?: string;
   existingScoreDetail?: string;
-}): {
-  mainScore: string;
-  detailedScore: string;
-} {
+}): AdaptiveLiveScoreResult {
   const {
     marketLabel,
     elapsedSeconds,
@@ -628,9 +632,12 @@ export function computeAdaptiveLiveScore(params: {
     existingScoreDetail &&
     existingScoreDetail.includes('(')
   ) {
+    const main = existingScoreFinal.replace(/\s*[:\-]\s*/g, ':');
     return {
-      mainScore: existingScoreFinal.replace(/\s*[:\-]\s*/g, ':'),
+      mainScore: main,
       detailedScore: existingScoreDetail,
+      scoreFinal: main,
+      scoreDetail: existingScoreDetail,
     };
   }
 
@@ -655,6 +662,8 @@ export function computeAdaptiveLiveScore(params: {
       return {
         mainScore: '0:0',
         detailedScore: '0:0 (0:0)',
+        scoreFinal: '0:0',
+        scoreDetail: '0:0 (0:0)',
       };
     }
   }
@@ -687,9 +696,12 @@ export function computeAdaptiveLiveScore(params: {
     const curH1 = Math.floor(targetH1 * halfRatio);
     const curA1 = Math.floor(targetA1 * halfRatio);
     const main = `${curH1}:${curA1}`;
+    const det = `${main} (${curH1}:${curA1})`;
     return {
       mainScore: main,
-      detailedScore: `${main} (${curH1}:${curA1})`,
+      detailedScore: det,
+      scoreFinal: main,
+      scoreDetail: det,
     };
   }
 
@@ -699,10 +711,13 @@ export function computeAdaptiveLiveScore(params: {
   const curTotalH = targetH1 + curH2;
   const curTotalA = targetA1 + curA2;
   const main = `${curTotalH}:${curTotalA}`;
+  const det = `${main} (${targetH1}:${targetA1}, ${curH2}:${curA2})`;
 
   return {
     mainScore: main,
-    detailedScore: `${main} (${targetH1}:${targetA1}, ${curH2}:${curA2})`,
+    detailedScore: det,
+    scoreFinal: main,
+    scoreDetail: det,
   };
 }
 
