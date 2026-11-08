@@ -554,7 +554,7 @@ export const getEventDurationSeconds = (event?: any): number => {
 
   // 1. TvBet / POKER
   if (allText.includes('POKER') || allText.includes('TVBET')) {
-    return 60; // 1 minute pour un tour de TvBet Poker
+    return 300; // 5 minutes pour un tour de TvBet Poker
   }
 
   // 2. FIFA (eSports)
@@ -626,129 +626,129 @@ export const getEventLiveProgress = (
 ): EventLiveProgress => {
   const now = typeof nowTimestamp === 'number' ? nowTimestamp : Date.now();
   const durationSeconds = getEventDurationSeconds(event);
+  const statusStr = String(event?.status || '').trim();
   const isResolved = [
     'Gain',
     'Perte',
     'Payé',
     'Perdu',
+    'Gagné',
     'gagne',
     'perdu',
     'rembourse',
     'Remboursé',
-  ].includes(event?.status);
+    'Vendu',
+    'vendu',
+  ].includes(statusStr);
 
   const startTime = getEventStartTime(event);
 
-  // Si un temps écoulé explicite (ex: 22:10 = 1330s) a été défini sur l'événement en direct non résolu
-  if (!isResolved && typeof event?.elapsedSeconds === 'number' && event.elapsedSeconds > 0) {
+  // État C prioritaire : Si l'événement est déjà résolu (Gain / Payé / Perte / Perdu)
+  if (isResolved) {
+    return {
+      hasStarted: true,
+      isFinished: true,
+      isLive: false,
+      elapsedSeconds: durationSeconds,
+      formattedElapsed: formatSecondsToMMSS(durationSeconds),
+      startTime,
+      durationSeconds,
+    };
+  }
+
+  // Si l'événement possède une heure de début programmée (startTime) :
+  // Machine à États Temporelle stricte : PRE_MATCH -> LIVE -> FINISHED
+  if (startTime) {
+    const diffSec = Math.floor((now - startTime.getTime()) / 1000);
+
+    // État A — AVANT LE DÉBUT DE L'ÉVÉNEMENT (now < startTime)
+    // Interdiction d'afficher un score, le badge En direct ou un temps écoulé avant startTime
+    if (diffSec < 0) {
+      return {
+        hasStarted: false,
+        isFinished: false,
+        isLive: false,
+        elapsedSeconds: 0,
+        formattedElapsed: '00:00',
+        startTime,
+        durationSeconds,
+      };
+    }
+
+    // État C — QUAND L'ÉVÉNEMENT A DÉPASSÉ SA DURÉE RÉGLEMENTAIRE (diffSec >= durationSeconds)
+    if (diffSec >= durationSeconds) {
+      return {
+        hasStarted: true,
+        isFinished: true,
+        isLive: false,
+        elapsedSeconds: durationSeconds,
+        formattedElapsed: formatSecondsToMMSS(durationSeconds),
+        startTime,
+        durationSeconds,
+      };
+    }
+
+    // État B — AU DÉBUT ET PENDANT L'ÉVÉNEMENT (0 <= diffSec < durationSeconds)
+    // Si un temps écoulé personnalisé a été explicitement saisi par l'utilisateur pour un match déjà en cours
+    const hasCustomElapsed =
+      Boolean(event?.hasCustomElapsed) &&
+      typeof event?.elapsedSeconds === 'number' &&
+      event.elapsedSeconds > 0;
+
+    if (hasCustomElapsed) {
+      const baseTs = typeof event?.liveStartedAt === 'number' ? event.liveStartedAt : startTime.getTime();
+      const tickDelta = Math.max(0, Math.floor((now - baseTs) / 1000));
+      const currentElapsed = Math.min(durationSeconds - 1, event.elapsedSeconds + tickDelta);
+      return {
+        hasStarted: true,
+        isFinished: false,
+        isLive: true,
+        elapsedSeconds: currentElapsed,
+        formattedElapsed: formatSecondsToMMSS(currentElapsed),
+        startTime,
+        durationSeconds,
+      };
+    }
+
+    // Sinon, démarre exactement à 00:00 à startTime et s'incrémente seconde par seconde
+    return {
+      hasStarted: true,
+      isFinished: false,
+      isLive: true,
+      elapsedSeconds: diffSec,
+      formattedElapsed: formatSecondsToMMSS(diffSec),
+      startTime,
+      durationSeconds,
+    };
+  }
+
+  // Fallback uniquement si aucune heure de début (startTime === null) n'est présente sur l'événement
+  if (event?.isLive) {
+    const explicitSec =
+      typeof event.elapsedSeconds === 'number' && event.elapsedSeconds >= 0
+        ? event.elapsedSeconds
+        : 0;
     const baseTs = typeof event?.liveStartedAt === 'number' ? event.liveStartedAt : now;
     const tickDelta = Math.max(0, Math.floor((now - baseTs) / 1000));
-    const currentElapsed = Math.min(durationSeconds - 1, event.elapsedSeconds + tickDelta);
+    const currentElapsed = Math.min(durationSeconds - 1, explicitSec + tickDelta);
     return {
       hasStarted: true,
       isFinished: false,
       isLive: true,
       elapsedSeconds: currentElapsed,
       formattedElapsed: formatSecondsToMMSS(currentElapsed),
-      startTime,
-      durationSeconds,
-    };
-  }
-
-  if (!startTime) {
-    if (event?.isLive && !isResolved) {
-      const defaultBase = durationSeconds <= 400 ? 125 : 1330; // 02:05 (FIFA) ou 22:10 (Football)
-      const explicitSec =
-        typeof event.elapsedSeconds === 'number' && event.elapsedSeconds > 0
-          ? event.elapsedSeconds
-          : defaultBase + (Math.floor(now / 1000) % 60);
-      return {
-        hasStarted: true,
-        isFinished: false,
-        isLive: true,
-        elapsedSeconds: explicitSec,
-        formattedElapsed: formatSecondsToMMSS(explicitSec),
-        startTime: null,
-        durationSeconds,
-      };
-    }
-    return {
-      hasStarted: false,
-      isFinished: false,
-      isLive: false,
-      elapsedSeconds: 0,
-      formattedElapsed: '00:00',
       startTime: null,
       durationSeconds,
     };
   }
 
-  const diffSec = Math.floor((now - startTime.getTime()) / 1000);
-
-  // Si l'événement est explicitement marqué EN DIRECT (isLive = true) et en statut Accepté (!isResolved),
-  // on garantit l'affichage de la ligne EN DIRECT + temps écoulé même si l'heure saisie est décalée
-  if (Boolean(event?.isLive) && !isResolved) {
-    if (diffSec >= 0 && diffSec < durationSeconds) {
-      return {
-        hasStarted: true,
-        isFinished: false,
-        isLive: true,
-        elapsedSeconds: diffSec,
-        formattedElapsed: formatSecondsToMMSS(diffSec),
-        startTime,
-        durationSeconds,
-      };
-    }
-    const defaultBase = durationSeconds <= 400 ? 125 : 1330; // 22:10 par défaut pour Football
-    const baseTs = typeof event?.liveStartedAt === 'number' ? event.liveStartedAt : null;
-    const simulatedSec = baseTs
-      ? Math.min(durationSeconds - 1, defaultBase + Math.max(0, Math.floor((now - baseTs) / 1000)))
-      : defaultBase + (Math.floor(now / 1000) % 60);
-    return {
-      hasStarted: true,
-      isFinished: false,
-      isLive: true,
-      elapsedSeconds: simulatedSec,
-      formattedElapsed: formatSecondsToMMSS(simulatedSec),
-      startTime,
-      durationSeconds,
-    };
-  }
-
-  // 1. Avant le début du match (l'heure n'est pas encore arrivée)
-  if (diffSec < 0) {
-    return {
-      hasStarted: false,
-      isFinished: false,
-      isLive: false,
-      elapsedSeconds: 0,
-      formattedElapsed: '00:00',
-      startTime,
-      durationSeconds,
-    };
-  }
-
-  // 2. Le match a commencé mais a dépassé sa durée réglementaire ou est résolu
-  if (isResolved || diffSec >= durationSeconds) {
-    return {
-      hasStarted: true,
-      isFinished: true,
-      isLive: false,
-      elapsedSeconds: Math.min(diffSec, durationSeconds),
-      formattedElapsed: formatSecondsToMMSS(Math.min(diffSec, durationSeconds)),
-      startTime,
-      durationSeconds,
-    };
-  }
-
-  // 3. Le match est EN DIRECT ! À l'heure de début, il est à 00:00 puis s'écoule
   return {
-    hasStarted: true,
+    hasStarted: false,
     isFinished: false,
-    isLive: true,
-    elapsedSeconds: diffSec,
-    formattedElapsed: formatSecondsToMMSS(diffSec),
-    startTime,
+    isLive: false,
+    elapsedSeconds: 0,
+    formattedElapsed: '00:00',
+    startTime: null,
     durationSeconds,
   };
 };

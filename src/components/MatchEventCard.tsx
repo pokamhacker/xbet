@@ -8,7 +8,13 @@ import { getTeamById } from '../data/sportsCatalog';
 import { useThemeStore } from '../stores/themeStore';
 import { MatchScoreView } from './MatchScoreView';
 import { useResponsive } from '../utils/responsive';
-import { formatBetDate, combineDateAndTime, formatFrenchEventDate, formatFootballHeader } from '../utils/dateFormatter';
+import {
+  formatBetDate,
+  combineDateAndTime,
+  formatFrenchEventDate,
+  formatFootballHeader,
+  getEventLiveProgress,
+} from '../utils/dateFormatter';
 import { formatCleanOdds } from '../utils/oddsFormatter';
 import { LiveBadge } from './LiveBadge';
 import { getEffectiveEventScore } from '../utils/scoreAdapter';
@@ -48,9 +54,19 @@ export const MatchEventCard: React.FC<MatchEventCardProps> = ({
     currentTheme.colors?.textSecondary ||
     (currentTheme.isDark ? '#8A96A3' : '#64748B');
   const { font, moderateScale } = useResponsive();
-  const showLiveBadge = isLive !== undefined ? isLive : Boolean(event.isLive);
+  const [nowTs, setNowTs] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowTs(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const eventIsWon = event.status === 'Gain' || event.status === 'Gagné' || isWon;
-  const eventIsLost = event.status === 'Perdu';
+  const eventIsLost = event.status === 'Perdu' || event.status === 'Perte';
+  const liveProgress = getEventLiveProgress(event, nowTs);
+  const showLiveBadge = !eventIsWon && !eventIsLost && liveProgress.isLive;
 
   // Détection stricte sport (FIFA, Poker, Football)
   const isPoker =
@@ -68,46 +84,12 @@ export const MatchEventCard: React.FC<MatchEventCardProps> = ({
         event.league.toUpperCase().includes('FC 24') ||
         event.league.toUpperCase().includes('5X5 RUSH')));
 
-  // Chronomètre temps écoulé en direct (MM:SS) pour les matchs EN DIRECT
-  const initialSeconds = React.useMemo(() => {
-    const customSec = (event as any).elapsedSeconds;
-    if (typeof customSec === 'number' && customSec >= 0) return customSec;
-    if (typeof event.elapsed === 'number' && event.elapsed > 0) {
-      return isFifa ? event.elapsed : event.elapsed * 60 + 43;
-    }
-    return isFifa ? 223 : 1483; // 03:43 par défaut sur FIFA Rush, 24:43 sur Football
-  }, [event, isFifa]);
-
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(initialSeconds);
-
-  useEffect(() => {
-    setElapsedSeconds(initialSeconds);
-  }, [initialSeconds]);
-
-  useEffect(() => {
-    if (!showLiveBadge) return;
-    const interval = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [showLiveBadge]);
-
-  const formattedElapsed = React.useMemo(() => {
-    const mins = Math.floor(elapsedSeconds / 60);
-    const secs = elapsedSeconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  }, [elapsedSeconds]);
+  const formattedElapsed = liveProgress.formattedElapsed;
 
   // Score effectif dynamique : VS avant le début, score live ou adapté dès le début
-  const rawScoreData = getEffectiveEventScore(event, isWon);
-  const mainScoreDisplay =
-    showLiveBadge && rawScoreData.mainScore === 'VS' && event.actualScore
-      ? event.actualScore.replace(/\s*[:\-]\s*/g, ' : ')
-      : rawScoreData.mainScore;
-  const detailedScoreDisplay =
-    showLiveBadge && !rawScoreData.detailedScore && event.halftimeScore
-      ? event.halftimeScore
-      : rawScoreData.detailedScore;
+  const rawScoreData = getEffectiveEventScore(event, eventIsWon, nowTs);
+  const mainScoreDisplay = rawScoreData.mainScore;
+  const detailedScoreDisplay = rawScoreData.detailedScore;
 
   // Formatage strict du libellé selon sport (FIFA. [Compétition] vs TvBet. POKER vs Football . [Compétition])
   let formattedHeader = '';

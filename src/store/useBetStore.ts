@@ -3,7 +3,11 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BetSlip, BetStatus, CustomLeague, CustomTeam, MatchEvent } from '../types/bet';
 import { generateRealisticPokerDraw, generateShareCode } from '../utils/pokerEngine';
-import { adaptEventResultToPrediction, normalizeBetSelectionLabel } from '../utils/scoreAdapter';
+import {
+  adaptEventResultToPrediction,
+  normalizeBetSelectionLabel,
+  ensureTwoHalvesScoreFormat,
+} from '../utils/scoreAdapter';
 import { betApiService } from '../services/betApiService';
 import { combineDateAndTime, formatBetDate } from '../utils/dateFormatter';
 
@@ -2289,14 +2293,41 @@ export const useBetStore = create<BetState>()(
           coupons: state.coupons.map((c) => {
             if (c.id !== couponId) return c;
             const isWinning = status === 'Payé' || status === 'Gagné' || status === 'Gain';
-            const isSettled = isWinning || status === 'Perdu' || status === 'Annulé';
+            const isLost = status === 'Perdu' || status === 'Perte';
+            const isSettled = isWinning || isLost || status === 'Annulé';
             actualPayout = isWinning ? (c.potentialPayout || c.actualPayout || 0) : 0;
+
+            const updatedEvents =
+              isSettled && c.events
+                ? c.events.map((ev) => {
+                    if (status === 'Annulé') {
+                      return { ...ev, isLive: false };
+                    }
+                    const adapted = adaptEventResultToPrediction(ev, isWinning);
+                    const completeScore = ensureTwoHalvesScoreFormat({
+                      event: ev,
+                      rawScoreFinal: ev.actualScore || ev.finalScore,
+                      rawScoreDetail: ev.halftimeScore,
+                      isWin: isWinning,
+                    });
+                    return {
+                      ...ev,
+                      status: (isWinning ? 'Gain' : 'Perdu') as BetStatus,
+                      isLive: false,
+                      actualScore: completeScore.scoreFinal,
+                      halftimeScore: completeScore.scoreDetail,
+                      pokerResult: adapted.pokerResult || ev.pokerResult,
+                      mkResult: adapted.mkResult || ev.mkResult,
+                    };
+                  })
+                : c.events;
+
             return {
               ...c,
               status,
               isLive: isSettled ? false : c.isLive,
-              events: isSettled && c.events ? c.events.map((ev) => ({ ...ev, isLive: false })) : c.events,
-              completedCount: isWinning || status === 'Perdu' ? c.eventsCount : c.completedCount,
+              events: updatedEvents,
+              completedCount: isWinning || isLost ? c.eventsCount : c.completedCount,
               actualPayout,
             };
           }),
@@ -2315,13 +2346,19 @@ export const useBetStore = create<BetState>()(
             const updatedEvents = coupon.events.map((event) => {
               const adapted = adaptEventResultToPrediction(event, isWon);
               const customScore = customScores?.[event.id];
+              const completeScore = ensureTwoHalvesScoreFormat({
+                event,
+                rawScoreFinal: customScore || event.actualScore || adapted.actualScore,
+                rawScoreDetail: event.halftimeScore || adapted.halftimeScore,
+                isWin: isWon,
+              });
 
               return {
                 ...event,
                 status: (isWon ? 'Gain' : 'Perdu') as BetStatus,
                 isLive: false,
-                actualScore: customScore || adapted.actualScore,
-                halftimeScore: adapted.halftimeScore || event.halftimeScore,
+                actualScore: completeScore.scoreFinal,
+                halftimeScore: completeScore.scoreDetail,
                 pokerResult: adapted.pokerResult || event.pokerResult,
                 mkResult: adapted.mkResult || event.mkResult,
               };
@@ -2360,12 +2397,19 @@ export const useBetStore = create<BetState>()(
             if (c.id !== couponId) return c;
             const newEvents = c.events.map((e) => {
               if (e.id !== eventId) return e;
-              let half = e.halftimeScore;
-              if (!half && score && score.includes('-')) {
-                const parts = score.split(/[-:]/).map((s) => parseInt(s.trim(), 10) || 0);
-                half = `(${Math.floor(parts[0] / 2)}:${Math.floor(parts[1] / 2)})`;
-              }
-              return { ...e, actualScore: score, status, halftimeScore: half };
+              const isWin = status === 'Gain' || status === 'Payé' || status === 'Gagné';
+              const completeScore = ensureTwoHalvesScoreFormat({
+                event: e,
+                rawScoreFinal: score,
+                rawScoreDetail: e.halftimeScore,
+                isWin,
+              });
+              return {
+                ...e,
+                actualScore: completeScore.scoreFinal,
+                status,
+                halftimeScore: completeScore.scoreDetail,
+              };
             });
             const allCompleted = newEvents.every((e) => e.status !== 'Accepté' && e.status !== 'En cours');
             const allWon = newEvents.every((e) => e.status === 'Gain' || e.status === 'Payé');

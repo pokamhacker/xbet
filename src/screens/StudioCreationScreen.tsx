@@ -850,8 +850,9 @@ export default function StudioCreationScreen({ navigation }: any) {
     setNewTeamLogo('');
   };
 
-  const parseElapsedMMSS = (input: string, isFifa: boolean): number => {
+  const parseElapsedMMSS = (input: string): number | undefined => {
     const clean = (input || '').trim();
+    if (!clean) return undefined;
     const m = clean.match(/^(\d{1,3}):(\d{1,2})$/);
     if (m) {
       return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
@@ -860,7 +861,7 @@ export default function StudioCreationScreen({ navigation }: any) {
     if (!isNaN(num) && num >= 0) {
       return num * 60;
     }
-    return isFifa ? 125 : 1330; // 02:05 FIFA ou 22:10 Football par défaut
+    return undefined;
   };
 
   const handleAddEvent = () => {
@@ -889,6 +890,7 @@ export default function StudioCreationScreen({ navigation }: any) {
     );
     const evIsLive = isFifa ? true : isLiveBadge;
 
+    const customElapsedSec = parseElapsedMMSS(liveElapsedInput);
     const newEv: MatchEvent = {
       id: String(Date.now()),
       sport: isFifa ? 'FIFA' : 'Football',
@@ -905,9 +907,10 @@ export default function StudioCreationScreen({ navigation }: any) {
       status: 'Accepté',
       isLive: evIsLive,
       isFifa,
-      elapsedSeconds: evIsLive ? parseElapsedMMSS(liveElapsedInput, isFifa) : undefined,
+      elapsedSeconds: customElapsedSec,
       gameCategory: 'sports',
     };
+    (newEv as any).hasCustomElapsed = typeof customElapsedSec === 'number';
     (newEv as any).liveStartedAt = Date.now();
     setAddedEvents([...addedEvents, newEv]);
     Alert.alert('Événement Ajouté', `${homeTeam} vs ${awayTeam} (${normalizedPred}) ajouté au coupon.`);
@@ -945,6 +948,7 @@ export default function StudioCreationScreen({ navigation }: any) {
         awayTeam
       );
       const evIsLive = isFifa ? true : isLiveBadge;
+      const customElapsedSec = parseElapsedMMSS(liveElapsedInput);
       const autoEv: MatchEvent = {
         id: String(Date.now()),
         sport: isFifa ? 'FIFA' : 'Football',
@@ -961,9 +965,10 @@ export default function StudioCreationScreen({ navigation }: any) {
         status: 'Accepté',
         isLive: evIsLive,
         isFifa,
-        elapsedSeconds: evIsLive ? parseElapsedMMSS(liveElapsedInput, isFifa) : undefined,
+        elapsedSeconds: customElapsedSec,
         gameCategory: 'sports',
       };
+      (autoEv as any).hasCustomElapsed = typeof customElapsedSec === 'number';
       (autoEv as any).liveStartedAt = Date.now();
       eventsToSave = [autoEv];
       setAddedEvents(eventsToSave);
@@ -1020,6 +1025,7 @@ export default function StudioCreationScreen({ navigation }: any) {
         const evAwayName = typeof ev.awayTeam === 'string' ? ev.awayTeam : ev.awayTeam?.name;
         const evLive = Boolean(evIsFifa || isLiveBadge || ev.isLive);
 
+        const resolvedElapsed = ev.elapsedSeconds ?? parseElapsedMMSS(liveElapsedInput);
         const mappedEv: MatchEvent = {
           ...ev,
           sport: evIsFifa ? 'FIFA' : (ev.sport || 'Football'),
@@ -1031,10 +1037,10 @@ export default function StudioCreationScreen({ navigation }: any) {
           status: 'Accepté' as const,
           isFifa: evIsFifa,
           isLive: evLive,
-          elapsedSeconds: evLive
-            ? (ev.elapsedSeconds ?? parseElapsedMMSS(liveElapsedInput, evIsFifa))
-            : ev.elapsedSeconds,
+          elapsedSeconds: resolvedElapsed,
         };
+        (mappedEv as any).hasCustomElapsed =
+          Boolean((ev as any).hasCustomElapsed) || typeof resolvedElapsed === 'number';
         (mappedEv as any).liveStartedAt = (ev as any).liveStartedAt || Date.now();
         return mappedEv;
       }),

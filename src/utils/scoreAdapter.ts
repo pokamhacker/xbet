@@ -1,6 +1,6 @@
 import { MatchEvent, BetStatus, PokerRoundResult, MKRoundResult } from '../types/bet';
 import { generateRealisticPokerDraw } from './pokerEngine';
-import { combineDateAndTime, getEventDurationSeconds } from './dateFormatter';
+import { combineDateAndTime, getEventDurationSeconds, getEventLiveProgress } from './dateFormatter';
 
 export interface AdaptedEventResult {
   actualScore: string;
@@ -322,8 +322,8 @@ export function adaptEventResultToPrediction(
     const totalH = h1 + h2;
     const totalA = a1 + a2;
     return {
-      actualScore: `${totalH}-${totalA}`,
-      halftimeScore: `(${h1}:${a1}, ${h2}:${a2})`,
+      actualScore: `${totalH}:${totalA}`,
+      halftimeScore: `${totalH}:${totalA} (${h1}:${a1},${h2}:${a2})`,
       status,
     };
   };
@@ -629,8 +629,196 @@ export interface AdaptiveLiveScoreResult {
 }
 
 /**
- * Calcule le score EN DIRECT adaptatif ("0:0" et "0:0 (0:0)" en 1ère mi-temps ou "1:2 (0:1, 1:1)" en 2ème mi-temps)
- * fidèle à la capture officielle `image_reference_ticket_en_direct.png`
+ * Garantit le formatage strict du score final et du sous-score des 2 mi-temps pour tout événement terminé / gagné :
+ * - Score principal : "${totalHome}:${totalAway}" (ex: "9:7")
+ * - Sous-score des deux mi-temps : "${totalHome}:${totalAway} (${ht1Home}:${ht1Away},${ht2Home}:${ht2Away})" (ex: "9:7 (1:3,8:4)")
+ * - Vérification mathématique automatique : totalHome = ht1Home + ht2Home et totalAway = ht1Away + ht2Away.
+ */
+export function ensureTwoHalvesScoreFormat(params: {
+  event: Partial<MatchEvent> | any;
+  rawScoreFinal?: string;
+  rawScoreDetail?: string;
+  isWin?: boolean;
+}): {
+  scoreFinal: string;
+  scoreDetail: string;
+  ht1Home: number;
+  ht1Away: number;
+  ht2Home: number;
+  ht2Away: number;
+  totalHome: number;
+  totalAway: number;
+} {
+  const { event, rawScoreFinal, rawScoreDetail, isWin = true } = params;
+
+  const pred = String(event?.prediction || event?.market || '1X2. V1').trim().toLowerCase();
+  const isExplicit11 = /(?:1\s*[-:–]\s*1|match\s*nul|nul|^x$|^n$|1x2\.\s*x)/i.test(pred);
+
+  const cleanRawFinal = (rawScoreFinal || '').trim();
+  const isDefault11 =
+    cleanRawFinal === '1-1' ||
+    cleanRawFinal === '1:1' ||
+    cleanRawFinal === '1 - 1' ||
+    cleanRawFinal === '1 : 1';
+
+  const adapted = adaptEventResultToPrediction(
+    {
+      id: event?.id || 'settled-ev',
+      sport: event?.sport || (event?.isFifa ? 'FIFA' : 'Football'),
+      league: event?.league || (event?.isFifa ? 'FIFA' : 'Football'),
+      date: event?.date || '',
+      homeTeam:
+        typeof event?.homeTeam === 'string'
+          ? { name: event.homeTeam }
+          : event?.homeTeam || { name: 'Équipe 1' },
+      awayTeam:
+        typeof event?.awayTeam === 'string'
+          ? { name: event.awayTeam }
+          : event?.awayTeam || { name: 'Équipe 2' },
+      prediction: event?.prediction || event?.market || '1X2. V1',
+      odd: Number(event?.odd) || 1.5,
+      status: isWin ? 'Gain' : 'Perdu',
+    } as MatchEvent,
+    isWin
+  );
+
+  // 1. Extraction de totalHome et totalAway
+  let totalHome = 1;
+  let totalAway = 0;
+  let hasExplicitTotal = false;
+
+  const validFinalStr =
+    cleanRawFinal && cleanRawFinal.toUpperCase() !== 'VS' && !(isDefault11 && !isExplicit11)
+      ? cleanRawFinal
+      : '';
+
+  const finalMatch = validFinalStr.match(/(\d+)\s*[:\-–]\s*(\d+)/);
+  const detailPrefixMatch =
+    !finalMatch && rawScoreDetail
+      ? rawScoreDetail.trim().match(/^(\d+)\s*[:\-–]\s*(\d+)\s*\(/)
+      : null;
+  const adaptedMatch = (adapted.actualScore || '2:1').match(/(\d+)\s*[:\-–]\s*(\d+)/);
+
+  if (finalMatch) {
+    totalHome = parseInt(finalMatch[1], 10);
+    totalAway = parseInt(finalMatch[2], 10);
+    hasExplicitTotal = true;
+  } else if (detailPrefixMatch) {
+    totalHome = parseInt(detailPrefixMatch[1], 10);
+    totalAway = parseInt(detailPrefixMatch[2], 10);
+    hasExplicitTotal = true;
+  } else if (adaptedMatch) {
+    totalHome = parseInt(adaptedMatch[1], 10);
+    totalAway = parseInt(adaptedMatch[2], 10);
+  }
+
+  // 2. Extraction ou reconstruction des 2 mi-temps (ht1Home:ht1Away,ht2Home:ht2Away)
+  let ht1Home = 0;
+  let ht1Away = 0;
+  let ht2Home = 0;
+  let ht2Away = 0;
+  let resolvedHalves = false;
+
+  const detailStr =
+    rawScoreDetail && !(isDefault11 && !isExplicit11) ? rawScoreDetail.trim() : '';
+
+  // Cas 2A : Les deux mi-temps sont déjà présentes entre parenthèses (h1:a1, h2:a2)
+  const twoHalvesMatch = detailStr.match(
+    /\(\s*(\d+)\s*[:\-]\s*(\d+)\s*,\s*(\d+)\s*[:\-]\s*(\d+)\s*\)/
+  );
+  if (twoHalvesMatch) {
+    const h1 = parseInt(twoHalvesMatch[1], 10);
+    const a1 = parseInt(twoHalvesMatch[2], 10);
+    const h2 = parseInt(twoHalvesMatch[3], 10);
+    const a2 = parseInt(twoHalvesMatch[4], 10);
+
+    if (!hasExplicitTotal) {
+      totalHome = h1 + h2;
+      totalAway = a1 + a2;
+      ht1Home = h1;
+      ht1Away = a1;
+      ht2Home = h2;
+      ht2Away = a2;
+      resolvedHalves = true;
+    } else if (h1 + h2 === totalHome && a1 + a2 === totalAway) {
+      ht1Home = h1;
+      ht1Away = a1;
+      ht2Home = h2;
+      ht2Away = a2;
+      resolvedHalves = true;
+    } else if (h1 <= totalHome && a1 <= totalAway) {
+      ht1Home = h1;
+      ht1Away = a1;
+      ht2Home = totalHome - h1;
+      ht2Away = totalAway - a1;
+      resolvedHalves = true;
+    }
+  }
+
+  // Cas 2B : Une seule mi-temps est présente entre parenthèses (ex: "(1:3)" ou "2:2 (2:2)")
+  if (!resolvedHalves && detailStr) {
+    const oneHalfMatch = detailStr.match(/\(\s*(\d+)\s*[:\-]\s*(\d+)\s*\)/);
+    if (oneHalfMatch) {
+      const h1 = parseInt(oneHalfMatch[1], 10);
+      const a1 = parseInt(oneHalfMatch[2], 10);
+      if (h1 <= totalHome && a1 <= totalAway && (h1 < totalHome || a1 < totalAway || (totalHome <= 1 && totalAway <= 1))) {
+        ht1Home = h1;
+        ht1Away = a1;
+        ht2Home = totalHome - h1;
+        ht2Away = totalAway - a1;
+        resolvedHalves = true;
+      }
+    }
+  }
+
+  // Cas 2C : Vérifier si adapted.halftimeScore correspond au totalHome:totalAway
+  if (!resolvedHalves && adapted.halftimeScore) {
+    const adaptedHalves = adapted.halftimeScore.match(
+      /\(\s*(\d+)\s*[:\-]\s*(\d+)\s*,\s*(\d+)\s*[:\-]\s*(\d+)\s*\)/
+    );
+    if (adaptedHalves) {
+      const ah1 = parseInt(adaptedHalves[1], 10);
+      const aa1 = parseInt(adaptedHalves[2], 10);
+      const ah2 = parseInt(adaptedHalves[3], 10);
+      const aa2 = parseInt(adaptedHalves[4], 10);
+      if (ah1 + ah2 === totalHome && aa1 + aa2 === totalAway) {
+        ht1Home = ah1;
+        ht1Away = aa1;
+        ht2Home = ah2;
+        ht2Away = aa2;
+        resolvedHalves = true;
+      }
+    }
+  }
+
+  // Cas 2D : Répartition mathématique exacte garantissant totalHome = ht1Home + ht2Home et totalAway = ht1Away + ht2Away
+  if (!resolvedHalves) {
+    ht1Home = Math.floor(totalHome / 2);
+    ht2Home = totalHome - ht1Home;
+    ht1Away = Math.floor(totalAway / 2);
+    ht2Away = totalAway - ht1Away;
+  }
+
+  const scoreFinal = `${totalHome}:${totalAway}`;
+  const scoreDetail = `${totalHome}:${totalAway} (${ht1Home}:${ht1Away},${ht2Home}:${ht2Away})`;
+
+  return {
+    scoreFinal,
+    scoreDetail,
+    ht1Home,
+    ht1Away,
+    ht2Home,
+    ht2Away,
+    totalHome,
+    totalAway,
+  };
+}
+
+/**
+ * Calcule le score EN DIRECT adaptatif :
+ * - À 00:00 : démarre systématiquement à "0:0" et "0:0 (0:0)"
+ * - En 1ère mi-temps : "${h1}:${a1}" et "${h1}:${a1} (${h1}:${a1})"
+ * - En 2ème mi-temps : "${totalH}:${totalA}" et "${totalH}:${totalA} (${h1}:${a1},${h2}:${a2})"
  */
 export function computeAdaptiveLiveScore(params: {
   marketLabel: string;
@@ -645,29 +833,22 @@ export function computeAdaptiveLiveScore(params: {
     elapsedSeconds,
     durationSeconds = 5400,
     isFifa = false,
-    existingScoreFinal,
-    existingScoreDetail,
   } = params;
 
-  // Si un score explicite non-VS a déjà été fixé manuellement, on le respecte en formatant son sous-score
-  if (
-    existingScoreFinal &&
-    existingScoreFinal !== 'VS' &&
-    existingScoreDetail &&
-    existingScoreDetail.includes('(')
-  ) {
-    const main = existingScoreFinal.replace(/\s*[:\-]\s*/g, ':');
+  const safeDur = Math.max(60, durationSeconds);
+  const safeElapsed = Math.max(0, elapsedSeconds);
+  const progress = Math.min(1, safeElapsed / safeDur);
+  const isFirstHalf = progress < 0.5;
+
+  // Au coup d'envoi (00:00) et dans les premières secondes : toujours 0:0 et 0:0 (0:0)
+  if (safeElapsed === 0 || progress < 0.04) {
     return {
-      mainScore: main,
-      detailedScore: existingScoreDetail,
-      scoreFinal: main,
-      scoreDetail: existingScoreDetail,
+      mainScore: '0:0',
+      detailedScore: '0:0 (0:0)',
+      scoreFinal: '0:0',
+      scoreDetail: '0:0 (0:0)',
     };
   }
-
-  const safeDur = Math.max(60, durationSeconds);
-  const progress = Math.min(1, Math.max(0, elapsedSeconds / safeDur));
-  const isFirstHalf = progress < 0.5;
 
   const normLabel = normalizeBetSelectionLabel(marketLabel);
   const lower = normLabel.toLowerCase();
@@ -692,7 +873,7 @@ export function computeAdaptiveLiveScore(params: {
     }
   }
 
-  // Sinon, on calcule la cible finale gagnante via adaptEventResultToPrediction et on l'échelonne selon le temps écoulé
+  // Cible finale gagnante via adaptEventResultToPrediction échelonnée selon le temps écoulé
   const target = adaptEventResultToPrediction(
     {
       id: 'live-sim',
@@ -708,17 +889,17 @@ export function computeAdaptiveLiveScore(params: {
     true
   );
 
-  // Extraire (h1:a1, h2:a2) de target.halftimeScore
+  // Extraire (h1:a1,h2:a2) de target.halftimeScore
   const htMatch = (target.halftimeScore || '').match(/\((\d+):(\d+),\s*(\d+):(\d+)\)/);
-  const targetH1 = htMatch ? parseInt(htMatch[1], 10) : 0;
+  const targetH1 = htMatch ? parseInt(htMatch[1], 10) : 1;
   const targetA1 = htMatch ? parseInt(htMatch[2], 10) : 0;
   const targetH2 = htMatch ? parseInt(htMatch[3], 10) : 1;
   const targetA2 = htMatch ? parseInt(htMatch[4], 10) : 0;
 
   if (isFirstHalf) {
     const halfRatio = Math.min(1, progress / 0.5);
-    const curH1 = Math.floor(targetH1 * halfRatio);
-    const curA1 = Math.floor(targetA1 * halfRatio);
+    const curH1 = Math.min(targetH1, Math.floor(targetH1 * (halfRatio * 1.25)));
+    const curA1 = Math.min(targetA1, Math.floor(targetA1 * (halfRatio * 1.25)));
     const main = `${curH1}:${curA1}`;
     const det = `${main} (${curH1}:${curA1})`;
     return {
@@ -730,12 +911,12 @@ export function computeAdaptiveLiveScore(params: {
   }
 
   const secondHalfRatio = Math.min(1, (progress - 0.5) / 0.5);
-  const curH2 = Math.floor(targetH2 * secondHalfRatio);
-  const curA2 = Math.floor(targetA2 * secondHalfRatio);
+  const curH2 = Math.min(targetH2, Math.floor(targetH2 * (secondHalfRatio * 1.25)));
+  const curA2 = Math.min(targetA2, Math.floor(targetA2 * (secondHalfRatio * 1.25)));
   const curTotalH = targetH1 + curH2;
   const curTotalA = targetA1 + curA2;
   const main = `${curTotalH}:${curTotalA}`;
-  const det = `${main} (${targetH1}:${targetA1}, ${curH2}:${curA2})`;
+  const det = `${main} (${targetH1}:${targetA1},${curH2}:${curA2})`;
 
   return {
     mainScore: main,
@@ -764,61 +945,31 @@ export function isFifaMatch(event?: Partial<MatchEvent> | null): boolean {
 /**
  * Détermine si l'heure de début d'un événement (ou d'un coupon) est arrivée ou dépassée
  */
-export function isEventStarted(event?: Partial<MatchEvent> | null): boolean {
+export function isEventStarted(event?: Partial<MatchEvent> | null, nowTimestamp?: number): boolean {
   if (!event) return false;
-
-  const status = String(event.status || '').toLowerCase().trim();
-  const isFinished =
-    status === 'payé' ||
-    status === 'paye' ||
-    status === 'gagné' ||
-    status === 'gagne' ||
-    status === 'gain' ||
-    status === 'perdu' ||
-    status === 'annulé' ||
-    status === 'annule' ||
-    status === 'vendu';
-
-  if (isFinished) {
-    return true;
-  }
-
-  if (event.isLive) {
-    return true;
-  }
-
-  // Extraction de l'heure de début
-  const dateInput = event.matchDate || event.startDate || event.date;
-  const timeInput = event.matchTime;
-
-  if (dateInput) {
-    const res = combineDateAndTime(dateInput, timeInput);
-    if (res && res.date && !isNaN(res.date.getTime())) {
-      const now = new Date();
-      return now.getTime() >= res.date.getTime();
-    }
-  }
-
-  return Boolean(event.isLive);
+  const progress = getEventLiveProgress(event, nowTimestamp);
+  return progress.hasStarted;
 }
 
 /**
  * Calcule le score effectif à afficher pour un événement :
- * - Avant l'heure de début (non commencé) : retourne 'VS' et aucun score de mi-temps.
- * - En direct (Accepté) : adapte le score en direct ("0:0" et "0:0 (0:0)").
- * - Terminé (Payé/Perdu) : adapte le score final au pronostic de départ.
+ * - État A (PRE_MATCH : now < startTime et non terminé) : retourne 'VS' et aucun score de mi-temps.
+ * - État B (LIVE : now >= startTime et now < startTime + duration) : adapte le score en direct ("0:0 (0:0)" -> 2ème mi-temps "total (h1,h2)").
+ * - État C (FINISHED : terminé ou Payé/Gain/Perdu) : retourne "${totalHome}:${totalAway}" et "${totalHome}:${totalAway} (${ht1Home}:${ht1Away},${ht2Home}:${ht2Away})".
  */
 export function getEffectiveEventScore(
   event: MatchEvent,
-  isWon?: boolean
+  isWon?: boolean,
+  nowTimestamp?: number
 ): { mainScore: string; detailedScore?: string; isStarted: boolean } {
   if (!event) {
     return { mainScore: 'VS', detailedScore: undefined, isStarted: false };
   }
 
-  const started = isEventStarted(event);
+  const progress = getEventLiveProgress(event, nowTimestamp);
 
-  if (!started) {
+  // État A — AVANT LE DÉBUT DE L'ÉVÉNEMENT (now < startTime)
+  if (!progress.hasStarted) {
     return {
       mainScore: 'VS',
       detailedScore: undefined,
@@ -836,15 +987,13 @@ export function getEffectiveEventScore(
     statusLower === 'perdu' ||
     statusLower === 'perte';
 
-  if (!isSettled && event.isLive) {
-    const dur = getEventDurationSeconds(event);
+  // État B — PENDANT L'ÉVÉNEMENT EN DIRECT
+  if (!isSettled && progress.isLive) {
     const liveAdapted = computeAdaptiveLiveScore({
       marketLabel: event.prediction || '1X2. V1',
-      elapsedSeconds: typeof (event as any).elapsedSeconds === 'number' ? (event as any).elapsedSeconds : 1330,
-      durationSeconds: dur,
+      elapsedSeconds: progress.elapsedSeconds,
+      durationSeconds: progress.durationSeconds,
       isFifa: isFifaMatch(event),
-      existingScoreFinal: event.actualScore || event.finalScore,
-      existingScoreDetail: event.halftimeScore,
     });
     return {
       mainScore: liveAdapted.mainScore,
@@ -853,6 +1002,7 @@ export function getEffectiveEventScore(
     };
   }
 
+  // État C — QUAND L'ÉVÉNEMENT EST TERMINÉ OU QUE LE COUPON GAGNE
   const isWinning =
     isWon ??
     (event.status === 'Gain' ||
@@ -860,40 +1010,16 @@ export function getEffectiveEventScore(
       event.status === 'Gagné' ||
       event.status !== 'Perdu');
 
-  const adapted = adaptEventResultToPrediction(event, isWinning);
-
-  const pred = (event.prediction || '').trim().toLowerCase();
-  const isExplicit11 =
-    /(?:1\s*[-:–]\s*1|match\s*nul|nul|^x$|^n$|1x2\.\s*x)/i.test(pred);
-
-  const rawScore = event.actualScore?.trim();
-  const isDefault11 =
-    rawScore === '1-1' ||
-    rawScore === '1:1' ||
-    rawScore === '1 - 1' ||
-    rawScore === '1 : 1';
-
-  const finalActualScore =
-    !rawScore || (isDefault11 && !isExplicit11)
-      ? adapted.actualScore
-      : rawScore;
-
-  const finalHalftimeScore =
-    !event.halftimeScore || (isDefault11 && !isExplicit11)
-      ? adapted.halftimeScore
-      : event.halftimeScore;
-
-  const formattedScore = finalActualScore
-    ? finalActualScore.replace(/\s*[:\-]\s*/g, ' : ')
-    : 'VS';
+  const completeScore = ensureTwoHalvesScoreFormat({
+    event,
+    rawScoreFinal: (event as any).scoreFinal || (event as any).score || event.finalScore || event.actualScore,
+    rawScoreDetail: (event as any).scoreDetail || event.halftimeScore,
+    isWin: isWinning,
+  });
 
   return {
-    mainScore: formattedScore,
-    detailedScore: finalHalftimeScore
-      ? finalHalftimeScore.includes('(')
-        ? finalHalftimeScore
-        : `(${finalHalftimeScore})`
-      : undefined,
+    mainScore: completeScore.scoreFinal,
+    detailedScore: completeScore.scoreDetail,
     isStarted: true,
   };
 }

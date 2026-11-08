@@ -29,6 +29,7 @@ import {
   adaptEventResultToPrediction,
   normalizeBetSelectionLabel,
   computeAdaptiveLiveScore,
+  ensureTwoHalvesScoreFormat,
 } from '../utils/scoreAdapter';
 import { TeamLogo } from '../components/common/TeamLogo';
 import {
@@ -461,17 +462,18 @@ export default function TicketDetailsScreen({
         (ev as any).scoreFinal || (ev as any).score || ev.finalScore || ev.actualScore;
       const rawScoreDetail = (ev as any).scoreDetail || ev.halftimeScore;
 
-      const adaptedFallback =
-        !isPoker && !isBonus && !isOutright && (evPaid || evLost) && !rawScoreFinal && !rawScoreDetail
-          ? adaptEventResultToPrediction(ev, evPaid)
+      const settledScores =
+        !isPoker && !isBonus && !isOutright && (evPaid || evLost)
+          ? ensureTwoHalvesScoreFormat({
+              event: ev,
+              rawScoreFinal,
+              rawScoreDetail,
+              isWin: evPaid,
+            })
           : undefined;
 
-      const resolvedScoreFinal = rawScoreFinal || adaptedFallback?.actualScore?.replace('-', ':');
-      const resolvedScoreDetail =
-        rawScoreDetail ||
-        (adaptedFallback?.actualScore && adaptedFallback?.halftimeScore
-          ? `${adaptedFallback.actualScore.replace('-', ':')} ${adaptedFallback.halftimeScore}`
-          : undefined);
+      const resolvedScoreFinal = settledScores ? settledScores.scoreFinal : rawScoreFinal;
+      const resolvedScoreDetail = settledScores ? settledScores.scoreDetail : rawScoreDetail;
 
       return {
         id: ev.id || `ev-${idx}`,
@@ -506,6 +508,8 @@ export default function TicketDetailsScreen({
         isLive: Boolean((ev as any).isLive || isFifa || currentCoupon?.isLive),
         durationSeconds: (ev as any).durationSeconds ?? (ev as any).duration ?? (ev as any).matchDuration,
         elapsedSeconds: (ev as any).elapsedSeconds,
+        hasCustomElapsed: Boolean((ev as any).hasCustomElapsed),
+        liveStartedAt: (ev as any).liveStartedAt,
         badge: ev.badge || (ev as any).badge,
         roundCode,
         pokerDraw: pokerDrawData,
@@ -1032,19 +1036,16 @@ export default function TicketDetailsScreen({
               </Text>
             </View>
 
-            {/* Badge • En direct rouge ou Serie A en haut à droite */}
+            {/* Badge • En direct rouge (uniquement si au moins un événement a atteint son startTime et est en cours) ou Serie A */}
             {(!isPaid &&
               !isLost &&
-              (currentCoupon?.isLive ||
-                isPokerCoupon ||
-                events.some(
-                  (e) =>
-                    e.isLive ||
-                    e.isPoker ||
-                    e.isFifa ||
-                    e.sport === 'FIFA' ||
-                    getEventLiveProgress(e, currentTime).isLive
-                ))) ? (
+              events.some(
+                (e) =>
+                  !e.isBonus &&
+                  e.status !== 'Gain' &&
+                  e.status !== 'Perte' &&
+                  getEventLiveProgress(e, currentTime).isLive
+              )) ? (
               <View
                 style={[
                   styles.liveRedBadge,
@@ -1137,32 +1138,29 @@ export default function TicketDetailsScreen({
         {/* CARTES DES ÉVÉNEMENTS / SÉLECTIONS                                */}
         {/* ================================================================ */}
         {events.map((ev, index) => {
-          const isEventGain = ev.status === 'Gain' || ev.status === 'gagne';
-          const isEventPerte = ev.status === 'Perte' || ev.status === 'perdu';
+          const isEventGain = ev.status === 'Gain' || ev.status === 'gagne' || isPaid;
+          const isEventPerte = ev.status === 'Perte' || ev.status === 'perdu' || isLost;
+          const isEventSettled = isEventGain || isEventPerte;
           const eventStatusLabel = isEventGain ? 'Gain' : isEventPerte ? 'Perte' : 'Accepté';
           const eventStatusColor = isEventGain ? payeColor : isEventPerte ? perduColor : accepteColor;
-          // Calcul d'avancement EN DIRECT et temps écoulé adapté à la durée
+
+          // Machine à États Temporelle en temps réel (PRE_MATCH -> LIVE -> FINISHED) via currentTime (1000ms)
           const liveProgress = getEventLiveProgress(ev, currentTime);
           const isFifaEvent = Boolean(
             ev.isFifa ||
               ev.sport === 'FIFA' ||
               String(ev.league || '').toLowerCase().includes('fifa')
           );
-          const isEventLive =
-            Boolean(ev.isLive || ev.isPoker || currentCoupon?.isLive || liveProgress.isLive || isFifaEvent) &&
-            !isPaid &&
-            !isLost &&
-            !isEventGain &&
-            !isEventPerte;
-          const hasEventStarted =
-            liveProgress.hasStarted || isEventLive || isPaid || isLost || isEventGain || isEventPerte;
-          const showElapsedRow =
-            !ev.isPoker &&
-            (liveProgress.hasStarted || isEventLive) &&
-            !isPaid &&
-            !isLost &&
-            !isEventGain &&
-            !isEventPerte;
+
+          // État C : Terminé ou coupon résolu (Gain / Payé / Perte)
+          const isEventFinished = isEventSettled || liveProgress.isFinished;
+          // État B : En direct (now >= startTime et now < startTime + durationSeconds, non terminé)
+          const isEventLive = !isEventFinished && liveProgress.isLive;
+          // État A : Avant le début de l'événement (now < startTime et non terminé)
+          const isPreMatch = !isEventFinished && !isEventLive;
+
+          const hasEventStarted = !isPreMatch;
+          const showElapsedRow = isEventLive;
           const elapsedSec = liveProgress.elapsedSeconds;
 
           const displayDate = isEventLive
@@ -1171,22 +1169,39 @@ export default function TicketDetailsScreen({
               : formatBetDate(ev.rawDate || ev.date)
             : formatFrenchEventDate(ev.rawDate || ev.date);
 
+          const isStandardMatch = !ev.isPoker && !ev.isBonus && !ev.isOutright;
+
           const liveAdaptiveScore =
-            isEventLive && !ev.isPoker && !ev.isBonus && !ev.isOutright
+            isStandardMatch && isEventLive
               ? computeAdaptiveLiveScore({
                   marketLabel: ev.market,
                   elapsedSeconds: elapsedSec,
                   durationSeconds: liveProgress.durationSeconds,
                   isFifa: isFifaEvent,
-                  existingScoreFinal: ev.scoreFinal,
-                  existingScoreDetail: ev.scoreDetail,
                 })
               : null;
 
-          const effectiveScoreFinal =
-            ev.scoreFinal || liveAdaptiveScore?.mainScore || liveAdaptiveScore?.scoreFinal;
-          const effectiveScoreDetail =
-            ev.scoreDetail || liveAdaptiveScore?.detailedScore || liveAdaptiveScore?.scoreDetail;
+          const finishedFormattedScore =
+            isStandardMatch && isEventFinished
+              ? ensureTwoHalvesScoreFormat({
+                  event: ev,
+                  rawScoreFinal: ev.scoreFinal,
+                  rawScoreDetail: ev.scoreDetail,
+                  isWin: !isEventPerte,
+                })
+              : null;
+
+          const effectiveScoreFinal = isPreMatch
+            ? undefined
+            : isEventLive
+            ? liveAdaptiveScore?.mainScore || '0:0'
+            : finishedFormattedScore?.scoreFinal || ev.scoreFinal;
+
+          const effectiveScoreDetail = isPreMatch
+            ? undefined
+            : isEventLive
+            ? liveAdaptiveScore?.detailedScore || '0:0 (0:0)'
+            : finishedFormattedScore?.scoreDetail || ev.scoreDetail;
 
           // Rendu dédié pour la carte Bonus (identique à video_gagnant.mp4 et WhatsApp_Video)
           if (ev.isBonus) {
@@ -2047,13 +2062,13 @@ const styles = StyleSheet.create({
     minWidth: 38,
   },
   vsText: {
-    fontSize: 17,
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#1D2B3A',
   },
   mainScoreText: {
-    fontSize: 19,
-    fontWeight: '500',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#1D2B3A',
   },
   detailScoreBelowText: {

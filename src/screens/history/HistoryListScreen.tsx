@@ -21,6 +21,7 @@ import { useBetStore } from '../../store/useBetStore';
 import { useCouponStore } from '../../store/couponStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { BetSlip } from '../../types/bet';
+import { getEventLiveProgress } from '../../utils/dateFormatter';
 
 // ============================================================================
 // ICÔNES LOCALES DEPUIS LE DOSSIER ASSETS
@@ -314,7 +315,12 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
         )
       ));
 
-  const isLive = Boolean((coupon.isLive || (isPoker && isAccepted) || (isFifa && isAccepted)) && isAccepted);
+  const isLive = Boolean(
+    isAccepted &&
+      (coupon.events && coupon.events.length > 0
+        ? coupon.events.some((ev: any) => getEventLiveProgress(ev).isLive)
+        : getEventLiveProgress(coupon).isLive)
+  );
   const statusLabel = isAccepted ? 'Accepté' : isPaid ? 'Payé' : 'Perdu';
   const statusColor = isPaid
     ? (currentTheme.status?.paye || currentTheme.status?.gagne || '#4EBA6F')
