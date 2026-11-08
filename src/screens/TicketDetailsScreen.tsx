@@ -49,14 +49,13 @@ import { renderCardsWithSuits, generateWinningPokerDraw } from '../utils/pokerGe
 // ============================================================================
 // Types
 // ============================================================================
-// Helper de formatage de devise (symbole ₣ identique à l'interface Historique de pari)
+// Helper de formatage de devise STRICTEMENT SANS DÉCIMALE (ni point ni virgule) pour Mise et Gains
 const formatCurrency = (val: number | string | undefined): string => {
-  if (val === undefined || val === null) return '0 ₣';
-  const num = typeof val === 'number' ? val : parseFloat(String(val).replace(',', '.'));
+  if (val === undefined || val === null || val === '') return '0 ₣';
+  const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/\s/g, '').replace(',', '.'));
   if (isNaN(num)) return `${val} ₣`;
-  const formatted = Number.isInteger(num)
-    ? num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-    : num.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const rounded = Math.round(num);
+  const formatted = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return `${formatted} ₣`;
 };
 
@@ -237,21 +236,28 @@ export default function TicketDetailsScreen({
     ? '#FFFFFF'
     : (currentTheme?.activeIcon || currentTheme?.primary || '#557089');
   const payeColor = currentTheme?.status?.paye || currentTheme?.status?.gagne || '#3BB54A';
-  const accepteColor = currentTheme?.status?.accepte || '#4A83C4';
+  const accepteColor = currentTheme?.status?.accepte || (isDark ? '#6FA6D6' : '#5A8FBE');
   const perduColor = currentTheme?.status?.perdu || '#E74C3C';
 
-  // Détection Poker pour le coupon global
-  const isPokerCoupon =
+  // Détection Poker / TVBet pour le coupon global (Simple ou Combiné)
+  const isPokerCoupon = Boolean(
     currentCoupon?.gameCategory === 'poker' ||
     String(currentCoupon?.sport || '').toUpperCase().includes('POKER') ||
+    String(currentCoupon?.sport || '').toUpperCase().includes('TVBET') ||
     String(currentCoupon?.league || '').toUpperCase().includes('POKER') ||
+    String(currentCoupon?.league || '').toUpperCase().includes('TVBET') ||
     currentCoupon?.badge === 'POKE' ||
-    currentCoupon?.events?.some(
-      (e) =>
+    (currentCoupon?.events && currentCoupon.events.some(
+      (e: any) =>
         e.gameCategory === 'poker' ||
         String(e.sport || '').toUpperCase().includes('POKER') ||
-        String(e.league || '').toUpperCase().includes('POKER')
-    );
+        String(e.sport || '').toUpperCase().includes('TVBET') ||
+        String(e.league || '').toUpperCase().includes('POKER') ||
+        String(e.league || '').toUpperCase().includes('TVBET') ||
+        String(e.homeTeam?.name || e.homeTeam || '').toUpperCase().includes('TVBET') ||
+        String(e.homeTeam?.name || e.homeTeam || '').toUpperCase().includes('POKER')
+    ))
+  );
 
   const isLive = Boolean(currentCoupon?.isLive || (isPokerCoupon && isAccepted));
   const statusLabel = isPaid ? 'Payé' : isLost ? 'Perdu' : 'Accepté';
@@ -904,7 +910,7 @@ export default function TicketDetailsScreen({
               <View
                 style={[
                   styles.avatarCircle,
-                  { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E9EFF6' },
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#EEF2F6' },
                 ]}
               >
                 <Image
@@ -925,7 +931,11 @@ export default function TicketDetailsScreen({
                       : isCombine
                       ? styles.avatarIconCombine
                       : styles.avatarIcon,
-                    isDark && { tintColor: currentTheme.textSecondary },
+                    isPokerCoupon
+                      ? { tintColor: isDark ? (currentTheme.textSecondary || '#8A9DB0') : '#5C7690' }
+                      : isDark
+                      ? { tintColor: currentTheme.textSecondary }
+                      : null,
                   ]}
                   resizeMode="contain"
                 />
@@ -942,12 +952,12 @@ export default function TicketDetailsScreen({
                       ? (currentTheme.status?.perdu || '#E74C3C')
                       : (currentTheme.status?.accepte || currentTheme.primary || '#4A8FE7'),
                     borderColor: currentTheme.cardBackground || '#FFFFFF',
-                    borderWidth: 1.8,
+                    borderWidth: 1.5,
                   },
                 ]}
               >
                 {(isAccepted || isPaid) && (
-                  <Svg width={10.5} height={10.5} viewBox="0 0 12 12" fill="none" style={{ width: 10.5, height: 10.5 }}>
+                  <Svg width={9} height={9} viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}>
                     <Path
                       d="M2.5 6.2L5 8.6L9.6 3.6"
                       stroke="#FFFFFF"
@@ -958,7 +968,7 @@ export default function TicketDetailsScreen({
                   </Svg>
                 )}
                 {isLost && (
-                  <Svg width={9} height={9} viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}>
+                  <Svg width={8} height={8} viewBox="0 0 12 12" fill="none" style={{ width: 8, height: 8 }}>
                     <Rect x="2.5" y="5" width="7" height="2" rx="1" fill="#FFFFFF" />
                   </Svg>
                 )}
@@ -989,7 +999,8 @@ export default function TicketDetailsScreen({
                     getEventLiveProgress(e, currentTime).isLive
                 ))) ? (
               <View style={styles.liveRedBadge}>
-                <Text style={styles.liveRedBadgeText}>• En direct</Text>
+                <View style={styles.liveRedDot} />
+                <Text style={styles.liveRedBadgeText}>En direct</Text>
               </View>
             ) : currentCoupon?.badge === 'Serie A' ? (
               <View style={styles.leagueBadge}>
@@ -1010,10 +1021,10 @@ export default function TicketDetailsScreen({
           {(isCombine || totalEventsCount > 1) && (
             <View style={styles.eventsRowContainer}>
               <View style={styles.eventsLeftGroup}>
-                <View style={{ marginRight: 10 }}>
+                <View style={{ marginRight: 8 }}>
                   <OfficialLayersIcon
-                    size={18}
-                    color={isDark ? currentTheme.textSecondary : '#557089'}
+                    size={16}
+                    color={isDark ? (currentTheme.textSecondary || '#8A9DB0') : '#5C7690'}
                   />
                 </View>
                 <Text style={[styles.eventsCountText, { color: currentTheme.textPrimary }]}>
@@ -1186,7 +1197,7 @@ export default function TicketDetailsScreen({
                     }
                     style={[
                       ev.isPoker ? styles.eventPokerIcon : styles.eventSportIcon,
-                      { tintColor: currentTheme.textSecondary || '#6E849B' },
+                      { tintColor: ev.isPoker ? (isDark ? '#8A9DB0' : '#7A8FA6') : (currentTheme.textSecondary || '#6E849B') },
                     ]}
                     resizeMode="contain"
                   />
@@ -1211,7 +1222,8 @@ export default function TicketDetailsScreen({
                 {/* Badge • En direct rouge ou Serie A en haut à droite */}
                 {isEventLive ? (
                   <View style={styles.liveRedBadge}>
-                    <Text style={styles.liveRedBadgeText}>• En direct</Text>
+                    <View style={styles.liveRedDot} />
+                    <Text style={styles.liveRedBadgeText}>En direct</Text>
                   </View>
                 ) : ev.badge === 'Serie A' ? (
                   <View style={styles.leagueBadge}>
@@ -1429,7 +1441,12 @@ export default function TicketDetailsScreen({
                     ]}
                   />
                   <View style={styles.extraInfoBox}>
-                    <Text style={[styles.extraInfoTitle, { color: primaryActionColor }]}>
+                    <Text
+                      style={[
+                        styles.extraInfoTitle,
+                        { color: isDark ? (currentTheme.textSecondary || '#8A9DB0') : '#557089' },
+                      ]}
+                    >
                       Informations supplémentaires
                     </Text>
                     <Text style={[styles.extraInfoValue, { color: currentTheme.textPrimary }]}>
@@ -1636,43 +1653,43 @@ const styles = StyleSheet.create({
   },
   avatarWrap: {
     position: 'relative',
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     marginRight: 14,
   },
   avatarCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#E9EFF6',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EEF2F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarIcon: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
   },
   avatarIconPoker: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     tintColor: '#5C7690',
   },
   avatarIconFifa: {
-    width: 30,
-    height: 20,
+    width: 28,
+    height: 18,
     tintColor: '#5C7690',
   },
   avatarIconCombine: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
   },
   statusMiniDot: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    bottom: -1,
+    right: -1,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1693,17 +1710,18 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   summaryTypeText: {
-    fontSize: 16.5,
+    fontSize: 17,
     fontWeight: '700',
     color: '#1D2B3A',
-    lineHeight: 20,
+    lineHeight: 21,
     marginBottom: 2,
   },
   summaryNumberText: {
     fontSize: 14.5,
     color: '#1D2B3A',
-    fontWeight: '600',
-    marginTop: 1,
+    fontWeight: '500',
+    letterSpacing: 0.1,
+    marginTop: 2,
   },
 
   // Badge Ligue Bleu (Serie A uniquement)
@@ -1735,20 +1753,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 3,
+    marginVertical: 4.5,
+    paddingVertical: 0,
   },
   financialLabel: {
-    fontSize: 14,
+    fontSize: 14.5,
     color: '#6E849B',
     fontWeight: '400',
   },
   financialValueBold: {
-    fontSize: 14.5,
+    fontSize: 15,
     color: '#1D2B3A',
     fontWeight: '600',
   },
   financialValueStatus: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '500',
   },
 
@@ -1756,25 +1775,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 7,
+    paddingVertical: 10,
+    marginBottom: 4,
   },
   eventsLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   layersIcon: {
-    width: 18,
-    height: 18,
-    marginRight: 9,
-    tintColor: '#557089',
+    width: 16,
+    height: 16,
+    marginRight: 8,
+    tintColor: '#5C7690',
   },
   eventsCountText: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '600',
     color: '#0D253F',
   },
   eventsFinishedText: {
-    fontSize: 15.5,
+    fontSize: 15,
     fontWeight: '400',
     color: '#0D253F',
   },
@@ -1795,21 +1815,21 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   eventSportIconWrap: {
-    width: 26,
-    height: 26,
+    width: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   eventSportIcon: {
-    width: 26,
-    height: 26,
+    width: 22,
+    height: 22,
     tintColor: '#6E849B',
   },
   eventPokerIcon: {
     width: 22,
     height: 22,
-    tintColor: '#6E849B',
+    tintColor: '#7A8FA6',
   },
   eventLeagueInfoCol: {
     flex: 1,
@@ -2016,7 +2036,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   eventMarketName: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '600',
     color: '#1D2B3A',
     flex: 1,
@@ -2034,12 +2054,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   eventLiveElapsedLeft: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6E849B',
     letterSpacing: 0.2,
   },
   eventLiveElapsedRight: {
-    fontSize: 13.5,
+    fontSize: 14.5,
     fontWeight: '600',
   },
   eventLiveElapsedRightBold: {
@@ -2052,27 +2073,37 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   eventStatusLabel: {
-    fontSize: 13.5,
+    fontSize: 14,
     color: '#6E849B',
     fontWeight: '400',
   },
   eventStatusValue: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '500',
   },
 
-  // Badge • En direct rouge
+  // Badge • En direct rouge (Rouge brique exact de la capture #D94343)
   liveRedBadge: {
-    backgroundColor: '#E04F44',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 6,
+    backgroundColor: '#D94343',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
+  },
+  liveRedDot: {
+    width: 4.5,
+    height: 4.5,
+    borderRadius: 2.25,
+    backgroundColor: '#FFFFFF',
+    marginRight: 5,
   },
   liveRedBadgeText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
+    lineHeight: 14,
   },
 
   // Section Informations supplémentaires (Poker)
@@ -2081,13 +2112,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   extraInfoTitle: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '500',
-    color: '#3B79C4',
+    color: '#557089',
     marginBottom: 2,
   },
   extraInfoValue: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '500',
     color: '#1D2B3A',
   },

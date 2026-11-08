@@ -5,6 +5,7 @@ import {
   BetHistoryCardProps as BaseProps,
 } from './history/BetHistoryCard';
 import { formatBetDate } from '../utils/dateFormatter';
+import { isCouponLiveOr5MinBefore } from '../utils/liveBetUtils';
 
 export * from './history/BetHistoryCard';
 
@@ -40,19 +41,23 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
       (firstEvent as any)?.sport ??
       (firstEvent as any)?.sportCategory;
 
+    const isLive = props.isLive ?? isCouponLiveOr5MinBefore(coupon);
+
     return (
       <HistoryCard
         ticketNumber={props.ticketNumber ?? coupon.id}
-        date={formatBetDate(props.date ?? coupon.createdAt)}
+        date={formatBetDate(props.date ?? coupon.createdAt ?? (coupon as any).placedAt ?? (coupon as any).date)}
         type={props.type ?? coupon.type}
         eventsCount={
           props.eventsCount ?? coupon.eventsCount ?? coupon.events?.length ?? 1
         }
+        events={props.events ?? coupon.events}
         sportCategory={sportCategory}
         odds={props.odds ?? coupon.totalOdds}
         stake={props.stake ?? coupon.stake}
         potentialGain={props.potentialGain ?? payoutAmount}
         status={props.status ?? (isPaye ? 'Payé' : coupon.status)}
+        isLive={isLive}
         onPress={props.onPress}
         onOptionsPress={props.onOptionsPress}
         onBellPress={props.onBellPress ?? props.onNotificationPress}

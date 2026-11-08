@@ -9,9 +9,13 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getBetTypeIcon } from '../../utils/getBetIcon';
+import Svg, { Circle, Path } from 'react-native-svg';
+import { getBetTypeIcon, isTvBetOrPokerSport, pokerIcon, tvbetIcon, combineIcon, fifaIcon } from '../../utils/getBetIcon';
 import { useThemeStore } from '../../stores/themeStore';
 import { formatBetDate } from '../../utils/dateFormatter';
+import { formatCleanOdds } from '../../utils/oddsFormatter';
+import { LiveBadge } from './LiveBadge';
+import { BellVectorIcon } from '../common/NotificationBell';
 
 // ============================================================================
 // EMPLACEMENTS / IMPORTS DES ICÔNES DU PROJET
@@ -60,49 +64,62 @@ export const DefaultFifaLogo: React.FC<{ size?: number }> = ({ size = 28 }) => {
   }
 };
 
-// 2. Fallback Verified Badge (Cercle avec coche blanche superposé au logo)
+// 2. Fallback Verified Badge (Cercle vectoriel net + coche blanche épaisse arrondie comme sur la capture)
 export const DefaultVerifiedBadgeIcon: React.FC<{
   size?: number;
   color?: string;
   checkColor?: string;
   borderColor?: string;
-}> = ({ size = 14, color, checkColor = '#FFFFFF', borderColor }) => {
+  isLost?: boolean;
+}> = ({ size = 16, color, checkColor = '#FFFFFF', borderColor, isLost = false }) => {
   const { currentTheme } = useThemeStore();
   const c = color || currentTheme.status?.accepte || currentTheme.primary;
   const b = borderColor || currentTheme.cardBackground || '#FFFFFF';
   return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: c,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: b,
-      }}
-    >
-      <Ionicons name="checkmark" size={size * 0.65} color={checkColor} />
-    </View>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle
+        cx="12"
+        cy="12"
+        r="10.2"
+        fill={c}
+        stroke={b}
+        strokeWidth="2.3"
+      />
+      {isLost ? (
+        <Path
+          d="M 7.5 12 L 16.5 12"
+          stroke={checkColor}
+          strokeWidth="3.0"
+          strokeLinecap="round"
+        />
+      ) : (
+        <Path
+          d="M 7.2 12.3 L 10.5 15.6 L 17.2 8.9"
+          stroke={checkColor}
+          strokeWidth="3.1"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </Svg>
   );
 };
 
 import { BetLayersIcon } from '../icons/BetLayersIcon';
 
-// 3. Fallback Layers Icon (Piles de calques 3D isométrique)
+// 3. Fallback Layers Icon (ic_events_layers identique à la capture de référence)
 export const DefaultLayersIcon: React.FC<IconBaseProps> = ({
-  size = 14,
+  size = 12.5,
   color,
 }) => {
   const { currentTheme } = useThemeStore();
+  const layersColor = color || (currentTheme.isDark ? '#8E9EAB' : '#758692');
   return (
     <BetLayersIcon
       size={size}
-      color={color || currentTheme.textSecondary}
-      primaryColor={currentTheme.textSecondary}
-      shadowColor={currentTheme.border}
-      lightColor={currentTheme.primarySoft}
+      variant="flat"
+      color={layersColor}
+      primaryColor={layersColor}
     />
   );
 };
@@ -114,17 +131,7 @@ export const DefaultBellIcon: React.FC<IconBaseProps> = ({
 }) => {
   const { currentTheme } = useThemeStore();
   const c = color || currentTheme.primary;
-  try {
-    return (
-      <Image
-        source={require('../../../assets/icons/cloche.png')}
-        style={{ width: size, height: size, tintColor: c }}
-        resizeMode="contain"
-      />
-    );
-  } catch {
-    return <Ionicons name="notifications-outline" size={size} color={c} />;
-  }
+  return <BellVectorIcon size={size} color={c} />;
 };
 
 // 5. Fallback More Horizontal Icon
@@ -142,16 +149,19 @@ export const DefaultMoreHorizontalIcon: React.FC<IconBaseProps> = ({
 // ============================================================================
 export const formatCurrency = (
   value?: number | string,
-  currency = 'F'
+  currency = '₣'
 ): string => {
   if (value === undefined || value === null || value === '') return `0 ${currency}`;
   if (typeof value === 'string') {
-    if (value.includes('F') || value.includes('₣')) return value;
+    if (value.includes('F') || value.includes('₣')) {
+      // Supprimer les espaces situés entre les chiffres
+      return value.replace(/(\d)\s+(\d)/g, '$1$2').trim();
+    }
     const num = parseFloat(value.replace(/[^0-9.-]+/g, ''));
     if (isNaN(num)) return value;
-    return `${Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ${currency}`;
+    return `${Math.round(num).toString()} ${currency}`;
   }
-  return `${Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ${currency}`;
+  return `${Math.round(value).toString()} ${currency}`;
 };
 
 export const getStatusColor = (status?: string): string => {
@@ -190,8 +200,13 @@ export interface BetHistoryCardProps {
   /** Symbole de devise (par défaut 'F') */
   currencySymbol?: string;
 
+  /** Indique si le match ou coupon est en direct */
+  isLive?: boolean;
+
   /** Catégorie du sport ou jeu (ex: 'fifa' | 'poker' | 'football') */
   sportCategory?: string;
+  /** Liste des événements du coupon (pour détection combiné poker/tvbet) */
+  events?: any[];
   /** Slot ou source pour le logo du sport / type de pari (ImageSource, Composant React ou JSX Element) */
   sportLogo?: any;
 
@@ -202,7 +217,7 @@ export interface BetHistoryCardProps {
 
   /** Slots d'icônes & logos personnalisés */
   FifaLogo?: any;
-  VerifiedBadgeIcon?: React.ComponentType<{ size?: number; color?: string; checkColor?: string }> | React.ReactNode;
+  VerifiedBadgeIcon?: React.ComponentType<{ size?: number; color?: string; checkColor?: string; borderColor?: string; isLost?: boolean }> | React.ReactNode;
   LayersIcon?: React.ComponentType<IconBaseProps> | React.ReactNode;
   BellIcon?: React.ComponentType<IconBaseProps> | React.ReactNode;
   MoreHorizontalIcon?: React.ComponentType<IconBaseProps> | React.ReactNode;
@@ -218,12 +233,14 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
   date = '27.09.2026 (08:30)',
   type = 'Simple',
   eventsCount = 1,
+  events,
+  isLive = false,
   sportCategory,
   odds = '58',
   stake = '5000',
   potentialGain = '290000',
   status = 'Accepté',
-  currencySymbol = 'F',
+  currencySymbol = '₣',
   onPress,
   onBellPress,
   onOptionsPress,
@@ -235,7 +252,7 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
   MoreHorizontalIcon = DefaultMoreHorizontalIcon,
   style,
 }) => {
-  const { currentTheme } = useThemeStore();
+  const { currentTheme, brandChoice } = useThemeStore();
   const isPaye = status === 'Payé' || status === 'Gagné' || status === 'Gain';
   const isLost = status === 'Perdu';
   const statusColor = isPaye
@@ -245,8 +262,23 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
       : (currentTheme.status?.accepte || currentTheme.primary);
   const badgeColor = isPaye
     ? (currentTheme.status?.paye || '#16A34A')
-    : (currentTheme.status?.accepte || currentTheme.primary);
-  const brandPrimary = currentTheme.primary;
+    : isLost
+      ? (currentTheme.status?.perdu || '#DC2626')
+      : (currentTheme.status?.accepte || currentTheme.primary);
+  const brandPrimary =
+    currentTheme?.primary ||
+    currentTheme?.colors?.primary ||
+    (brandChoice === 'melbet'
+      ? '#E58B05'
+      : brandChoice === 'winwin'
+        ? '#7CBD17'
+        : brandChoice === 'betwinner'
+          ? '#007348'
+          : brandChoice === 'paripesa'
+            ? '#1E5BBB'
+            : brandChoice === 'megaparis' || brandChoice === 'megapari'
+              ? '#D3242A'
+              : '#2B78C9');
   const cleanTicketNumber = ticketNumber ? String(ticketNumber).replace(/^(?:№|N[º°o])\s*/i, '') : '';
 
   const renderComponentOrNode = (
@@ -263,40 +295,89 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
     return null;
   };
 
+  const isMelbet = Boolean(
+    brandChoice === 'melbet' ||
+    (currentTheme?.name || '').toLowerCase().includes('melbet')
+  );
+
+  const isMegaPari = Boolean(
+    brandChoice === 'megaparis' ||
+    brandChoice === 'megapari' ||
+    (currentTheme?.name || '').toLowerCase().includes('megapari')
+  );
+
+  const detailPokerColor =
+    currentTheme.textSecondary ||
+    currentTheme.colors?.textSecondary ||
+    (currentTheme.isDark ? '#8A96A3' : '#64748B');
+
+  const pokerIconTint = isMelbet
+    ? '#1B365D'
+    : isMegaPari
+      ? detailPokerColor
+      : '#507694';
+
+  const isTvBetSport = Boolean(
+    isTvBetOrPokerSport(sportCategory) ||
+    sportLogo === pokerIcon ||
+    sportLogo === tvbetIcon
+  );
+
+  const customLogo = sportLogo ?? (FifaLogo !== DefaultFifaLogo ? FifaLogo : undefined);
+  const dynamicIconSource = getBetTypeIcon({
+    id: ticketNumber,
+    type,
+    sportCategory,
+    eventsCount,
+    events,
+  });
+  const resolvedLogoSource = customLogo ?? dynamicIconSource;
+  const isCombineLogo = resolvedLogoSource === combineIcon;
+  const isFifaLogo =
+    resolvedLogoSource === fifaIcon ||
+    (!customLogo && !isCombineLogo && (sportCategory || '').toLowerCase().includes('fifa'));
+  const isTvBet =
+    resolvedLogoSource === tvbetIcon ||
+    resolvedLogoSource === pokerIcon ||
+    (isTvBetSport && !isCombineLogo);
+
   const renderLogo = () => {
     // 1. Si un logo personnalisé a été explicitement fourni via sportLogo ou FifaLogo (différent de DefaultFifaLogo)
-    const customLogo = sportLogo ?? (FifaLogo !== DefaultFifaLogo ? FifaLogo : undefined);
-
     if (customLogo) {
       if (React.isValidElement(customLogo)) {
         return customLogo;
       }
       if (typeof customLogo === 'function') {
         const LogoComponent = customLogo;
-        return <LogoComponent size={30} />;
+        return <LogoComponent size={isCombineLogo ? 21 : isFifaLogo ? 25 : isTvBet ? 25 : 28} />;
       }
       // ImageSource (number de require() ou { uri: string })
       return (
         <Image
           source={customLogo}
-          style={styles.sportBadgeImage}
+          style={[
+            styles.sportBadgeImage,
+            isCombineLogo ? styles.combineBadgeImage : null,
+            isFifaLogo ? styles.fifaBadgeImage : null,
+            isTvBet ? styles.pokerBadgeImage : null,
+            isTvBet && pokerIconTint ? { tintColor: pokerIconTint } : null,
+          ]}
           resizeMode="contain"
         />
       );
     }
 
     // 2. Résolution dynamique selon type ('Combiné' vs 'Simple') et sportCategory
-    const dynamicIconSource = getBetTypeIcon({
-      id: ticketNumber,
-      type,
-      sportCategory,
-      eventsCount,
-    });
-
     return (
       <Image
         source={dynamicIconSource}
-        style={styles.sportBadgeImage}
+        style={[
+          styles.sportBadgeImage,
+          isCombineLogo ? styles.combineBadgeImage : null,
+          isFifaLogo ? styles.fifaBadgeImage : null,
+          isTvBet ? styles.pokerBadgeImage : null,
+          isTvBet && pokerIconTint ? { tintColor: pokerIconTint } : null,
+        ]}
         resizeMode="contain"
       />
     );
@@ -323,12 +404,20 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
         <View style={styles.headerLeft}>
           <View style={styles.logoWrapper}>
             {renderLogo()}
-            <View style={styles.verifiedBadgeContainer}>
+            <View
+              style={[
+                styles.verifiedBadgeContainer,
+                isCombineLogo ? styles.verifiedBadgeCombine : null,
+                isFifaLogo ? styles.verifiedBadgeFifa : null,
+                isTvBet ? styles.verifiedBadgeTvBet : null,
+              ]}
+            >
               {renderComponentOrNode(VerifiedBadgeIcon, {
-                size: 13,
+                size: 16,
                 color: badgeColor,
                 checkColor: '#FFFFFF',
                 borderColor: currentTheme.cardBackground,
+                isLost,
               })}
             </View>
           </View>
@@ -345,31 +434,38 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
 
             <View style={styles.typeLayersRow}>
               <Text style={[styles.typeText, { color: currentTheme.textPrimary }]}>{type}</Text>
-              <View style={styles.layersBlock}>
-                {renderComponentOrNode(LayersIcon, {
-                  size: 14,
-                  color: currentTheme.textSecondary,
-                })}
-                <Text style={[styles.eventsCountText, { color: currentTheme.textPrimary }]}>{eventsCount}</Text>
-              </View>
+              {(type === 'Combiné' || (eventsCount && eventsCount > 1)) && (
+                <View style={styles.layersBlock}>
+                  {renderComponentOrNode(LayersIcon, {
+                    size: 12.5,
+                    color: currentTheme.isDark ? '#8E9EAB' : '#758692',
+                  })}
+                  <Text style={[styles.eventsCountText, { color: currentTheme.textPrimary }]}>{eventsCount}</Text>
+                </View>
+              )}
+              {isLive && !isPaye && !isLost && (
+                <LiveBadge style={styles.historyLiveBadge} label="EN DIRECT" />
+              )}
             </View>
           </View>
         </View>
 
-        {/* À droite : Cloche & Menu 3 points adaptés au thème */}
+        {/* À droite : Cloche (paris en cours) & Menu 3 points adaptés au thème */}
         <View style={styles.headerActionsRight}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={(e) => {
-              e?.stopPropagation?.();
-              onBellPress?.();
-            }}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            accessibilityLabel="Activer les notifications du coupon"
-            style={styles.actionIconBtn}
-          >
-            {renderComponentOrNode(BellIcon, { size: 20, color: brandPrimary })}
-          </TouchableOpacity>
+          {!isPaye && !isLost && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={(e) => {
+                e?.stopPropagation?.();
+                onBellPress?.();
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              accessibilityLabel="Activer les notifications du coupon"
+              style={styles.actionIconBtn}
+            >
+              {renderComponentOrNode(BellIcon, { size: 20, color: brandPrimary })}
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             activeOpacity={0.7}
@@ -402,7 +498,7 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
         <View style={styles.keyValueRow}>
           <Text style={[styles.keyLabel, { color: currentTheme.textSecondary }]}>Cote :</Text>
           <Text style={[styles.valueBold, { color: currentTheme.textPrimary }]}>
-            {typeof odds === 'number' ? odds.toLocaleString('fr-FR') : odds}
+            {formatCleanOdds(odds)}
           </Text>
         </View>
 
@@ -458,21 +554,16 @@ const styles = StyleSheet.create({
   // 1. Conteneur Principal (Card)
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#EDF1F7',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    borderWidth: 0,
   },
 
-  // 2. Section En-tête (paddingHorizontal: 10, paddingTop: 10, paddingBottom: 10)
+  // 2. Section En-tête (Fond blanc pur #FFFFFF)
   headerSection: {
-    paddingHorizontal: 10,
-    paddingTop: 10,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingTop: 12,
     paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -488,18 +579,42 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 32,
     height: 32,
-    marginRight: 8,
+    marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sportBadgeImage: {
+    width: 28,
+    height: 28,
+  },
+  combineBadgeImage: {
+    width: 28,
+    height: 28,
+  },
+  fifaBadgeImage: {
     width: 30,
-    height: 30,
+    height: 19,
+  },
+  pokerBadgeImage: {
+    width: 28,
+    height: 28,
   },
   verifiedBadgeContainer: {
     position: 'absolute',
-    bottom: -2,
-    right: -3,
+    bottom: -1,
+    right: -2,
+  },
+  verifiedBadgeCombine: {
+    bottom: -1,
+    right: -2,
+  },
+  verifiedBadgeFifa: {
+    bottom: -1,
+    right: -2,
+  },
+  verifiedBadgeTvBet: {
+    bottom: -1,
+    right: -2,
   },
   headerTextCol: {
     flex: 1,
@@ -508,30 +623,32 @@ const styles = StyleSheet.create({
   dateNumberText: {
     fontSize: 12,
     fontWeight: '400',
-    color: '#7B8A9E',
-    marginBottom: 2,
-    letterSpacing: -0.1,
+    color: '#6E8299',
+    marginBottom: 3,
   },
   typeLayersRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   typeText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#17263A',
-    letterSpacing: -0.2,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F2742',
   },
   layersBlock: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 6,
-    gap: 3,
+    gap: 4,
   },
   eventsCountText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#17263A',
+    color: '#0F2742',
+  },
+  historyLiveBadge: {
+    marginLeft: 6,
   },
   headerActionsRight: {
     flexDirection: 'row',
@@ -539,45 +656,45 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionIconBtn: {
-    padding: 2,
+    padding: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // 3. Barre de Séparation Pleine Largeur (Bordure à Bordure)
+  // 3. Barre de Séparation Pleine Largeur (#F0F3F8, 1px)
   separatorLine: {
     width: '100%',
     height: 1,
-    backgroundColor: '#EDF1F7',
+    backgroundColor: '#F0F3F8',
   },
 
-  // 4. Section Corps (paddingHorizontal: 10, paddingTop: 9, paddingBottom: 11, gap: 4)
+  // 4. Section Corps (Fond blanc légèrement bleuté #F9FBFD)
   bodySection: {
-    paddingHorizontal: 10,
-    paddingTop: 9,
-    paddingBottom: 11,
+    backgroundColor: '#ffffffff',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
     gap: 4,
   },
   keyValueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 1.5,
+    marginVertical: 1.5,
   },
   keyLabel: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '400',
-    color: '#64748B',
+    color: '#63788E',
   },
   valueBold: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#101E33',
-    letterSpacing: -0.2,
+    fontWeight: '500',
+    color: '#0F2742',
   },
   statusValue: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    letterSpacing: -0.1,
+    color: '#4A83C4',
   },
 });
