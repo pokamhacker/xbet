@@ -13,7 +13,14 @@ function copyDirectory(src, dest) {
     if (!fs.existsSync(dest)) {
       fs.mkdirSync(dest, { recursive: true });
     }
-    fs.cpSync(src, dest, { recursive: true, force: true });
+    fs.cpSync(src, dest, {
+      recursive: true,
+      force: true,
+      filter: (source) => {
+        const ext = path.extname(source).toLowerCase();
+        return !['.apk', '.zip', '.rar', '.tar', '.gz'].includes(ext);
+      },
+    });
     console.log(`Copied ${src} -> ${dest}`);
   }
 }
