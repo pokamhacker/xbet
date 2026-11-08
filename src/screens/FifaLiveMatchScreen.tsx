@@ -36,7 +36,11 @@ import { Typography } from '../theme/theme';
 import { getEventLiveProgress, getEventStartTime } from '../utils/dateFormatter';
 import { buildFifaMarkets, MarketGroupItem, MarketOddOption } from '../data/mockData';
 import { formatCleanOdds } from '../utils/oddsFormatter';
-import { formatBetSelectionLabel } from '../utils/scoreAdapter';
+import {
+  formatBetSelectionLabel,
+  ensureTwoHalvesScoreFormat,
+  computeAdaptiveLiveScore,
+} from '../utils/scoreAdapter';
 
 const FIFA_HEADER_BG = require('../../assets/ui/fifa24_player_smoke.jpg');
 const FIFA_SPLASH_TOP_BG = require('../../assets/ui/fifa24_splash_top.jpg');
@@ -986,19 +990,35 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
     );
   }, [passedEvent?.status]);
 
-  // L'utilisateur indique explicitement que "Les évènements FIFA sont toujours en direct".
-  // Par défaut, tous les matches FIFA démarrent donc en mode Direct (Live avec vidéo active),
-  // sauf si explicitement demandé comme avant-match (passedEvent.stage === 'prematch' ou passedEvent.isPreMatch === true).
-  // L'utilisateur peut aussi basculer manuellement entre le direct vidéo et l'avant-match.
+  const isMatchFinished = Boolean(
+    isStatusFinished ||
+      passedEvent?.isFinished ||
+      (hasExplicitDate && liveProgress.isFinished)
+  );
+
   const [userViewMode, setUserViewMode] = useState<'live' | 'prematch'>(() => {
-    if (passedEvent?.stage === 'prematch' || passedEvent?.isPreMatch === true) {
+    if (isMatchFinished) {
+      return 'live';
+    }
+    if (
+      passedEvent?.stage === 'prematch' ||
+      passedEvent?.isPreMatch === true ||
+      (hasExplicitDate && !liveProgress.hasStarted)
+    ) {
       return 'prematch';
     }
     return 'live';
   });
 
-  const isPreMatch = userViewMode === 'prematch';
-  const isMatchFinished = isStatusFinished;
+  useEffect(() => {
+    if (isMatchFinished) {
+      setUserViewMode('live');
+    } else if (hasExplicitDate && liveProgress.isLive && userViewMode === 'prematch') {
+      setUserViewMode('live');
+    }
+  }, [isMatchFinished, hasExplicitDate, liveProgress.isLive, userViewMode]);
+
+  const isPreMatch = !isMatchFinished && userViewMode === 'prematch';
 
   // Compte à rebours avant-match (ex: "Le jeu démarre dans 00:17:18")
   const preMatchCountdown = useMemo(() => {
@@ -1094,56 +1114,70 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
     p2HomeScore,
     p2AwayScore,
   } = useMemo(() => {
+    if (isMatchFinished) {
+      const st = String(passedEvent?.status || '').toLowerCase();
+      const isLostEvent = st === 'perdu' || st === 'perte' || st === 'lost';
+      const complete = ensureTwoHalvesScoreFormat({
+        event: {
+          ...passedEvent,
+          sport: 'FIFA',
+          isFifa: true,
+          prediction: passedEvent?.prediction || passedEvent?.market || '1X2. V1',
+        },
+        rawScoreFinal:
+          passedEvent?.actualScore || passedEvent?.score || passedEvent?.finalScore,
+        rawScoreDetail: passedEvent?.halftimeScore || passedEvent?.scoreDetail,
+        isWin: !isLostEvent,
+      });
+
+      return {
+        homeScoreNum: complete.totalHome,
+        awayScoreNum: complete.totalAway,
+        formattedScore: `${complete.totalHome} : ${complete.totalAway}`,
+        p1HomeScore: complete.ht1Home,
+        p1AwayScore: complete.ht1Away,
+        p2HomeScore: complete.ht2Home,
+        p2AwayScore: complete.ht2Away,
+      };
+    }
+
+    // En direct : évolution dynamique du score à partir de 0:0 selon activeElapsedSeconds
+    if (hasExplicitDate) {
+      const liveSim = computeAdaptiveLiveScore({
+        marketLabel: passedEvent?.prediction || passedEvent?.market || '1X2. V1',
+        elapsedSeconds: activeElapsedSeconds,
+        durationSeconds: liveProgress.durationSeconds || 366,
+        isFifa: true,
+      });
+      const mainParts = liveSim.mainScore.split(':').map((n) => parseInt(n.trim(), 10) || 0);
+      const hTotal = mainParts[0] || 0;
+      const aTotal = mainParts[1] || 0;
+      const parenMatch = liveSim.detailedScore.match(/\(([^)]+)\)/);
+      if (parenMatch) {
+        const halves = parenMatch[1].split(/[,\s]+/).filter(Boolean);
+        const h1Parts = (halves[0] || '0:0').split(':').map((n) => parseInt(n.trim(), 10) || 0);
+        const h2Parts = (halves[1] || '0:0').split(':').map((n) => parseInt(n.trim(), 10) || 0);
+        return {
+          homeScoreNum: hTotal,
+          awayScoreNum: aTotal,
+          formattedScore: `${hTotal} : ${aTotal}`,
+          p1HomeScore: h1Parts[0] || 0,
+          p1AwayScore: h1Parts[1] || 0,
+          p2HomeScore: h2Parts[0] || 0,
+          p2AwayScore: h2Parts[1] || 0,
+        };
+      }
+    }
+
     const raw =
       passedEvent?.actualScore ||
       passedEvent?.score ||
       passedEvent?.finalScore ||
-      (isMatchFinished ? '5:7' : defaultTeams.score);
+      defaultTeams.score;
     const cleanMain = String(raw).split('(')[0].trim();
     const parts = cleanMain.split(/[:\-]/).map((s) => parseInt(s.trim(), 10));
-    const hTotal = !isNaN(parts[0]) ? parts[0] : isMatchFinished ? 5 : 3;
-    const aTotal = !isNaN(parts[1]) ? parts[1] : isMatchFinished ? 7 : 3;
-
-    // Vérifier si un détail de mi-temps explicite existe ex: "5:7 (2:4, 3:3)"
-    const detailStr = String(
-      passedEvent?.halftimeScore || passedEvent?.scoreDetail || ''
-    );
-    const parenMatch = detailStr.match(/\(([^)]+)\)/);
-    if (parenMatch) {
-      const halves = parenMatch[1].split(/[,\s]+/).filter(Boolean);
-      if (halves.length >= 2) {
-        const h1Parts = halves[0].split(/[:\-]/).map((n) => parseInt(n.trim(), 10));
-        const h2Parts = halves[1].split(/[:\-]/).map((n) => parseInt(n.trim(), 10));
-        if (!isNaN(h1Parts[0]) && !isNaN(h1Parts[1]) && !isNaN(h2Parts[0]) && !isNaN(h2Parts[1])) {
-          return {
-            homeScoreNum: hTotal,
-            awayScoreNum: aTotal,
-            formattedScore: `${hTotal} : ${aTotal}`,
-            p1HomeScore: h1Parts[0],
-            p1AwayScore: h1Parts[1],
-            p2HomeScore: h2Parts[0],
-            p2AwayScore: h2Parts[1],
-          };
-        }
-      } else if (halves.length === 1) {
-        const h1Parts = halves[0].split(/[:\-]/).map((n) => parseInt(n.trim(), 10));
-        if (!isNaN(h1Parts[0]) && !isNaN(h1Parts[1])) {
-          const p1H = Math.min(hTotal, h1Parts[0]);
-          const p1A = Math.min(aTotal, h1Parts[1]);
-          return {
-            homeScoreNum: hTotal,
-            awayScoreNum: aTotal,
-            formattedScore: `${hTotal} : ${aTotal}`,
-            p1HomeScore: p1H,
-            p1AwayScore: p1A,
-            p2HomeScore: Math.max(0, hTotal - p1H),
-            p2AwayScore: Math.max(0, aTotal - p1A),
-          };
-        }
-      }
-    }
-
-    // Répartition réaliste des deux mi-temps dont la somme donne exactement le score final (ex: 5:7 -> 2:4 + 3:3)
+    const hTotal = !isNaN(parts[0]) ? parts[0] : 3;
+    const aTotal = !isNaN(parts[1]) ? parts[1] : 3;
     const p1H = Math.floor(hTotal / 2);
     const p2H = hTotal - p1H;
     const p1A = Math.ceil(aTotal / 2);
@@ -1153,18 +1187,17 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
       homeScoreNum: hTotal,
       awayScoreNum: aTotal,
       formattedScore: `${hTotal} : ${aTotal}`,
-      p1HomeScore: isMatchFinished ? p1H : hTotal,
-      p1AwayScore: isMatchFinished ? p1A : aTotal,
+      p1HomeScore: p1H,
+      p1AwayScore: p1A,
       p2HomeScore: p2H,
       p2AwayScore: p2A,
     };
   }, [
-    passedEvent?.actualScore,
-    passedEvent?.score,
-    passedEvent?.finalScore,
-    passedEvent?.halftimeScore,
-    passedEvent?.scoreDetail,
+    passedEvent,
     isMatchFinished,
+    hasExplicitDate,
+    activeElapsedSeconds,
+    liveProgress.durationSeconds,
     defaultTeams.score,
   ]);
 
@@ -1816,8 +1849,12 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
 
             <TouchableOpacity
               style={styles.scoreCenterBox}
-              activeOpacity={0.8}
-              onPress={() => setUserViewMode((m) => (m === 'live' ? 'prematch' : 'live'))}
+              activeOpacity={isMatchFinished ? 1 : 0.8}
+              onPress={() => {
+                if (!isMatchFinished) {
+                  setUserViewMode((m) => (m === 'live' ? 'prematch' : 'live'));
+                }
+              }}
             >
               {isPreMatch ? (
                 <Text style={styles.preMatchVsText}>VS</Text>
@@ -1889,28 +1926,30 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
       ) : (
         <>
           {/* ===================================================================== */}
-          {/* 2B. MODE EN DIRECT / FINI : VIDÉO FIXE + ZONE STATS SCROLLABLE        */}
+          {/* 2B. MODE EN DIRECT / FINI : VIDÉO (SI EN DIRECT) + ZONE STATS         */}
           {/* ===================================================================== */}
-          {/* A. LECTEUR VIDÉO FIXE (NE DÉFILE PAS) SELON LE CHAMPIONNAT FIFA CHOISI */}
-          <View style={styles.videoOuterWrap}>
-            <View style={[styles.videoPlayerContainer, { height: playerHeight }]}>
-              <FifaChampionshipStreamPlayer
-                mode={broadcastMode}
-                streamUrl={streamUrl}
-                isPlaying={isFocused}
-                isFinished={isMatchFinished}
-                homeTeamName={homeTeamName}
-                awayTeamName={awayTeamName}
-                homeLogoUrl={homeLogoUrl}
-                awayLogoUrl={awayLogoUrl}
-                homeScore={isPreMatch ? 0 : homeScoreNum}
-                awayScore={isPreMatch ? 0 : awayScoreNum}
-                matchSeconds={activeElapsedSeconds}
-                width={playerWidth}
-                height={playerHeight}
-              />
+          {/* A. LECTEUR VIDÉO FIXE (UNIQUEMENT PENDANT LE DIRECT — MASQUÉ QUAND LE MATCH EST TERMINÉ) */}
+          {!isMatchFinished && (
+            <View style={styles.videoOuterWrap}>
+              <View style={[styles.videoPlayerContainer, { height: playerHeight }]}>
+                <FifaChampionshipStreamPlayer
+                  mode={broadcastMode}
+                  streamUrl={streamUrl}
+                  isPlaying={isFocused && !isMatchFinished}
+                  isFinished={isMatchFinished}
+                  homeTeamName={homeTeamName}
+                  awayTeamName={awayTeamName}
+                  homeLogoUrl={homeLogoUrl}
+                  awayLogoUrl={awayLogoUrl}
+                  homeScore={isPreMatch ? 0 : homeScoreNum}
+                  awayScore={isPreMatch ? 0 : awayScoreNum}
+                  matchSeconds={activeElapsedSeconds}
+                  width={playerWidth}
+                  height={playerHeight}
+                />
+              </View>
             </View>
-          </View>
+          )}
 
           <ScrollView
             style={styles.scrollView}

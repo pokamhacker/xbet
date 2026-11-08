@@ -734,10 +734,33 @@ export default function TicketDetailsScreen({
       return;
     }
 
+    const liveState = getEventLiveProgress(ev, currentTime);
+    const isFinishedOrResolved =
+      liveState.isFinished ||
+      ev.status === 'Gain' ||
+      ev.status === 'Perte' ||
+      ev.status === 'Payé' ||
+      ev.status === 'Perdu' ||
+      isPaid ||
+      isLost;
+    const isEventLost = ev.status === 'Perte' || ev.status === 'Perdu' || isLost;
+    const isEventPreMatch = !isFinishedOrResolved && !liveState.hasStarted;
+
     if (ev.isFifa) {
-      const resolvedFifaScore =
-        ev.scoreFinal ||
-        (ev.scoreDetail ? ev.scoreDetail.split('(')[0].trim() : undefined);
+      const completeFifa = isFinishedOrResolved
+        ? ensureTwoHalvesScoreFormat({
+            event: ev,
+            rawScoreFinal: ev.scoreFinal,
+            rawScoreDetail: ev.scoreDetail,
+            isWin: !isEventLost,
+          })
+        : null;
+
+      const resolvedFifaScore = completeFifa
+        ? completeFifa.scoreFinal
+        : ev.scoreFinal || (ev.scoreDetail ? ev.scoreDetail.split('(')[0].trim() : undefined);
+      const resolvedFifaDetail = completeFifa ? completeFifa.scoreDetail : ev.scoreDetail;
+
       navigation?.navigate?.('FifaLiveMatch', {
         event: {
           id: ev.id,
@@ -748,8 +771,8 @@ export default function TicketDetailsScreen({
           score: resolvedFifaScore,
           actualScore: resolvedFifaScore,
           finalScore: resolvedFifaScore,
-          halftimeScore: ev.scoreDetail,
-          scoreDetail: ev.scoreDetail,
+          halftimeScore: resolvedFifaDetail,
+          scoreDetail: resolvedFifaDetail,
           date: ev.date,
           rawDate: ev.rawDate,
           startDate: ev.startDate,
@@ -757,24 +780,23 @@ export default function TicketDetailsScreen({
           matchTime: ev.matchTime,
           durationSeconds: ev.durationSeconds,
           elapsedSeconds: ev.elapsedSeconds,
+          hasCustomElapsed: (ev as any).hasCustomElapsed,
+          liveStartedAt: (ev as any).liveStartedAt,
           prediction: ev.market,
           odd: Number(ev.odd) || 1.92,
-          status: ev.status === 'Gain' ? 'Payé' : ev.status === 'Perte' ? 'Perdu' : 'Accepté',
-          isLive: ev.isLive,
+          status: isFinishedOrResolved
+            ? isEventLost
+              ? 'Perdu'
+              : 'Payé'
+            : 'Accepté',
+          isFinished: isFinishedOrResolved,
+          isPreMatch: isEventPreMatch,
+          isLive: !isFinishedOrResolved && liveState.isLive,
         },
       });
       return;
     }
 
-    const liveState = getEventLiveProgress(ev, currentTime);
-    const isFinishedOrResolved =
-      liveState.isFinished ||
-      ev.status === 'Gain' ||
-      ev.status === 'Perte' ||
-      ev.status === 'Payé' ||
-      ev.status === 'Perdu' ||
-      isPaid ||
-      isLost;
     const targetScreen = isFinishedOrResolved
       ? 'MatchStatistics'
       : resolveMatchNavigationTarget(ev.status, ev.status === 'Gain');
