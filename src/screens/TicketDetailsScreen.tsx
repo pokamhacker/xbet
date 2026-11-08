@@ -1452,8 +1452,14 @@ export default function TicketDetailsScreen({
             styles.fixedFooter,
             {
               bottom: bottomBarHeight,
-              backgroundColor: currentTheme.cardBackground,
-              borderTopColor: currentTheme.border,
+              backgroundColor:
+                currentTheme.bottomBar?.barBg ||
+                currentTheme.cardBackground ||
+                (isDark ? '#263547' : '#FFFFFF'),
+              borderTopColor:
+                currentTheme.border ||
+                currentTheme.divider ||
+                (isDark ? '#334458' : '#EEF2F6'),
             },
           ]}
         >
@@ -1461,7 +1467,12 @@ export default function TicketDetailsScreen({
             <TouchableOpacity
               style={[
                 styles.duplicateBtn,
-                { backgroundColor: '#2B4C9B' },
+                {
+                  backgroundColor:
+                    currentTheme.cashoutButton?.bg ||
+                    currentTheme.primary ||
+                    (isDark ? '#5190D1' : '#2B4C9B'),
+                },
               ]}
               activeOpacity={0.85}
               onPress={handleCashout}
@@ -1469,7 +1480,11 @@ export default function TicketDetailsScreen({
               <Text
                 style={[
                   styles.duplicateBtnText,
-                  { color: '#FFFFFF', fontWeight: '600', fontSize: 15.5 },
+                  {
+                    color: currentTheme.cashoutButton?.text || '#FFFFFF',
+                    fontWeight: '600',
+                    fontSize: 15.5,
+                  },
                 ]}
               >
                 Vendre pour {sellPriceFormatted} ₣
@@ -1479,7 +1494,11 @@ export default function TicketDetailsScreen({
             <TouchableOpacity
               style={[
                 styles.duplicateBtn,
-                { backgroundColor: currentTheme.duplicateButton?.bg || '#D6E6F7' },
+                {
+                  backgroundColor:
+                    currentTheme.duplicateButton?.bg ||
+                    (isDark ? '#324460' : '#D6E6F7'),
+                },
               ]}
               activeOpacity={0.85}
               onPress={handleDuplicate}
@@ -1487,7 +1506,11 @@ export default function TicketDetailsScreen({
               <Text
                 style={[
                   styles.duplicateBtnText,
-                  { color: currentTheme.duplicateButton?.text || '#2E73B8' },
+                  {
+                    color:
+                      currentTheme.duplicateButton?.text ||
+                      (isDark ? '#5395DA' : '#2E73B8'),
+                  },
                 ]}
               >
                 Dupliquer le coupon de pari
