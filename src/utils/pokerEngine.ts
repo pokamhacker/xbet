@@ -1,4 +1,5 @@
 import { PokerRoundResult, PokerHandDistribution } from '../types/bet';
+import { getStableRandomHand } from './pokerGenerator';
 export * from './pokerGenerator';
 
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
@@ -6,13 +7,19 @@ const SUITS = ['♠️', '❤️', '♦️', '♣️'];
 
 /**
  * Génère un tirage de Texas Hold'em réaliste à 6 mains + 5 cartes de board
- * @param winningHandId Main déclarée gagnante (1 à 6)
+ * @param winningHandId Main déclarée gagnante (1 à 6). Si non précisé, tirage aléatoire entre 1 et 6.
  * @param combinationName Combinaison (ex: "Carte haute", "Paire", "Couleur")
+ * @param seed Graine optionnelle pour un tirage stable
  */
 export function generateRealisticPokerDraw(
-  winningHandId: number = 1,
-  combinationName: string = 'Carte haute'
+  winningHandId?: number,
+  combinationName: string = 'Carte haute',
+  seed?: string
 ): PokerRoundResult {
+  let resolvedWinner = winningHandId;
+  if (!resolvedWinner || resolvedWinner < 1 || resolvedWinner > 6) {
+    resolvedWinner = getStableRandomHand(seed || combinationName);
+  }
   // 1. Jeu de 52 cartes
   const deck: string[] = [];
   for (const r of RANKS) {
@@ -49,7 +56,8 @@ export function generateRealisticPokerDraw(
   const board = boardCards.join(', ');
 
   // 5. Libellé du gagnant
-  const winnerLabel = `${winningHandId} (${combinationName})`;
+  const cleanComb = combinationName.replace(/^Combinaison gagnante\.\s*/i, '').trim();
+  const winnerLabel = `${resolvedWinner} (${cleanComb})`;
 
   return {
     hands,

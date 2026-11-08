@@ -20,15 +20,20 @@ import {
   generateRoundScheduleSequence,
   parseScheduleString,
 } from '../../utils/scheduleHelper';
+import { replaceMonthNamesWithNumbers } from '../../utils/dateFormatter';
 
 export interface PokerScheduleModalProps {
   visible: boolean;
   onClose: () => void;
+  currentPlacedDate?: string;
+  currentPlacedTime?: string;
   currentStartDate?: string;
   currentStartTime?: string;
   currentInterval?: number;
   currentRoundsCount?: number;
   onApplySchedule: (params: {
+    placedDate?: string;
+    placedTime?: string;
     startDate: string;
     startTime: string;
     interval: number;
@@ -39,6 +44,8 @@ export interface PokerScheduleModalProps {
 export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
   visible,
   onClose,
+  currentPlacedDate,
+  currentPlacedTime,
   currentStartDate,
   currentStartTime,
   currentInterval = 3,
@@ -50,6 +57,8 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
   const isDark = theme.isDark;
 
   // États locaux du formulaire de programmation
+  const [placedDate, setPlacedDate] = useState<string>(currentPlacedDate || getCurrentDateString());
+  const [placedTime, setPlacedTime] = useState<string>(currentPlacedTime || getCurrentTimeString());
   const [startDate, setStartDate] = useState<string>(currentStartDate || getCurrentDateString());
   const [startTime, setStartTime] = useState<string>(currentStartTime || getCurrentTimeString());
   const [interval, setInterval] = useState<number>(currentInterval);
@@ -58,12 +67,14 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
   // Initialisation à l'ouverture
   useEffect(() => {
     if (visible) {
+      setPlacedDate(currentPlacedDate || getCurrentDateString());
+      setPlacedTime(currentPlacedTime || getCurrentTimeString());
       setStartDate(currentStartDate || getCurrentDateString());
       setStartTime(currentStartTime || getCurrentTimeString());
       setInterval(currentInterval || 3);
       setRoundsCount(Math.max(1, currentRoundsCount || 1));
     }
-  }, [visible, currentStartDate, currentStartTime, currentInterval, currentRoundsCount]);
+  }, [visible, currentPlacedDate, currentPlacedTime, currentStartDate, currentStartTime, currentInterval, currentRoundsCount]);
 
   // Presets de date rapide
   const handleSetToday = () => {
@@ -86,14 +97,29 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
     setStartTime(res.timeStr);
   };
 
+  const handleSetPlacedNow = () => {
+    setPlacedDate(getCurrentDateString());
+    setPlacedTime(getCurrentTimeString());
+  };
+
+  const handleSetPlacedBeforeMatch = (minsBefore: number) => {
+    const res = addMinutesToSchedule(startDate, startTime, -minsBefore);
+    setPlacedDate(res.dateStr);
+    setPlacedTime(res.timeStr);
+  };
+
   // Séquence prévisualisée
   const previewSequence = useMemo(() => {
     return generateRoundScheduleSequence(startDate, startTime, interval, roundsCount, 1);
   }, [startDate, startTime, interval, roundsCount]);
 
   const handleConfirm = () => {
+    // Normalisation automatique des mois textuels (ex: 21 oct 2026 -> 21.10.2026)
+    const cleanPlacedDate = replaceMonthNamesWithNumbers(placedDate.trim());
+    const cleanDate = replaceMonthNamesWithNumbers(startDate.trim());
+
     // Validation du format date (JJ.MM.AAAA)
-    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(startDate.trim())) {
+    if (!/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(cleanDate)) {
       Alert.alert('Format invalide', 'Veuillez saisir une date au format JJ.MM.AAAA (ex: 25.09.2026).');
       return;
     }
@@ -105,7 +131,9 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
     }
 
     onApplySchedule({
-      startDate: startDate.trim(),
+      placedDate: cleanPlacedDate,
+      placedTime: placedTime.trim(),
+      startDate: cleanDate,
       startTime: startTime.trim(),
       interval: Math.max(1, interval),
       roundsCount: Math.max(1, roundsCount),
@@ -133,7 +161,7 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
                 <Text style={[styles.title, { color: theme.textPrimary }]}>Programmation TVBet</Text>
               </View>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                Configure les horaires de départ et le cadencement des manches
+                Configure l'heure de mise et le cadencement des manches
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -142,6 +170,91 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
           </View>
 
           <ScrollView style={styles.bodyScroll} showsVerticalScrollIndicator={false}>
+            {/* 0. Heure et Date de Mise du Coupon */}
+            <View style={[styles.sectionCard, { backgroundColor: isDark ? '#1C222B' : '#F8FAFC', borderColor: isDark ? '#2E3846' : '#E2E8F0' }]}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="receipt-outline" size={17} color={theme.primary} style={{ marginRight: 6 }} />
+                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Heure de mise du coupon</Text>
+              </View>
+              <Text style={{ fontSize: 11.5, color: theme.textSecondary, marginBottom: 10, lineHeight: 16 }}>
+                Cette heure de mise est affichée en haut du bloc financier du ticket et sur les cartes d'historique.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1.2 }}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary, fontSize: 11, marginBottom: 4 }]}>Date de mise</Text>
+                  <TextInput
+                    style={[
+                      styles.inputField,
+                      {
+                        backgroundColor: isDark ? '#12161C' : '#FFFFFF',
+                        borderColor: isDark ? '#2E3846' : '#CBD5E1',
+                        color: isDark ? '#FFFFFF' : '#0F172A',
+                      },
+                    ]}
+                    value={placedDate}
+                    onChangeText={(val) => setPlacedDate(replaceMonthNamesWithNumbers(val))}
+                    placeholder="JJ.MM.AAAA"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary, fontSize: 11, marginBottom: 4 }]}>Heure de mise</Text>
+                  <TextInput
+                    style={[
+                      styles.inputField,
+                      {
+                        backgroundColor: isDark ? '#12161C' : '#FFFFFF',
+                        borderColor: isDark ? '#2E3846' : '#CBD5E1',
+                        color: isDark ? '#FFFFFF' : '#0F172A',
+                      },
+                    ]}
+                    value={placedTime}
+                    onChangeText={setPlacedTime}
+                    placeholder="HH:mm"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+              </View>
+
+              <View style={[styles.presetsRow, { marginTop: 8 }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.presetBtn,
+                    { backgroundColor: isDark ? '#252D38' : '#EDF2F7', borderColor: isDark ? '#334155' : '#CBD5E1' },
+                  ]}
+                  onPress={handleSetPlacedNow}
+                >
+                  <Text style={[styles.presetBtnText, { color: theme.textPrimary }]}>
+                    Maintenant
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.presetBtn,
+                    { backgroundColor: isDark ? '#252D38' : '#EDF2F7', borderColor: isDark ? '#334155' : '#CBD5E1' },
+                  ]}
+                  onPress={() => handleSetPlacedBeforeMatch(5)}
+                >
+                  <Text style={[styles.presetBtnText, { color: theme.textPrimary }]}>
+                    -5 min avant match
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.presetBtn,
+                    { backgroundColor: isDark ? '#252D38' : '#EDF2F7', borderColor: isDark ? '#334155' : '#CBD5E1' },
+                  ]}
+                  onPress={() => handleSetPlacedBeforeMatch(15)}
+                >
+                  <Text style={[styles.presetBtnText, { color: theme.textPrimary }]}>
+                    -15 min avant match
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* 1. Date de Début */}
             <View style={[styles.sectionCard, { backgroundColor: isDark ? '#1C222B' : '#F8FAFC', borderColor: isDark ? '#2E3846' : '#E2E8F0' }]}>
               <View style={styles.sectionHeader}>
@@ -189,7 +302,7 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
                   },
                 ]}
                 value={startDate}
-                onChangeText={setStartDate}
+                onChangeText={(val) => setStartDate(replaceMonthNamesWithNumbers(val))}
                 placeholder="JJ.MM.AAAA (ex: 25.09.2026)"
                 placeholderTextColor="#94A3B8"
               />
@@ -479,6 +592,11 @@ const styles = StyleSheet.create({
   presetBtnText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   inputField: {
     borderRadius: 8,

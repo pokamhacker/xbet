@@ -1,15 +1,12 @@
-import BetDetailScreen, {
-  BetEventSelection,
-  BetTicket,
+import TicketDetailsScreen, {
+  BetDetailEvent,
   Props as BetDetailScreenProps,
-  mapBetSlipToBetTicket,
-} from '../../BetDetailScreen';
+} from './TicketDetailsScreen';
 
-export default BetDetailScreen;
-export {
-  BetDetailScreen,
-  BetEventSelection,
-  BetTicket,
-  BetDetailScreenProps,
-  mapBetSlipToBetTicket,
-};
+export const BetDetailScreen = TicketDetailsScreen;
+export type BetEventSelection = any;
+export type BetTicket = any;
+export const mapBetSlipToBetTicket = (slip: any) => slip;
+export type { BetDetailEvent, BetDetailScreenProps };
+
+export default TicketDetailsScreen;

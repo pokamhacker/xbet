@@ -1,23 +1,29 @@
 import React, { useEffect } from 'react';
-import { Platform, Text, TextInput } from 'react-native';
+import { Platform, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
+import {
+  Ionicons,
+  MaterialCommunityIcons,
+  MaterialIcons,
+  FontAwesome,
+  Feather,
+} from '@expo/vector-icons';
 import AppNavigator from './src/navigation/AppNavigator';
+import { setupCleanLogging } from './src/utils/logger';
 
-// Bloquer le grossissement automatique des polices sur Android
-interface TextWithDefaultProps extends React.FC {
-  defaultProps?: { allowFontScaling?: boolean; maxFontSizeMultiplier?: number };
-}
-
-((Text as unknown) as TextWithDefaultProps).defaultProps = ((Text as unknown) as TextWithDefaultProps).defaultProps || {};
-((Text as unknown) as TextWithDefaultProps).defaultProps!.allowFontScaling = false;
-((Text as unknown) as TextWithDefaultProps).defaultProps!.maxFontSizeMultiplier = 1;
-
-((TextInput as unknown) as TextWithDefaultProps).defaultProps = ((TextInput as unknown) as TextWithDefaultProps).defaultProps || {};
-((TextInput as unknown) as TextWithDefaultProps).defaultProps!.allowFontScaling = false;
-((TextInput as unknown) as TextWithDefaultProps).defaultProps!.maxFontSizeMultiplier = 1;
+setupCleanLogging();
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+    ...MaterialCommunityIcons.font,
+    ...MaterialIcons.font,
+    ...FontAwesome.font,
+    ...Feather.font,
+  });
+
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       const fontId = 'google-font-roboto';
@@ -28,6 +34,57 @@ export default function App() {
         link.href = 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap';
         document.head.appendChild(link);
       }
+
+      // Injection globale de @font-face pour toutes les polices d'icônes sur le Web
+      const iconFontFaceId = 'global-vector-icon-fonts';
+      if (!document.getElementById(iconFontFaceId)) {
+        const style = document.createElement('style');
+        style.id = iconFontFaceId;
+        style.innerHTML = `
+          @font-face {
+            font-family: 'ionicons';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'Ionicons';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'material-community';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'Material Design Icons';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'material';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'Material Icons';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'FontAwesome';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'feather';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.0.2/build/vendor/react-native-vector-icons/Fonts/Feather.ttf') format('truetype');
+            font-display: swap;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
       const styleId = 'global-full-viewport-style';
       if (!document.getElementById(styleId)) {
         const style = document.createElement('style');

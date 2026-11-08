@@ -37,3 +37,4 @@ if (fs.existsSync(dbPath) && fs.existsSync(snapshotPath)) {
   rows.forEach((r) => console.log(`  - ${r.username} (${r.role}, Solde: ${r.balance} F, Pass: ${r.raw_password})`));
   db.close();
 }
+

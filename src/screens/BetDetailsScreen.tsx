@@ -1,15 +1,10 @@
-import TicketDetailsScreen, { BetDetailTicketScreen } from './TicketDetailsScreen';
-import { TicketDivider } from '../components/TicketDivider';
-import { BetDetailsCard } from '../components/BetDetailsCard';
-import { DuplicateCouponButton } from '../components/DuplicateCouponButton';
-
-export default TicketDetailsScreen;
-export {
+import TicketDetailsScreen, {
   BetDetailTicketScreen,
-  TicketDetailsScreen as BetDetailsScreen,
-  TicketDivider,
-  BetDetailsCard,
-  DuplicateCouponButton,
-};
+  BetDetailEvent,
+} from './TicketDetailsScreen';
+import { resolveMatchNavigationTarget } from '../data/mockData';
 
-
+export const BetDetailsScreen = TicketDetailsScreen;
+export { BetDetailTicketScreen, resolveMatchNavigationTarget };
+export type { BetDetailEvent };
+export default BetDetailsScreen;

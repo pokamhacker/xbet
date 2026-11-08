@@ -12,6 +12,7 @@ import {
   Animated,
   Platform,
   StatusBar,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
@@ -379,12 +380,20 @@ const resolveWebMediaUri = (moduleAsset: any, fallbackPath: string): string => {
   if (typeof moduleAsset === 'number') {
     try {
       const asset = Asset.fromModule(moduleAsset);
+      if (asset?.localUri) return asset.localUri;
       if (asset?.uri) return asset.uri;
     } catch {
       // ignore
     }
   }
   return fallbackPath;
+};
+
+const resolveImageSource = (moduleAsset: any, fallbackPath: string): any => {
+  if (Platform.OS === 'web') {
+    return { uri: resolveWebMediaUri(moduleAsset, fallbackPath) };
+  }
+  return moduleAsset;
 };
 
 /**
@@ -403,6 +412,8 @@ const FifaChampionshipStreamPlayer: React.FC<{
   homeScore: string | number;
   awayScore: string | number;
   matchSeconds: number;
+  width: number;
+  height: number;
 }> = ({
   mode,
   streamUrl,
@@ -415,12 +426,24 @@ const FifaChampionshipStreamPlayer: React.FC<{
   homeScore,
   awayScore,
   matchSeconds,
+  width: propWidth,
+  height: propHeight,
 }) => {
     const [frameIndex, setFrameIndex] = useState(0);
-    const [viewport, setViewport] = useState({ width: 364, height: 200 });
+    const [viewport, setViewport] = useState({
+      width: propWidth || 364,
+      height: propHeight || 200,
+    });
     const [webVideoError, setWebVideoError] = useState(false);
+    const [webVideoReady, setWebVideoReady] = useState(false);
     const [showRushTransition, setShowRushTransition] = useState(false);
     const videoRef = useRef<any>(null);
+
+    useEffect(() => {
+      if (propWidth > 0 && propHeight > 0) {
+        setViewport({ width: propWidth, height: propHeight });
+      }
+    }, [propWidth, propHeight]);
 
     const videoModule = useMemo(() => {
       if (mode === 'fc26_rush') return FIFA_FC26_RUSH_VIDEO;
@@ -428,16 +451,40 @@ const FifaChampionshipStreamPlayer: React.FC<{
       return FIFA_VOLTA_VIDEO;
     }, [mode]);
 
-    const spriteModule = useMemo(() => {
-      if (mode === 'fc26_rush') return FIFA_FC26_RUSH_SPRITE;
-      if (mode === 'fc25_3x3') return FIFA_FC25_3X3_SPRITE;
-      return FIFA_VOLTA_SPRITE;
+    const spriteSource = useMemo(() => {
+      if (mode === 'fc26_rush') {
+        return resolveImageSource(FIFA_FC26_RUSH_SPRITE, '/assets/ui/fifa_fc26_rush_sprite.jpg');
+      }
+      if (mode === 'fc25_3x3') {
+        return resolveImageSource(FIFA_FC25_3X3_SPRITE, '/assets/ui/fifa_fc25_3x3_sprite.jpg');
+      }
+      return resolveImageSource(FIFA_VOLTA_SPRITE, '/assets/ui/fifa_volta_sprite.jpg');
+    }, [mode]);
+
+    const posterSource = useMemo(() => {
+      if (mode === 'fc26_rush') {
+        return resolveImageSource(FIFA_FC26_RUSH_POSTER, '/assets/ui/fifa_fc26_rush_poster.jpg');
+      }
+      if (mode === 'fc25_3x3') {
+        return resolveImageSource(FIFA_FC25_3X3_POSTER, '/assets/ui/fifa_fc25_3x3_poster.jpg');
+      }
+      return null;
     }, [mode]);
 
     const directFallbackUri = useMemo(() => {
       if (mode === 'fc26_rush') return '/assets/ui/fifa_fc26_rush_live.mp4';
       if (mode === 'fc25_3x3') return '/assets/ui/fifa_fc25_3x3_live.mp4';
       return '/assets/ui/fifa_volta_live.mp4';
+    }, [mode]);
+
+    const resolvedPosterUri = useMemo(() => {
+      if (mode === 'fc26_rush') {
+        return resolveWebMediaUri(FIFA_FC26_RUSH_POSTER, '/assets/ui/fifa_fc26_rush_poster.jpg');
+      }
+      if (mode === 'fc25_3x3') {
+        return resolveWebMediaUri(FIFA_FC25_3X3_POSTER, '/assets/ui/fifa_fc25_3x3_poster.jpg');
+      }
+      return undefined;
     }, [mode]);
 
     const resolvedWebVideoUri = useMemo(() => {
@@ -448,13 +495,17 @@ const FifaChampionshipStreamPlayer: React.FC<{
       return null;
     }, [streamUrl, videoModule, directFallbackUri]);
 
-    // En mode terminé ("Jeu terminé"), on n'a pas besoin de vidéo : affichage de l'affiche / image fixe comme avant
+    useEffect(() => {
+      setWebVideoError(false);
+      setWebVideoReady(false);
+    }, [resolvedWebVideoUri, mode]);
+
     const useWebVideo =
-      Platform.OS === 'web' && Boolean(resolvedWebVideoUri) && !webVideoError && !isFinished;
+      Platform.OS === 'web' && Boolean(resolvedWebVideoUri) && !webVideoError;
 
     // Gestion impérative du son muet et du démarrage de lecture pour contourner la politique autoplay du navigateur
     useEffect(() => {
-      if (Platform.OS !== 'web' || isFinished) return;
+      if (Platform.OS !== 'web') return;
       const el = videoRef.current;
       if (!el) return;
 
@@ -494,7 +545,7 @@ const FifaChampionshipStreamPlayer: React.FC<{
     }, [resolvedWebVideoUri, isPlaying]);
 
     useEffect(() => {
-      if (!isPlaying || isFinished) {
+      if (!isPlaying) {
         setFrameIndex(4);
         return;
       }
@@ -502,7 +553,7 @@ const FifaChampionshipStreamPlayer: React.FC<{
         setFrameIndex((f) => (f + 1) % SPRITE_FRAMES);
       }, 55);
       return () => clearInterval(interval);
-    }, [isPlaying, isFinished]);
+    }, [isPlaying]);
 
     // Animation de transition officielle EA SPORTS FC 26 RUSH (comme sur annimation FC 26. 5X5 Rush. Superligue.jpeg)
     useEffect(() => {
@@ -549,7 +600,7 @@ const FifaChampionshipStreamPlayer: React.FC<{
 
     return (
       <View
-        style={styles.broadcastViewport}
+        style={[styles.broadcastViewport, { width: viewport.width, height: viewport.height }]}
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
           if (width > 0 && height > 0) {
@@ -557,78 +608,24 @@ const FifaChampionshipStreamPlayer: React.FC<{
           }
         }}
       >
-        {useWebVideo && resolvedWebVideoUri ? (
-          React.createElement(
-            'video',
-            {
-              ref: (el: any) => {
-                videoRef.current = el;
-                if (el) {
-                  el.muted = true;
-                  el.defaultMuted = true;
-                  el.playsInline = true;
-                  el.setAttribute('playsinline', '');
-                  el.setAttribute('webkit-playsinline', '');
-                  el.play?.().catch(() => {});
-                }
-              },
-              key: resolvedWebVideoUri,
-              autoPlay: true,
-              muted: true,
-              loop: true,
-              playsInline: true,
-              preload: 'auto',
-              controls: false,
-              onError: () => {
-                if (videoRef.current && directFallbackUri && videoRef.current.src !== directFallbackUri) {
-                  videoRef.current.src = directFallbackUri;
-                  videoRef.current.play().catch(() => {});
-                } else {
-                  setWebVideoError(true);
-                }
-              },
-              style: {
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                backgroundColor: '#000000',
-                display: 'block',
-                pointerEvents: 'none',
-              },
-            },
-            [
-              React.createElement('source', {
-                key: 'src-primary',
-                src: resolvedWebVideoUri,
-                type: 'video/mp4',
-              }),
-              directFallbackUri && directFallbackUri !== resolvedWebVideoUri
-                ? React.createElement('source', {
-                    key: 'src-fallback',
-                    src: directFallbackUri,
-                    type: 'video/mp4',
-                  })
-                : null,
-            ].filter(Boolean)
-          )
-        ) : isFinished && mode === 'fc25_3x3' ? (
+        {/* Couche de fond : Affiche et/ou Sprite animé toujours visible sous la vidéo */}
+        {posterSource ? (
           <Image
-            source={FIFA_FC25_3X3_POSTER}
-            style={{ width: '100%', height: '100%' }}
+            source={posterSource}
+            style={StyleSheet.absoluteFill}
             resizeMode="cover"
           />
-        ) : isFinished && mode === 'fc26_rush' ? (
+        ) : null}
+
+        {!(isFinished && posterSource) && (
           <Image
-            source={FIFA_FC26_RUSH_POSTER}
-            style={{ width: '100%', height: '100%' }}
-            resizeMode="cover"
-          />
-        ) : (
-          <Image
-            source={spriteModule}
+            source={spriteSource}
             fadeDuration={0}
             resizeMode="stretch"
             style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
               width: viewport.width * SPRITE_COLS,
               height: viewport.height * SPRITE_ROWS,
               transform: [
@@ -638,6 +635,75 @@ const FifaChampionshipStreamPlayer: React.FC<{
             }}
           />
         )}
+
+        {/* Couche vidéo HTML5 principale sur le Web */}
+        {useWebVideo && resolvedWebVideoUri
+          ? React.createElement(
+              'video',
+              {
+                ref: (el: any) => {
+                  videoRef.current = el;
+                  if (el) {
+                    el.muted = true;
+                    el.defaultMuted = true;
+                    el.playsInline = true;
+                    el.setAttribute('playsinline', '');
+                    el.setAttribute('webkit-playsinline', '');
+                    el.play?.().catch(() => {});
+                  }
+                },
+                key: resolvedWebVideoUri,
+                src: resolvedWebVideoUri,
+                poster: resolvedPosterUri,
+                autoPlay: true,
+                muted: true,
+                loop: true,
+                playsInline: true,
+                preload: 'auto',
+                controls: false,
+                onLoadedData: () => setWebVideoReady(true),
+                onCanPlay: () => setWebVideoReady(true),
+                onPlaying: () => setWebVideoReady(true),
+                onTimeUpdate: () => {
+                  if (!webVideoReady) setWebVideoReady(true);
+                },
+                onError: () => {
+                  if (videoRef.current && directFallbackUri && videoRef.current.src !== directFallbackUri && !videoRef.current.src?.endsWith(directFallbackUri)) {
+                    videoRef.current.src = directFallbackUri;
+                    videoRef.current.play().catch(() => {});
+                  } else {
+                    setWebVideoError(true);
+                  }
+                },
+                style: {
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  backgroundColor: 'transparent',
+                  opacity: webVideoReady ? 1 : 0,
+                  display: 'block',
+                  pointerEvents: 'none',
+                },
+              },
+              [
+                React.createElement('source', {
+                  key: 'src-primary',
+                  src: resolvedWebVideoUri,
+                  type: 'video/mp4',
+                }),
+                directFallbackUri && directFallbackUri !== resolvedWebVideoUri
+                  ? React.createElement('source', {
+                      key: 'src-fallback',
+                      src: directFallbackUri,
+                      type: 'video/mp4',
+                    })
+                  : null,
+              ].filter(Boolean)
+            )
+          : null}
 
         {/* ================================================================= */}
         {/* INCRUSTATION TV DYNAMIQUE : NOM DES CLUBS & SCORE CHOISIS         */}
@@ -814,8 +880,11 @@ const TeamStatsDonutChart: React.FC<{
 
 export default function FifaLiveMatchScreen({ route, navigation }: any) {
   const isFocused = useIsFocused();
+  const { width: windowWidth } = useWindowDimensions();
   const { insets } = useResponsive();
   const { currentTheme, brandChoice, modeChoice } = useThemeStore();
+  const playerWidth = Math.max(280, Math.min(windowWidth || 375, 480) - 12);
+  const playerHeight = Math.round((playerWidth * 200) / 364);
   const brandPrimary = currentTheme?.primary || '#2ECC71';
   const isMelbet =
     brandChoice === 'melbet' || (currentTheme?.name || '').toLowerCase().includes('melbet');
@@ -929,7 +998,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
   });
 
   const isPreMatch = userViewMode === 'prematch';
-  const isMatchFinished = isStatusFinished || (hasExplicitDate && liveProgress.isFinished);
+  const isMatchFinished = isStatusFinished;
 
   // Compte à rebours avant-match (ex: "Le jeu démarre dans 00:17:18")
   const preMatchCountdown = useMemo(() => {
@@ -1669,7 +1738,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
       {/* 1. EN-TÊTE FIFA 24 FIXE EN HAUT (Adapté Avant-match / Direct / Fini) */}
       {/* ===================================================================== */}
       <ImageBackground
-        source={FIFA_HEADER_BG}
+        source={resolveImageSource(FIFA_HEADER_BG, '/assets/ui/fifa24_player_smoke.jpg')}
         resizeMode="cover"
         style={[
           styles.headerBg,
@@ -1824,11 +1893,11 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
           {/* ===================================================================== */}
           {/* A. LECTEUR VIDÉO FIXE (NE DÉFILE PAS) SELON LE CHAMPIONNAT FIFA CHOISI */}
           <View style={styles.videoOuterWrap}>
-            <View style={styles.videoPlayerContainer}>
+            <View style={[styles.videoPlayerContainer, { height: playerHeight }]}>
               <FifaChampionshipStreamPlayer
                 mode={broadcastMode}
                 streamUrl={streamUrl}
-                isPlaying={isFocused && !isStreamLoading}
+                isPlaying={isFocused}
                 isFinished={isMatchFinished}
                 homeTeamName={homeTeamName}
                 awayTeamName={awayTeamName}
@@ -1837,13 +1906,9 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
                 homeScore={isPreMatch ? 0 : homeScoreNum}
                 awayScore={isPreMatch ? 0 : awayScoreNum}
                 matchSeconds={activeElapsedSeconds}
+                width={playerWidth}
+                height={playerHeight}
               />
-
-              {isStreamLoading && (
-                <View style={[StyleSheet.absoluteFill, styles.videoLoaderOverlay]}>
-                  <ActivityIndicator size="large" color={brandPrimary} />
-                </View>
-              )}
             </View>
           </View>
 
@@ -2039,7 +2104,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
         >
           <View style={styles.splashTopArtworkWrap}>
             <Image
-              source={FIFA_SPLASH_TOP_BG}
+              source={resolveImageSource(FIFA_SPLASH_TOP_BG, '/assets/ui/fifa24_splash_top.jpg')}
               style={styles.splashTopArtwork}
               resizeMode="cover"
             />
@@ -2070,7 +2135,11 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
           </View>
 
           <Animated.View style={[styles.splashBallCenter, { transform: [{ scale: ballScale }] }]}>
-            <Image source={FIFA_SPLASH_BALL} style={styles.splashBallImage} resizeMode="contain" />
+            <Image
+              source={resolveImageSource(FIFA_SPLASH_BALL, '/assets/ui/fifa_splash_ball.png')}
+              style={styles.splashBallImage}
+              resizeMode="contain"
+            />
           </Animated.View>
         </Animated.View>
       )}

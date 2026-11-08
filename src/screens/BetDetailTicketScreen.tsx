@@ -1,7 +1,12 @@
-import TicketDetailsScreen, { BetDetailTicketScreen } from './TicketDetailsScreen';
+import TicketDetailsScreen, {
+  BetDetailEvent,
+  Props as BetDetailTicketScreenProps,
+} from './TicketDetailsScreen';
 import { TicketDivider } from '../components/TicketDivider';
 import { BetDetailsCard } from '../components/BetDetailsCard';
 
-export default TicketDetailsScreen;
-export { BetDetailTicketScreen, TicketDivider, BetDetailsCard };
+export const BetDetailTicketScreen = TicketDetailsScreen;
+export { TicketDivider, BetDetailsCard };
+export type { BetDetailEvent, BetDetailTicketScreenProps };
 
+export default TicketDetailsScreen;

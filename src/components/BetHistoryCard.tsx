@@ -51,7 +51,6 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
         eventsCount={
           props.eventsCount ?? coupon.eventsCount ?? coupon.events?.length ?? 1
         }
-        events={props.events ?? coupon.events}
         sportCategory={sportCategory}
         odds={props.odds ?? coupon.totalOdds}
         stake={props.stake ?? coupon.stake}

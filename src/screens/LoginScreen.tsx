@@ -59,8 +59,8 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: currentTheme.isDark ? currentTheme.background : '#0F172A' }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#0F172A" translucent={Platform.OS === 'android'} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: currentTheme?.isDark ? currentTheme?.background : '#0F172A' }]}>
+      <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
@@ -75,10 +75,10 @@ export default function LoginScreen() {
             <View style={{ marginBottom: 12, alignItems: 'center' }}>
               <BrandLogo size={36} variant="header" showTagline />
             </View>
-            <Text style={[styles.brandTitle, { color: currentTheme.isDark ? currentTheme.textPrimary : '#FFFFFF' }]}>
-              {currentTheme.displayName.toUpperCase()} STUDIO
+            <Text style={[styles.brandTitle, { color: currentTheme?.isDark ? currentTheme?.textPrimary : '#FFFFFF' }]}>
+              {((currentTheme?.displayName || '1xBet')).toUpperCase()} STUDIO
             </Text>
-            <Text style={[styles.brandSubtitle, { color: currentTheme.textSecondary }]}>PORTAIL D'AUTHENTIFICATION UNIQUE</Text>
+            <Text style={[styles.brandSubtitle, { color: currentTheme?.textSecondary || '#94A3B8' }]}>PORTAIL D'AUTHENTIFICATION UNIQUE</Text>
           </View>
 
           {/* Session Invalidation Alert if kicked out */}
@@ -161,7 +161,7 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={[
                 styles.loginBtn,
-                { backgroundColor: currentTheme.primary },
+                { backgroundColor: currentTheme?.primary || '#243DB5' },
                 isLoading && styles.loginBtnDisabled,
               ]}
               onPress={handleLogin}
@@ -169,11 +169,11 @@ export default function LoginScreen() {
               activeOpacity={0.85}
             >
               {isLoading ? (
-                <ActivityIndicator color={currentTheme.colors?.primaryText || '#FFFFFF'} />
+                <ActivityIndicator color={currentTheme?.colors?.primaryText || '#FFFFFF'} />
               ) : (
                 <>
-                  <Text style={[styles.loginBtnText, { color: currentTheme.colors?.primaryText || '#FFFFFF' }]}>SE CONNECTER</Text>
-                  <Ionicons name="arrow-forward" size={18} color={currentTheme.colors?.primaryText || '#FFFFFF'} />
+                  <Text style={[styles.loginBtnText, { color: currentTheme?.colors?.primaryText || '#FFFFFF' }]}>SE CONNECTER</Text>
+                  <Ionicons name="arrow-forward" size={18} color={currentTheme?.colors?.primaryText || '#FFFFFF'} />
                 </>
               )}
             </TouchableOpacity>

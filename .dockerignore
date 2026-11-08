@@ -4,5 +4,17 @@ node_modules
 android
 ios
 dist
+apk
+x-game
+tools
+bot-kamikaze
+bot-royal-feast
+assets
+*.apk
+*.exe
+*.zip
+*.mp4
+*.psd
+*.pdf
 .env
 .tempmediaStorage

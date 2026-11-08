@@ -6,6 +6,7 @@ import {
   Modal,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BetSlip } from '../types/bet';
@@ -77,6 +78,17 @@ export const BetOptionsBottomSheet: React.FC<BetOptionsBottomSheetProps> = ({
   };
 
   const handleDelete = () => {
+    if (Platform.OS === 'web') {
+      const ok =
+        typeof window !== 'undefined'
+          ? window.confirm('Supprimer ce coupon de votre historique ? Cette action est irréversible.')
+          : true;
+      if (ok) {
+        deleteCoupon(coupon.id);
+        onClose();
+      }
+      return;
+    }
     Alert.alert(
       'Supprimer ce coupon ?',
       'Ce coupon sera définitivement retiré de votre historique. Cette action est irréversible.',

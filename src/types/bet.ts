@@ -1,4 +1,4 @@
-export type BetStatus = 'Accepté' | 'En cours' | 'Payé' | 'Gagné' | 'Gain' | 'Perdu' | 'Annulé' | 'Vendu';
+export type BetStatus = 'Accepté' | 'En cours' | 'Payé' | 'Gagné' | 'Gain' | 'Perdu' | 'Perte' | 'Annulé' | 'Vendu';
 export type BetType = 'Simple' | 'Combiné' | 'Système';
 
 export interface PokerHandDistribution {
@@ -37,20 +37,25 @@ export interface MatchEvent {
   prediction: string;
   odd: number;
   actualScore?: string;
+  finalScore?: string;
+  scoreFinal?: string;
   halftimeScore?: string;
+  scoreDetail?: string;
   status: BetStatus;
   roundCode?: string;
   badge?: string;
   isLive?: boolean;
+  isFifa?: boolean;
   gameCategory?: 'sports' | 'poker' | 'mortalkombat' | 'apple' | 'crash' | 'esports';
   pokerResult?: PokerRoundResult;
   mkResult?: MKRoundResult;
   betId?: string;
   sportCategory?: string;
   tournamentName?: string;
-  finalScore?: string;
   eventDate?: string;
   elapsed?: number;
+  elapsedSeconds?: number;
+  durationSeconds?: number;
   fixture?: any;
 }
 
@@ -76,6 +81,9 @@ export interface BetSlip {
   cashoutAmount?: number;
   sellPrice?: number | string;
   shareCode?: string;
+  league?: string;
+  badge?: string;
+  sport?: string;
   isLive?: boolean;
   gameCategory?: 'sports' | 'poker' | 'mortalkombat' | 'apple' | 'crash' | 'esports';
   drawNumber?: string;

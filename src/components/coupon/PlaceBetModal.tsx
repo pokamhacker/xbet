@@ -14,6 +14,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { useCouponStore } from '../../store/couponStore';
 import { useBetStore } from '../../store/useBetStore';
 import { useAuthStore } from '../../store/authStore';
+import { formatCleanOdds } from '../../utils/oddsFormatter';
 
 export interface PlaceBetModalProps {
   visible: boolean;
@@ -55,7 +56,7 @@ export const PlaceBetModal: React.FC<PlaceBetModalProps> = ({
   const [promoCode, setPromoCode] = useState('');
   const [oddsPolicy, setOddsPolicy] = useState<'up' | 'any' | 'ask'>('up');
 
-  const totalOddsDisplay = Number.isInteger(totalOdds) ? totalOdds.toString() : totalOdds.toFixed(2);
+  const totalOddsDisplay = formatCleanOdds(totalOdds);
   const potentialPayout = Math.round(currentStake * (totalOdds || 1));
 
   const handleSetStake = (val: number) => {

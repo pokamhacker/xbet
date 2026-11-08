@@ -3,6 +3,8 @@
  * Format standard : JJ.MM.AAAA (HH:mm)
  */
 
+import { replaceMonthNamesWithNumbers } from './dateFormatter';
+
 export interface ScheduleItem {
   roundNumber: number;
   dateStr: string;     // JJ.MM.AAAA
@@ -42,7 +44,8 @@ export function getCurrentDateTimeFormatted(date: Date = new Date()): string {
  */
 export function parseDateTime(dateStr: string, timeStr: string): Date {
   try {
-    const [day, month, year] = dateStr.split('.').map((n) => parseInt(n, 10));
+    const cleanDateStr = replaceMonthNamesWithNumbers(dateStr);
+    const [day, month, year] = cleanDateStr.split('.').map((n) => parseInt(n, 10));
     const [hours, minutes] = timeStr.split(':').map((n) => parseInt(n, 10));
 
     const validYear = year || new Date().getFullYear();
@@ -61,7 +64,8 @@ export function parseDateTime(dateStr: string, timeStr: string): Date {
  * Décompose une chaîne au format "JJ.MM.AAAA (HH:mm)"
  */
 export function parseScheduleString(schedule: string): { dateStr: string; timeStr: string; jsDate: Date } {
-  const match = schedule.match(/^(\d{2}\.\d{2}\.\d{4})\s*\(([\d]{1,2}:[\d]{2})\)$/);
+  const normalized = replaceMonthNamesWithNumbers(schedule);
+  const match = normalized.match(/^(\d{1,2}\.\d{1,2}\.\d{4})\s*\(([\d]{1,2}:[\d]{2})\)$/);
   if (match) {
     const dateStr = match[1];
     const timeStr = match[2];

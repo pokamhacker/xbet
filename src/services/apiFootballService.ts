@@ -499,14 +499,24 @@ class ApiFootballService {
 
   private getLocalFallbackTeams(leagueId: number | string): ApiFootballTeamItem[] {
     const clean = String(leagueId).trim().toLowerCase();
-    const found = SPORTS_CATALOG.find(
-      (c: Competition) =>
-        c.id.toLowerCase() === clean ||
-        c.id.toLowerCase().includes(clean) ||
-        c.name.toLowerCase() === clean ||
-        c.name.toLowerCase().includes(clean) ||
-        c.logo.includes(`/${clean}.png`)
-    );
+    const found =
+      SPORTS_CATALOG.find(
+        (c: Competition) =>
+          c.sport === 'Football' &&
+          (c.id.toLowerCase() === clean ||
+            c.id.toLowerCase().includes(clean) ||
+            c.name.toLowerCase() === clean ||
+            c.name.toLowerCase().includes(clean) ||
+            c.logo.includes(`/${clean}.png`))
+      ) ||
+      SPORTS_CATALOG.find(
+        (c: Competition) =>
+          c.id.toLowerCase() === clean ||
+          c.id.toLowerCase().includes(clean) ||
+          c.name.toLowerCase() === clean ||
+          c.name.toLowerCase().includes(clean) ||
+          c.logo.includes(`/${clean}.png`)
+      );
 
     if (found && found.teams) {
       return found.teams.map((t: Team, idx: number) => {

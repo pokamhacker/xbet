@@ -40,21 +40,17 @@ export const DuplicateCouponButton: React.FC<DuplicateCouponButtonProps> = ({
   const theme = propTheme || currentTheme;
   const isDark = Boolean(theme?.isDark);
 
-  // Couleur de fond selon le thème (évite tout blanc en mode sombre)
+  // Couleur de fond selon le thème (s'adapte à toutes les marques)
   const bgColor = isDark
     ? theme.duplicateButton?.bg &&
       theme.duplicateButton.bg !== '#FFFFFF' &&
       theme.duplicateButton.bg !== '#ffffffff'
       ? theme.duplicateButton.bg
-      : '#243242'
-    : theme.duplicateButton?.bg || '#E8F1FD';
+      : (theme.cardBackground || '#243242')
+    : theme.duplicateButton?.bg || theme.primarySoft || '#E8F1FD';
 
-  // Couleur du texte (bleu 1xBet officiel)
-  const textColor = isDark
-    ? theme.duplicateButton?.text && theme.duplicateButton.text !== '#E58B05'
-      ? theme.duplicateButton.text
-      : '#3A86FF'
-    : theme.duplicateButton?.text || '#2563EB';
+  // Couleur du texte dynamique selon le thème de chaque marque (Melbet, MegaPari, WinWin, BetWinner, PariPesa, 1xBet)
+  const textColor = theme.duplicateButton?.text || theme.primary || (isDark ? '#3A86FF' : '#2563EB');
 
   const borderColor = isDark ? (theme.border || '#2C3A4B') : 'transparent';
 
@@ -98,7 +94,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   buttonText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',

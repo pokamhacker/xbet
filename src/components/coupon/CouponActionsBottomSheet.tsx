@@ -1,7 +1,11 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform } from 'react-native';
 import { useThemeStore } from '../../stores/themeStore';
+import {
+  SaveCouponActionIcon,
+  LoadCouponActionIcon,
+  CreateCouponActionIcon,
+} from '../common/CouponIcons';
 
 export interface CouponActionsBottomSheetProps {
   visible: boolean;
@@ -19,19 +23,39 @@ export const CouponActionsBottomSheet: React.FC<CouponActionsBottomSheetProps> =
   onLoadCoupon,
   onCreateCoupon,
 }) => {
-  const { currentTheme } = useThemeStore();
-  const isDark = currentTheme.isDark;
+  const { currentTheme, setBottomBarHidden } = useThemeStore();
+  const isDark = currentTheme?.isDark ?? false;
 
-  const sheetBg = isDark ? currentTheme.cardBackground : '#FFFFFF';
+  const sheetBg = isDark ? (currentTheme?.cardBackground || '#1E293B') : '#FFFFFF';
   const textColor = isDark ? '#F8FAFC' : '#1E293B';
   const titleColor = isDark ? '#F8FAFC' : '#0F172A';
-  const iconColor = isDark ? '#F8FAFC' : '#1E293B';
+  const iconColor = isDark ? '#94A3B8' : '#567994';
   const borderColor = isDark ? '#334155' : '#F1F5F9';
   const handleColor = isDark ? '#475569' : '#CBD5E1';
 
+  useEffect(() => {
+    if (visible) {
+      setBottomBarHidden(true);
+    }
+    return () => {
+      setBottomBarHidden(false);
+    };
+  }, [visible, setBottomBarHidden]);
+
+  const handleClose = () => {
+    setBottomBarHidden(false);
+    onClose();
+  };
+
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
-      <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.overlay}>
+    <Modal
+      animationType="slide"
+      onRequestClose={handleClose}
+      transparent
+      visible={visible}
+      statusBarTranslucent={true}
+    >
+      <TouchableOpacity activeOpacity={1} onPress={handleClose} style={styles.overlay}>
         <TouchableOpacity
           activeOpacity={1}
           style={[styles.sheetContainer, { backgroundColor: sheetBg }]}
@@ -52,7 +76,9 @@ export const CouponActionsBottomSheet: React.FC<CouponActionsBottomSheetProps> =
               onSaveCoupon();
             }}
           >
-            <Feather color={iconColor} name="download" size={24} style={styles.icon} />
+            <View style={styles.iconWrapper}>
+              <SaveCouponActionIcon color={iconColor} size={24} />
+            </View>
             <Text style={[styles.optionText, { color: textColor }]}>Enregistrer le coupon de pari</Text>
           </TouchableOpacity>
 
@@ -65,7 +91,9 @@ export const CouponActionsBottomSheet: React.FC<CouponActionsBottomSheetProps> =
               onLoadCoupon();
             }}
           >
-            <Feather color={iconColor} name="upload" size={24} style={styles.icon} />
+            <View style={styles.iconWrapper}>
+              <LoadCouponActionIcon color={iconColor} size={24} />
+            </View>
             <Text style={[styles.optionText, { color: textColor }]}>Charger le coupon de pari</Text>
           </TouchableOpacity>
 
@@ -78,7 +106,9 @@ export const CouponActionsBottomSheet: React.FC<CouponActionsBottomSheetProps> =
               if (onCreateCoupon) onCreateCoupon();
             }}
           >
-            <Feather color={iconColor} name="sliders" size={24} style={styles.icon} />
+            <View style={styles.iconWrapper}>
+              <CreateCouponActionIcon color={iconColor} size={24} />
+            </View>
             <Text style={[styles.optionText, { color: textColor }]}>Créer un coupon de pari</Text>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -90,8 +120,22 @@ export const CouponActionsBottomSheet: React.FC<CouponActionsBottomSheetProps> =
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     justifyContent: 'flex-end',
+    width: '100%',
+    height: '100%',
+    zIndex: 99999,
+    ...(Platform.OS === 'web'
+      ? ({
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+        } as any)
+      : {}),
   },
   sheetContainer: {
     backgroundColor: '#FFFFFF',
@@ -99,7 +143,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 32,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 28,
   },
   handle: {
     width: 36,
@@ -123,13 +167,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  icon: {
-    marginRight: 16,
+  iconWrapper: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
   optionText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#1E293B',
+    letterSpacing: -0.1,
   },
 });
 

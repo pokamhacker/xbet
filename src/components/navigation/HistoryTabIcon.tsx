@@ -15,84 +15,64 @@ export interface HistoryTabIconProps {
 export const HistoryTabIcon: React.FC<HistoryTabIconProps> = ({
   focused = false,
   color,
-  size = 24,
+  size = 22,
   showLabel = true,
   label = 'Historique',
 }) => {
   const { currentTheme, isDark } = useThemeStore();
 
-  // 1. Couleurs adaptées au thème actif (1xBet, Melbet, Melbet Light, Paripesa)
+  // 1. Couleurs adaptées au thème actif (1xBet, Melbet, Melbet Light, Paripesa, WinWin, BetWinner, MegaPari)
   const activeColor =
-    color ||
+    (focused && color) ||
     currentTheme.bottomBar?.active ||
     currentTheme.primary ||
     '#2563EB';
 
   const inactiveColor =
+    (!focused && color) ||
     currentTheme.bottomBar?.inactive ||
     currentTheme.textSecondary ||
     (isDark ? '#7C8B99' : '#7E95AC');
 
-  // Couleur des aiguilles au centre de la pastille active (généralement blanc ou fort contraste)
-  const needleColor = currentTheme.bottomBar?.centerTint || '#FFFFFF';
+  // Le fond de la pastille prend la couleur active si sélectionné, sinon la couleur inactive (identique au fond plein de l'icône Favoris)
+  const discBgColor = focused ? activeColor : inactiveColor;
 
-  // Dimensions proportionnelles
-  const badgeSize = size + 2; // ex. 26 pour size=24
-  const needleSvgSize = Math.round(size * 0.6); // ex. 14 pour size=24
-  const outlineSvgSize = Math.max(size - 2, 18); // ex. 22 pour size=24
+  // Couleur des aiguilles au centre : blanc haute visibilité ou centerTint du thème
+  const rawCenterTint = currentTheme.bottomBar?.centerTint;
+  const needleColor =
+    rawCenterTint && rawCenterTint.length >= 4 && rawCenterTint !== '#FFFFF'
+      ? rawCenterTint
+      : '#FFFFFF';
+
+  // Dimensions
+  const discSize = size;
+  const needleSvgSize = Math.round(discSize * 0.65); // ~14px pour size=22
 
   return (
     <View style={styles.container}>
-      {focused ? (
-        /* ÉTAT ACTIF : Pastille circulaire pleine à la couleur du thème avec aiguilles d'horloge */
-        <View
-          style={[
-            styles.activeCircle,
-            {
-              width: badgeSize,
-              height: badgeSize,
-              borderRadius: badgeSize / 2,
-              backgroundColor: activeColor,
-            },
-          ]}
-        >
-          <Svg width={needleSvgSize} height={needleSvgSize} viewBox="0 0 24 24" fill="none">
-            {/* Cadran / Aiguille d'horloge en L */}
-            <Path
-              d="M12 7V12L15.5 14.9"
-              stroke={needleColor}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </Svg>
-        </View>
-      ) : (
-        /* ÉTAT INACTIF : Horloge simple contour selon la teinte inactive du thème */
-        <View
-          style={[
-            styles.inactiveContainer,
-            {
-              width: badgeSize,
-              height: badgeSize,
-            },
-          ]}
-        >
-          <Svg width={outlineSvgSize} height={outlineSvgSize} viewBox="0 0 24 24" fill="none">
-            <Path
-              d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
-              stroke={inactiveColor}
-              strokeWidth="2"
-            />
-            <Path
-              d="M12 6V12L16 14"
-              stroke={inactiveColor}
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </Svg>
-        </View>
-      )}
+      {/* Pastille circulaire pleine à la couleur du thème (active ou inactive, calquée sur le fond de Favoris) */}
+      <View
+        style={[
+          styles.circleDisc,
+          {
+            width: discSize,
+            height: discSize,
+            borderRadius: discSize / 2,
+            backgroundColor: discBgColor,
+          },
+        ]}
+      >
+        <Svg width={needleSvgSize} height={needleSvgSize} viewBox="0 0 24 24" fill="none">
+          {/* Aiguille d'horloge en L à angle droit (12h - 15h) parfaitement nette et lisible */}
+          <Path
+            d="M12 6.5V12H16.5"
+            stroke={needleColor}
+            strokeWidth="2.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      </View>
 
       {/* Libellé du texte dynamique selon l'état et le thème */}
       {showLabel && (
@@ -120,21 +100,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 2,
   },
-  activeCircle: {
+  circleDisc: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 3,
-  },
-  inactiveContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   label: {
     fontSize: 10.5,
     textAlign: 'center',
     letterSpacing: -0.1,
     fontFamily: Typography.fontFamily,
+    fontWeight: '500',
+    marginTop: 1,
   },
   activeLabel: {
     fontWeight: '700',

@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import Svg, { Line } from 'react-native-svg';
 import { useThemeStore } from '../stores/themeStore';
 
 export interface TicketDividerProps {
-  backgroundColor?: string; // Couleur de fond exacte derrière la carte (ex: #F1F5F9 ou #18222D)
-  dotColor?: string;        // Couleur des points (ex: #CBD5E1 ou #2C3A4B)
-  notchSize?: number;       // Diamètre de l'encoche (défaut: 12)
+  backgroundColor?: string; // Couleur de fond exacte derrière la carte (ex: #EDF0F5 ou #18222D)
+  dotColor?: string;        // Couleur des pointillés (ex: #DCE1E7 ou #2C3A4B)
+  notchSize?: number;       // Diamètre de l'encoche (défaut: 16)
   style?: StyleProp<ViewStyle>;
   marginVertical?: number;
 }
@@ -13,21 +14,21 @@ export interface TicketDividerProps {
 export const TicketDivider: React.FC<TicketDividerProps> = ({
   backgroundColor: propBg,
   dotColor: propDot,
-  notchSize = 12,
+  notchSize = 16,
   style,
   marginVertical = 6,
 }) => {
   const { currentTheme } = useThemeStore();
   const backgroundColor =
     propBg ??
-    currentTheme?.notchBg ??
-    currentTheme?.background ??
-    (currentTheme?.isDark ? '#18222D' : '#F1F5F9');
+    (currentTheme?.isDark
+      ? currentTheme?.notchBg ?? currentTheme?.background ?? '#18222D'
+      : '#EDF0F5');
   const dotColor =
     propDot ??
-    currentTheme?.dividerBorder ??
-    currentTheme?.border ??
-    (currentTheme?.isDark ? '#2C3A4B' : '#CBD5E1');
+    (currentTheme?.isDark
+      ? currentTheme?.dividerBorder ?? currentTheme?.border ?? '#2C3A4B'
+      : '#DCE1E7');
   const radius = notchSize / 2;
 
   return (
@@ -46,9 +47,19 @@ export const TicketDivider: React.FC<TicketDividerProps> = ({
         ]}
       />
 
-      {/* Ligne de petits points ronds */}
-      <View style={[styles.dashedContainer, { paddingHorizontal: radius }]}>
-        <View style={[styles.dottedLine, { borderColor: dotColor }]} />
+      {/* Ligne horizontale en pointillés (dashed) */}
+      <View style={[styles.dashedContainer, { paddingHorizontal: radius + 2 }]}>
+        <Svg height="2" width="100%">
+          <Line
+            x1="0"
+            y1="1"
+            x2="100%"
+            y2="1"
+            stroke={dotColor}
+            strokeWidth="1.2"
+            strokeDasharray="4, 3"
+          />
+        </Svg>
       </View>
 
       {/* Notch / Encoche Droite */}
@@ -68,7 +79,7 @@ export const TicketDivider: React.FC<TicketDividerProps> = ({
   );
 };
 
-const DEFAULT_NOTCH_SIZE = 12;
+const DEFAULT_NOTCH_SIZE = 16;
 
 const styles = StyleSheet.create({
   container: {
@@ -88,7 +99,7 @@ const styles = StyleSheet.create({
   },
   dashedContainer: {
     flex: 1,
-    height: 1,
+    height: 2,
     paddingHorizontal: DEFAULT_NOTCH_SIZE / 2,
     overflow: 'hidden',
     justifyContent: 'center',
@@ -96,8 +107,8 @@ const styles = StyleSheet.create({
   dottedLine: {
     height: 0,
     borderWidth: 1,
-    borderStyle: 'dotted',
-    borderRadius: 1,
+    borderStyle: 'dashed',
+    borderColor: '#DCE1E7',
   },
 });
 

@@ -24,6 +24,7 @@ import { useCouponStore } from '../store/couponStore';
 import { useThemeStore } from '../stores/themeStore';
 import { BetSlip, MatchEvent } from '../types/bet';
 import { resolveMatchNavigationTarget } from '../data/mockData';
+import { resolveTeamLogo } from '../data/sportsCatalog';
 import {
   adaptEventResultToPrediction,
   normalizeBetSelectionLabel,
@@ -255,7 +256,32 @@ export default function TicketDetailsScreen({
         String(e.league || '').toUpperCase().includes('POKER')
     );
 
-  const isLive = Boolean(currentCoupon?.isLive || (isPokerCoupon && isAccepted));
+  // Détection FIFA pour le coupon global
+  const isFifaCoupon =
+    !isPokerCoupon &&
+    (String(currentCoupon?.sport || '').toUpperCase().includes('FIFA') ||
+      String(currentCoupon?.league || '').toUpperCase().includes('FIFA') ||
+      String(currentCoupon?.league || '').toUpperCase().includes('FC 2') ||
+      String(currentCoupon?.league || '').toUpperCase().includes('5X5 RUSH') ||
+      Boolean(
+        currentCoupon?.events?.some((e: any) => {
+          const sUp = String(e?.sport || '').toUpperCase();
+          const lUp = String(e?.league || '').toUpperCase();
+          return (
+            Boolean(e?.isFifa) ||
+            sUp.includes('FIFA') ||
+            lUp.includes('FIFA') ||
+            lUp.includes('FC 24') ||
+            lUp.includes('FC 25') ||
+            lUp.includes('FC 26') ||
+            lUp.includes('5X5 RUSH') ||
+            lUp.includes('3X3') ||
+            lUp.includes('4X4')
+          );
+        })
+      ));
+
+  const isLive = Boolean(currentCoupon?.isLive || (isPokerCoupon && isAccepted) || (isFifaCoupon && isAccepted));
   const statusLabel = isPaid ? 'Payé' : isLost ? 'Perdu' : 'Accepté';
   const statusColor = isPaid
     ? payeColor
@@ -309,10 +335,26 @@ export default function TicketDetailsScreen({
         typeof ev.awayTeam === 'string'
           ? ev.awayTeam
           : (ev.awayTeam as any)?.name || 'Équipe 2';
-      const homeLogo =
+      const rawHomeLogo =
         typeof ev.homeTeam === 'object' ? (ev.homeTeam as any)?.logo : undefined;
-      const awayLogo =
+      const rawAwayLogo =
         typeof ev.awayTeam === 'object' ? (ev.awayTeam as any)?.logo : undefined;
+      const homeLogo =
+        (rawHomeLogo &&
+        (rawHomeLogo.startsWith('http://') || rawHomeLogo.startsWith('https://')) &&
+        !rawHomeLogo.includes('ui-avatars.com')
+          ? rawHomeLogo
+          : undefined) ||
+        resolveTeamLogo(homeName) ||
+        rawHomeLogo;
+      const awayLogo =
+        (rawAwayLogo &&
+        (rawAwayLogo.startsWith('http://') || rawAwayLogo.startsWith('https://')) &&
+        !rawAwayLogo.includes('ui-avatars.com')
+          ? rawAwayLogo
+          : undefined) ||
+        resolveTeamLogo(awayName) ||
+        rawAwayLogo;
 
       const evStatusRaw = String(ev.status || currentCoupon?.status || 'Accepté');
       const evPaid =
@@ -348,8 +390,15 @@ export default function TicketDetailsScreen({
       const isFifa =
         !isBonus &&
         !isPoker &&
-        (sportUpper.includes('FIFA') ||
+        (Boolean((ev as any).isFifa) ||
+          sportUpper.includes('FIFA') ||
           leagueUpper.includes('FIFA') ||
+          leagueUpper.includes('FC 24') ||
+          leagueUpper.includes('FC 25') ||
+          leagueUpper.includes('FC 26') ||
+          leagueUpper.includes('5X5 RUSH') ||
+          leagueUpper.includes('3X3') ||
+          leagueUpper.includes('4X4') ||
           homeName.toUpperCase().includes('FIFA') ||
           awayName.toUpperCase().includes('FIFA'));
 
@@ -454,7 +503,7 @@ export default function TicketDetailsScreen({
         isPoker,
         isFifa,
         isBonus,
-        isLive: Boolean((ev as any).isLive || currentCoupon?.isLive),
+        isLive: Boolean((ev as any).isLive || isFifa || currentCoupon?.isLive),
         durationSeconds: (ev as any).durationSeconds ?? (ev as any).duration ?? (ev as any).matchDuration,
         elapsedSeconds: (ev as any).elapsedSeconds,
         badge: ev.badge || (ev as any).badge,
@@ -919,7 +968,7 @@ export default function TicketDetailsScreen({
                       ? ASSET_ICONS.combine
                       : isPokerCoupon
                       ? ASSET_ICONS.poker
-                      : currentCoupon?.sport === 'FIFA'
+                      : isFifaCoupon
                       ? ASSET_ICONS.fifa
                       : ASSET_ICONS.football
                   }
@@ -928,7 +977,7 @@ export default function TicketDetailsScreen({
                       ? styles.avatarIconCombine
                       : isPokerCoupon
                       ? styles.avatarIconPoker
-                      : currentCoupon?.sport === 'FIFA'
+                      : isFifaCoupon
                       ? styles.avatarIconFifa
                       : styles.avatarIcon,
                     { tintColor: currentTheme.textSecondary || (isDark ? '#8A9DB0' : '#6E849B') },

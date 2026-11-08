@@ -17,10 +17,47 @@ export const SportStatusBadge: React.FC<SportStatusBadgeProps> = ({
   size = 38,
   style,
 }) => {
-  const { currentTheme } = useThemeStore();
+  const { currentTheme, brandChoice } = useThemeStore();
   const isFifa = category.toUpperCase().includes('FIFA');
   const isPoker = category.toUpperCase().includes('POKER') || category.toUpperCase().includes('TVBET');
   const isCombine = category.toUpperCase().includes('COMBINÉ') || category.toUpperCase().includes('COMBINE');
+
+  const brandPrimary =
+    currentTheme?.primary ||
+    currentTheme?.colors?.primary ||
+    (brandChoice === 'melbet'
+      ? '#E58B05'
+      : brandChoice === 'winwin'
+        ? '#7CBD17'
+        : brandChoice === 'betwinner'
+          ? '#007348'
+          : brandChoice === 'paripesa'
+            ? '#1E5BBB'
+            : brandChoice === 'megaparis' || brandChoice === 'megapari'
+              ? '#D3242A'
+              : '#2563EB');
+
+  const isMelbet = Boolean(
+    brandChoice === 'melbet' ||
+    (currentTheme?.name || '').toLowerCase().includes('melbet')
+  );
+
+  const isMegaPari = Boolean(
+    brandChoice === 'megaparis' ||
+    brandChoice === 'megapari' ||
+    (currentTheme?.name || '').toLowerCase().includes('megapari')
+  );
+
+  const detailPokerColor =
+    currentTheme.textSecondary ||
+    currentTheme.colors?.textSecondary ||
+    (currentTheme.isDark ? '#8A96A3' : '#64748B');
+
+  const pokerIconTint = isMelbet
+    ? '#1B365D'
+    : isMegaPari
+      ? detailPokerColor
+      : brandPrimary;
 
   const checkSize = Math.max(14, Math.round(size * 0.38));
   const checkRadius = checkSize / 2;
@@ -38,7 +75,7 @@ export const SportStatusBadge: React.FC<SportStatusBadgeProps> = ({
         ) : isPoker ? (
           <Image
             source={require('../../assets/icons/ic_tvbet_gamepad.png')}
-            style={styles.gamepadImage}
+            style={[styles.gamepadImage, { tintColor: pokerIconTint }]}
             resizeMode="contain"
           />
         ) : isCombine ? (

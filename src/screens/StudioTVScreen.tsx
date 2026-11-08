@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,8 +14,10 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
+import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
-import { generateCouponId, generateRoundCode, generateShareCode } from '../utils/pokerEngine';
+import { useResponsive } from '../utils/responsive';
+import { generateCouponId, generateRoundCode, generateShareCode, generateRealisticPokerDraw } from '../utils/pokerEngine';
 import { BetSlip, MatchEvent } from '../types/bet';
 import { PokerScheduleModal } from '../components/modals/PokerScheduleModal';
 import { SingleRoundEditModal } from '../components/modals/SingleRoundEditModal';
@@ -26,6 +28,8 @@ import {
   addMinutesToSchedule,
   parseScheduleString,
 } from '../utils/scheduleHelper';
+import { combineDateAndTime } from '../utils/dateFormatter';
+import { formatCleanOdds } from '../utils/oddsFormatter';
 
 interface RoundEvent {
   id: string;
@@ -37,36 +41,51 @@ interface RoundEvent {
 }
 
 const COMBINATIONS = [
-  { name: 'Carte haute', odd: 100 },
-  { name: 'Une Paire', odd: 5 },
-  { name: 'Deux Paires', odd: 3 },
-  { name: 'Brelan', odd: 6 },
-  { name: 'Quinte', odd: 5 },
-  { name: 'Couleur', odd: 8 },
-  { name: 'Full House', odd: 8 },
-  { name: 'Carré', odd: 10 },
-  { name: 'Quinte flush', odd: 60 },
-  { name: 'Quinte flush royale', odd: 100 },
+  { name: 'Combinaison gagnante. Carte haute', odd: 100 },
+  { name: 'Combinaison gagnante. Une Paire', odd: 5.8 },
+  { name: 'Combinaison gagnante. Deux Paires', odd: 3.1 },
+  { name: 'Combinaison gagnante. Brelan', odd: 6.8 },
+  { name: 'Combinaison gagnante. Quinte', odd: 5.7 },
+  { name: 'Combinaison gagnante. Couleur', odd: 8.7 },
+  { name: 'Combinaison gagnante. Full House', odd: 8.6 },
+  { name: 'Combinaison gagnante. Carré', odd: 100 },
+  { name: 'Combinaison gagnante. Quinte flush', odd: 600 },
+  { name: 'Combinaison gagnante. Quinte flush royale', odd: 1000 },
   { name: 'Combinaison gagnante. Carte haute', odd: 1000 },
 ];
 
 const HANDS = [
-  { name: 'Main 1', odd: 5 },
-  { name: 'Main 2', odd: 5 },
-  { name: 'Main 3', odd: 5 },
-  { name: 'Main 4', odd: 5 },
-  { name: 'Main 5', odd: 5 },
-  { name: 'Main 6', odd: 5 },
-  { name: 'Quelle Main va gagner ?. Main 1', odd: 5 },
+
+  { name: 'Quelle Main va gagner ?.(1)', odd: 5.2 },
+  { name: 'Quelle Main va gagner ?.(2)', odd: 5.2 },
+  { name: 'Quelle Main va gagner ?.(3)', odd: 5.2 },
+  { name: 'Quelle Main va gagner ?.(4)', odd: 5.2 },
+  { name: 'Quelle Main va gagner ?.(5)', odd: 5.2 },
+  { name: 'Quelle Main va gagner ?.(6)', odd: 5.2 },
 ];
 
 export default function StudioTVScreen({ navigation }: any) {
+  const hasAccess = useAuthStore((s) => s.hasAccessToFeature('studio_tv'));
+
+  useEffect(() => {
+    if (!hasAccess) {
+      Alert.alert(
+        'Accès restreint',
+        "Vous n'avez pas l'autorisation d'accéder au Studio TV & Poker. Veuillez contacter votre administrateur.",
+        [{ text: 'Compris', onPress: () => navigation.goBack() }]
+      );
+    }
+  }, [hasAccess, navigation]);
+
   const { addCoupon } = useBetStore();
   const { currentTheme, theme: baseTheme } = useThemeStore();
   const theme = currentTheme || baseTheme;
   const isDark = theme.isDark;
+  const { contentContainerStyle } = useResponsive();
 
   // Configuration de Programmation (Date, Heure, Intervalle)
+  const [placedDate, setPlacedDate] = useState(getCurrentDateString());
+  const [placedTime, setPlacedTime] = useState(getCurrentTimeString());
   const [startDate, setStartDate] = useState(getCurrentDateString());
   const [startTime, setStartTime] = useState(getCurrentTimeString());
   const [interval, setInterval] = useState(3); // 3 minutes standard TVBet
@@ -97,16 +116,22 @@ export default function StudioTVScreen({ navigation }: any) {
 
   // Applique la programmation complète (date, heure, intervalle, nombre de manches)
   const handleApplySchedule = ({
+    placedDate: newPlacedDate,
+    placedTime: newPlacedTime,
     startDate: newStartDate,
     startTime: newStartTime,
     interval: newInterval,
     roundsCount: newRoundsCount,
   }: {
+    placedDate?: string;
+    placedTime?: string;
     startDate: string;
     startTime: string;
     interval: number;
     roundsCount: number;
   }) => {
+    if (newPlacedDate) setPlacedDate(newPlacedDate);
+    if (newPlacedTime) setPlacedTime(newPlacedTime);
     setStartDate(newStartDate);
     setStartTime(newStartTime);
     setInterval(newInterval);
@@ -232,24 +257,46 @@ export default function StudioTVScreen({ navigation }: any) {
 
     const ticketId = generateCouponId();
 
-    const slipEvents: MatchEvent[] = events.map((ev) => ({
-      id: ev.id,
-      sport: 'Cyber-Sport',
-      league: 'TvBet. POKER',
-      date: ev.timeString,
-      homeTeam: { name: 'Main 1' },
-      awayTeam: { name: 'Main 6' },
-      prediction: ev.selectedOption!.name,
-      odd: ev.selectedOption!.odd,
-      status: 'Accepté',
-      roundCode: ev.roundCode,
-      badge: 'POKE',
-      gameCategory: 'poker',
-    }));
+    // L'heure à laquelle on mise le coupon est différente de l'heure de début du coupon / match
+    const placedDateTime = combineDateAndTime(placedDate, placedTime);
+    const combinedCouponDate = combineDateAndTime(startDate, startTime);
+
+    const slipEvents: MatchEvent[] = events.map((ev) => {
+      const parsed = parseScheduleString(ev.timeString);
+      const evCombined = combineDateAndTime(parsed.dateStr, parsed.timeStr);
+      const handMatch = ev.selectedOption!.name.match(/\(([1-6])\)/);
+      const resolvedTargetHand = (ev.marketType === 'hand' && handMatch)
+        ? parseInt(handMatch[1], 10)
+        : undefined;
+
+      return {
+        id: ev.id,
+        sport: 'Cyber-Sport',
+        league: 'TvBet. POKER',
+        date: evCombined.formatted,
+        startDate: evCombined.toISOString(),
+        matchTime: parsed.timeStr,
+        matchDate: parsed.dateStr,
+        homeTeam: { name: 'Main 1' },
+        awayTeam: { name: 'Main 6' },
+        prediction: ev.selectedOption!.name,
+        odd: ev.selectedOption!.odd,
+        status: 'Accepté' as const,
+        roundCode: ev.roundCode,
+        badge: 'POKE',
+        gameCategory: 'poker' as const,
+        pokerResult: generateRealisticPokerDraw(resolvedTargetHand, ev.selectedOption!.name, ev.roundCode || ev.id),
+        isLive: true,
+      };
+    });
 
     const newCoupon: BetSlip = {
       id: ticketId,
-      createdAt: `${startDate} (${startTime})`,
+      ticketNumber: ticketId,
+      createdAt: placedDateTime.formatted,
+      startDate: combinedCouponDate.toISOString(),
+      matchTime: startTime,
+      matchDate: startDate,
       type: events.length > 1 ? 'Combiné' : 'Simple',
       eventsCount: events.length,
       completedCount: 0,
@@ -261,15 +308,14 @@ export default function StudioTVScreen({ navigation }: any) {
       isForSale: false,
       shareCode: generateShareCode(),
       gameCategory: 'poker',
+      isLive: true,
     };
 
     addCoupon(newCoupon);
 
     Alert.alert(
       'Coupon TVBet Créé !',
-      `Coupon ${newCoupon.type} № ${ticketId}\nCote totale: ${totalOdd.toLocaleString(
-        'fr-FR'
-      )}\nGains potentiels: ${potentialPayout.toLocaleString(
+      `Coupon ${newCoupon.type} № ${ticketId}\nCote totale: ${formatCleanOdds(totalOdd)}\nGains potentiels: ${potentialPayout.toLocaleString(
         'fr-FR'
       )} ₣\n\nLe coupon a été ajouté à votre Historique !`,
       [
@@ -282,21 +328,53 @@ export default function StudioTVScreen({ navigation }: any) {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={Platform.OS === 'android'} />
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+  if (!hasAccess) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0B132B', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Ionicons name="lock-closed" size={56} color="#EF4444" />
+        <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
+          Accès restreint
+        </Text>
+        <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 8, marginBottom: 24 }}>
+          Votre compte n'a pas l'autorisation d'accéder au Studio TV & Poker. Veuillez contacter votre administrateur.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ backgroundColor: '#EF4444', paddingVertical: 12, paddingHorizontal: 28, borderRadius: 10 }}
+          activeOpacity={0.8}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Retour</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Studio TV</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+      {/* Header */}
+      <View
+        style={[
+          styles.header,
+          {
+            alignSelf: 'center',
+            maxWidth: 600,
+            width: '100%',
+            backgroundColor: theme.headerBackground || theme.cardBackground,
+            borderBottomColor: theme.border,
+          },
+        ]}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+          <Ionicons name="arrow-back" size={22} color={theme.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Studio TV</Text>
         <TouchableOpacity style={styles.iconBtn}>
-          <Ionicons name="game-controller-outline" size={24} color={Colors.textSubtle} />
+          <Ionicons name="game-controller-outline" size={24} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, contentContainerStyle]} showsVerticalScrollIndicator={false}>
         {/* Banner Info */}
         <View style={styles.infoBanner}>
           <View style={styles.infoIconBox}>
@@ -326,15 +404,15 @@ export default function StudioTVScreen({ navigation }: any) {
             onPress={() => setIsScheduleModalVisible(true)}
           >
             <View style={styles.dateIconBox}>
-              <Ionicons name="calendar-outline" size={20} color={theme.primary} />
+              <Ionicons name="time-outline" size={20} color={theme.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.dateSub}>Première manche programmée</Text>
+              <Text style={styles.dateSub}>Heure de mise du coupon (Header & Historique)</Text>
               <Text style={styles.dateValue}>
-                {events[0]?.timeString || `${startDate} (${startTime})`}
+                {placedDate} ({placedTime})
               </Text>
               <Text style={styles.scheduleDetailText}>
-                {events.length} manche{events.length > 1 ? 's' : ''} • Fin prévue : {events[events.length - 1]?.timeString.split(' ')[1] || ''}
+                Début 1ère manche : {events[0]?.timeString || `${startDate} (${startTime})`} • {events.length} manche{events.length > 1 ? 's' : ''}
               </Text>
             </View>
             <Ionicons name="create-outline" size={20} color={theme.primary} />
@@ -475,7 +553,7 @@ export default function StudioTVScreen({ navigation }: any) {
                       {item.name}
                     </Text>
                     <Text style={[styles.oddValue, isSelected && styles.oddTextActive]}>
-                      {item.odd}
+                      {formatCleanOdds(item.odd)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -498,7 +576,7 @@ export default function StudioTVScreen({ navigation }: any) {
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryRowLabel}>Cote</Text>
-            <Text style={styles.summaryRowVal}>{totalOdd.toLocaleString('fr-FR')}</Text>
+            <Text style={styles.summaryRowVal}>{formatCleanOdds(totalOdd)}</Text>
           </View>
 
           <View style={styles.summaryRow}>
@@ -518,6 +596,8 @@ export default function StudioTVScreen({ navigation }: any) {
       <PokerScheduleModal
         visible={isScheduleModalVisible}
         onClose={() => setIsScheduleModalVisible(false)}
+        currentPlacedDate={placedDate}
+        currentPlacedTime={placedTime}
         currentStartDate={startDate}
         currentStartTime={startTime}
         currentInterval={interval}

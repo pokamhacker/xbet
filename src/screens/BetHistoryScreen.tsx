@@ -1,5 +1,15 @@
-import BetHistoryScreen, { BetHistoryScreen as BetHistoryComponent, MainHistoryScreen, BetItem } from './history/BetHistoryScreen';
+import HistoryListScreen, {
+  BetItem,
+  HistoryCard,
+  HistoryAvatarBadge,
+  ASSET_ICONS,
+} from './history/HistoryListScreen';
 
-export { BetHistoryComponent, MainHistoryScreen, BetItem };
-export const HistoryScreen = BetHistoryScreen;
-export default BetHistoryScreen;
+export const BetHistoryScreen = HistoryListScreen;
+export const BetHistoryComponent = HistoryListScreen;
+export const MainHistoryScreen = HistoryListScreen;
+export const HistoryScreen = HistoryListScreen;
+export { HistoryCard, HistoryAvatarBadge, ASSET_ICONS };
+export type { BetItem };
+
+export default HistoryListScreen;

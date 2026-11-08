@@ -19,10 +19,18 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
 
   // Logo effectif : utilise logoUrl fourni, sinon tente la résolution automatique via API-Football
   const activeLogo = useMemo(() => {
-    if (logoUrl && !hasError) return logoUrl;
+    const isValidHttpLogo =
+      Boolean(logoUrl) &&
+      (logoUrl!.startsWith('http://') || logoUrl!.startsWith('https://')) &&
+      !logoUrl!.includes('ui-avatars.com');
+
+    if (isValidHttpLogo && !hasError) return logoUrl!;
     if (!hasError) {
       const resolved = resolveTeamLogo(teamName);
       if (resolved) return resolved;
+      if (logoUrl && (logoUrl.startsWith('http://') || logoUrl.startsWith('https://'))) {
+        return logoUrl;
+      }
     }
     return null;
   }, [logoUrl, teamName, hasError]);

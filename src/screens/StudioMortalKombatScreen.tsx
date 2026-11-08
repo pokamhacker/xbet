@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,13 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
+import { useThemeStore } from '../stores/themeStore';
 import { useBetStore } from '../store/useBetStore';
+import { useAuthStore } from '../store/authStore';
 import { generateCouponId, generateShareCode } from '../utils/pokerEngine';
 import { BetSlip, MatchEvent } from '../types/bet';
+import { combineDateAndTime, formatBetDate } from '../utils/dateFormatter';
+import { formatCleanOdds } from '../utils/oddsFormatter';
 
 interface MKSelection {
   id: string;
@@ -38,6 +42,20 @@ const FIGHTERS = [
 ];
 
 export default function StudioMortalKombatScreen({ navigation }: any) {
+  const { currentTheme } = useThemeStore();
+  const isDark = Boolean(currentTheme?.isDark);
+  const hasAccess = useAuthStore((s) => s.hasAccessToFeature('studio_mk'));
+
+  useEffect(() => {
+    if (!hasAccess) {
+      Alert.alert(
+        'Accès restreint',
+        "Vous n'avez pas l'autorisation d'accéder au Studio Mortal Kombat. Veuillez contacter votre administrateur.",
+        [{ text: 'Compris', onPress: () => navigation.goBack() }]
+      );
+    }
+  }, [hasAccess, navigation]);
+
   const { addCoupon } = useBetStore();
 
   const [fighter1, setFighter1] = useState(FIGHTERS[0]);
@@ -85,31 +103,43 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
   const handleCreateCoupon = () => {
     const ticketId = generateCouponId();
 
-    const slipEvents: MatchEvent[] = selections.map((sel) => ({
-      id: sel.id,
-      sport: 'Cyber-Sport',
-      league: 'Mortal Kombat 11 · Cyber Arena',
-      date: sel.timeString,
-      homeTeam: { name: fighter1.name },
-      awayTeam: { name: fighter2.name },
-      prediction: sel.prediction,
-      odd: sel.odd,
-      status: 'Accepté',
-      badge: 'MK-11',
-      gameCategory: 'mortalkombat',
-      mkResult: {
-        rounds: [
-          { roundNum: 1, winner: fighter1.name, victoryType: 'Brutality' },
-          { roundNum: 2, winner: fighter2.name, victoryType: 'Normal' },
-          { roundNum: 3, winner: fighter1.name, victoryType: 'Fatality' },
-        ],
-        finalWinner: fighter1.name,
-      },
-    }));
+    const slipEvents: MatchEvent[] = selections.map((sel) => {
+      const combined = combineDateAndTime(sel.timeString);
+      return {
+        id: sel.id,
+        sport: 'Cyber-Sport',
+        league: 'Mortal Kombat 11 · Cyber Arena',
+        date: sel.timeString,
+        startDate: combined.toISOString(),
+        matchTime: combined.isoString.substring(11, 16),
+        matchDate: combined.formatted.substring(0, 10),
+        homeTeam: { name: fighter1.name },
+        awayTeam: { name: fighter2.name },
+        prediction: sel.prediction,
+        odd: sel.odd,
+        status: 'Accepté' as const,
+        badge: 'MK-11',
+        gameCategory: 'mortalkombat' as const,
+        mkResult: {
+          rounds: [
+            { roundNum: 1, winner: fighter1.name, victoryType: 'Brutality' as const },
+            { roundNum: 2, winner: fighter2.name, victoryType: 'Normal' as const },
+            { roundNum: 3, winner: fighter1.name, victoryType: 'Fatality' as const },
+          ],
+          finalWinner: fighter1.name,
+        },
+      };
+    });
+
+    const firstEventTime = selections[0]?.timeString;
+    const combinedCouponDate = combineDateAndTime(firstEventTime);
 
     const newCoupon: BetSlip = {
       id: ticketId,
-      createdAt: '03.09.2026 (21:12)',
+      createdAt: formatBetDate(new Date()),
+      startDate: combinedCouponDate.toISOString(),
+      matchTime: combinedCouponDate.isoString.substring(11, 16),
+      matchDate: combinedCouponDate.formatted.substring(0, 10),
       type: selections.length > 1 ? 'Combiné' : 'Simple',
       eventsCount: selections.length,
       completedCount: 0,
@@ -140,15 +170,46 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={Platform.OS === 'android'} />
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+  if (!hasAccess) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#1A0B0E', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Ionicons name="lock-closed" size={56} color="#EF4444" />
+        <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
+          Accès restreint
+        </Text>
+        <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 8, marginBottom: 24 }}>
+          Votre compte n'a pas l'autorisation d'accéder au Studio Mortal Kombat. Veuillez contacter votre administrateur.
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ backgroundColor: '#EF4444', paddingVertical: 12, paddingHorizontal: 28, borderRadius: 10 }}
+          activeOpacity={0.8}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Retour</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Studio Mortal Kombat</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      {/* Header */}
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground,
+            borderBottomColor: currentTheme.border,
+          },
+        ]}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={currentTheme.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: currentTheme.textPrimary }]}>
+          Studio Mortal Kombat
+        </Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -339,7 +400,7 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
                 <Text style={styles.selTitle}>{s.marketTitle}</Text>
                 <Text style={styles.selPred}>{s.prediction}</Text>
               </View>
-              <Text style={styles.selOdd}>{s.odd.toFixed(2)}</Text>
+              <Text style={styles.selOdd}>{formatCleanOdds(s.odd)}</Text>
               <TouchableOpacity onPress={() => removeSelection(s.id)} style={{ padding: 4 }}>
                 <Ionicons name="trash-outline" size={16} color={Colors.danger} />
               </TouchableOpacity>
@@ -357,7 +418,7 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Cote totale :</Text>
-            <Text style={styles.summaryVal}>{totalOdds.toFixed(2)}</Text>
+            <Text style={styles.summaryVal}>{formatCleanOdds(totalOdds)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Gains potentiels :</Text>

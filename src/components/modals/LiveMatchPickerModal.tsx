@@ -18,6 +18,8 @@ import { useFootballStore } from '../../store/useFootballStore';
 import { useCouponStore } from '../../store/couponStore';
 import { MatchEvent } from '../../types/bet';
 import apiFootballService, { ApiFootballFixtureItem } from '../../services/apiFootballService';
+import { formatBetDate } from '../../utils/dateFormatter';
+import { formatCleanOdds } from '../../utils/oddsFormatter';
 
 interface LiveMatchPickerModalProps {
   visible: boolean;
@@ -114,18 +116,21 @@ export const LiveMatchPickerModal: React.FC<LiveMatchPickerModalProps> = ({
       predictionLabel = `V2 (Victoire ${fixture.teams.away.name})`;
     }
 
+    const fixtureDateStr = fixture.fixture.date;
+    const formattedDate = formatBetDate(fixtureDateStr);
+    const parsedTime = formattedDate.match(/\(([\d]{1,2}:[\d]{2})\)/)?.[1];
+    const parsedDate = formattedDate.match(/^(\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)/)?.[1];
+
     const event: MatchEvent = {
       id: `apifb-${fixture.fixture.id}-${predictionType}`,
       sport: 'Football',
       league: fixture.league.name,
       tournamentName: fixture.league.name,
       badge: fixture.league.logo,
-      date: new Date(fixture.fixture.date).toLocaleDateString('fr-FR', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      date: formattedDate,
+      startDate: fixtureDateStr,
+      matchTime: parsedTime,
+      matchDate: parsedDate,
       homeTeam: {
         name: fixture.teams.home.name,
         logo: fixture.teams.home.logo,
@@ -457,7 +462,7 @@ export const LiveMatchPickerModal: React.FC<LiveMatchPickerModalProps> = ({
                       >
                         <Text style={[styles.oddLabel, { color: theme.textSecondary }]}>1</Text>
                         <Text style={[styles.oddValue, { color: theme.textPrimary }]}>
-                          {odds.odd1.toFixed(2)}
+                          {formatCleanOdds(odds.odd1)}
                         </Text>
                       </TouchableOpacity>
 
@@ -477,7 +482,7 @@ export const LiveMatchPickerModal: React.FC<LiveMatchPickerModalProps> = ({
                       >
                         <Text style={[styles.oddLabel, { color: theme.textSecondary }]}>X</Text>
                         <Text style={[styles.oddValue, { color: theme.textPrimary }]}>
-                          {odds.oddX.toFixed(2)}
+                          {formatCleanOdds(odds.oddX)}
                         </Text>
                       </TouchableOpacity>
 
@@ -497,7 +502,7 @@ export const LiveMatchPickerModal: React.FC<LiveMatchPickerModalProps> = ({
                       >
                         <Text style={[styles.oddLabel, { color: theme.textSecondary }]}>2</Text>
                         <Text style={[styles.oddValue, { color: theme.textPrimary }]}>
-                          {odds.odd2.toFixed(2)}
+                          {formatCleanOdds(odds.odd2)}
                         </Text>
                       </TouchableOpacity>
                     </View>

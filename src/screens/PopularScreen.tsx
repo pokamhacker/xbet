@@ -8,18 +8,58 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
+import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
 import { BrandLogo } from '../components/common/BrandLogo';
+import { ROUTE_TO_FEATURE_MAP } from '../types/permissions';
+import {
+  createAppRefreshControl,
+  useAppRefresh,
+} from '../components/common/AppRefreshControl';
 
 export default function PopularScreen({ navigation }: any) {
   const { balance } = useBetStore();
+  const {
+    currentUser,
+    accounts,
+    hasAccessToFeature,
+    isSimulatingUser,
+    exitUserSimulation,
+  } = useAuthStore();
   const { currentTheme } = useThemeStore();
   const { contentContainerStyle, font, moderateScale, insets } = useResponsive();
+  const { refreshing, onRefresh } = useAppRefresh();
+
+  const handlePressStudio = (route: string) => {
+    // Si l'utilisateur est bloqué / inactif
+    if (currentUser && !currentUser.isActive) {
+      Alert.alert(
+        'Compte suspendu',
+        currentUser.blockedReason
+          ? `Votre compte est bloqué : ${currentUser.blockedReason}.\n\nL'accès aux studios et mini-jeux est restreint.`
+          : "Votre compte a été suspendu par l'administrateur. L'accès aux jeux et studios est révoqué.",
+        [{ text: 'Compris', style: 'default' }]
+      );
+      return;
+    }
+
+    const feat = ROUTE_TO_FEATURE_MAP[route];
+    if (feat && !hasAccessToFeature(feat)) {
+      Alert.alert(
+        'Accès restreint',
+        "Vous n'avez pas l'autorisation d'accéder à ce studio / mini-jeu.\n\nVeuillez contacter votre administrateur pour débloquer votre accès.",
+        [{ text: 'Compris', style: 'default' }]
+      );
+      return;
+    }
+    navigation.navigate(route);
+  };
 
   const studios = [
     {
@@ -63,6 +103,16 @@ export default function PopularScreen({ navigation }: any) {
       route: 'AppleOfFortune',
     },
     {
+      id: 'game-royal-feast',
+      title: 'Accéder à Royal Feast',
+      subtitle: 'Ouvre les cloches royales sans toucher le poison et multiplie tes gains jusqu\'à 24x !',
+      badge: 'NOUVEAU',
+      badgeColor: '#EAB308',
+      iconName: 'silverware-fork-knife',
+      iconType: 'material' as const,
+      route: 'RoyalFeast',
+    },
+    {
       id: 'game-crash',
       title: 'Accéder à Crash',
       subtitle: 'Observe la fusée monter et encaisse avant l’explosion en direct.',
@@ -72,19 +122,32 @@ export default function PopularScreen({ navigation }: any) {
       iconType: 'material' as const,
       route: 'CrashGame',
     },
+    {
+      id: 'game-kamikaze',
+      title: 'Accéder à Kamikaze',
+      subtitle: 'Fais passer ton avion entre les tirs de la DCA, ligne après ligne, jusqu’à x50.',
+      badge: 'NOUVEAU',
+      badgeColor: '#E5282C',
+      iconName: 'crosshairs-gps',
+      iconType: 'material' as const,
+      route: 'Kamikaze',
+    },
   ];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
       <StatusBar
         barStyle={currentTheme.isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={currentTheme.headerBackground || '#FFFFFF'}
-        translucent={Platform.OS === 'android'}
       />
       {/* Top Header Bar */}
       <View style={[styles.topHeader, { backgroundColor: currentTheme.headerBackground, borderBottomColor: currentTheme.border }]}>
         <View style={[{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, contentContainerStyle]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+            onPress={onRefresh}
+            activeOpacity={0.8}
+            accessibilityLabel="Actualiser"
+          >
             <BrandLogo size={18} variant="header" />
             <View>
               <Text style={[styles.headerLabel, { color: currentTheme.textSecondary, fontSize: font(11) }]}>
@@ -94,7 +157,7 @@ export default function PopularScreen({ navigation }: any) {
                 {balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ₣
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.depositSmallBtn, { backgroundColor: currentTheme.depositButton.bg }]}
             onPress={() => navigation.navigate('Menu')}
@@ -105,7 +168,45 @@ export default function PopularScreen({ navigation }: any) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, contentContainerStyle, { paddingBottom: 100 + (insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 12 : 0)) }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, contentContainerStyle, { paddingBottom: 100 + (insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 12 : 0)) }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={createAppRefreshControl({
+          refreshing,
+          onRefresh,
+          theme: currentTheme,
+          progressViewOffset: 15,
+        })}
+      >
+        {/* Mode Simulation Admin Banner */}
+        {isSimulatingUser && (
+          <View style={styles.simulationBanner}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={styles.simIconBadge}>
+                <Ionicons name="eye" size={18} color="#F59E0B" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.simulationTitle}>
+                  MODE TEST : @{currentUser?.username || 'utilisateur'}
+                </Text>
+                <Text style={styles.simulationSub}>
+                  {!currentUser?.isActive
+                    ? '⚠️ Compte suspendu / bloqué (Tous les jeux verrouillés)'
+                    : `${currentUser?.allowedFeatures?.length || 0}/7 studios & jeux autorisés`}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.exitSimBtn}
+              onPress={() => exitUserSimulation()}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="arrow-undo" size={14} color="#FFFFFF" />
+              <Text style={styles.exitSimBtnText}>Admin</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Banner Welcome */}
         <View style={[styles.welcomeCard, { backgroundColor: currentTheme.primary }]}>
           <View style={styles.welcomeIconCircle}>
@@ -125,34 +226,58 @@ export default function PopularScreen({ navigation }: any) {
           STUDIOS & MINI-JEUX DISPONIBLES
         </Text>
 
-        {studios.map((st) => (
-          <TouchableOpacity
-            key={st.id}
-            style={[
-              styles.studioCard,
-              {
-                backgroundColor: currentTheme.cardBackground,
-                borderColor: currentTheme.border,
-              },
-            ]}
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate(st.route)}
-          >
-            <View style={styles.cardLeftIcon}>
-              <MaterialCommunityIcons name={st.iconName as any} size={24} color={currentTheme.primary} />
-            </View>
-            <View style={styles.cardInfo}>
-              <View style={styles.cardTitleRow}>
-                <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]}>{st.title}</Text>
-                <View style={[styles.badgeTag, { backgroundColor: `${st.badgeColor}18` }]}>
-                  <Text style={[styles.badgeTagText, { color: st.badgeColor }]}>{st.badge}</Text>
-                </View>
+        {studios.map((st) => {
+          const feat = ROUTE_TO_FEATURE_MAP[st.route];
+          const isAccountActive = currentUser?.isActive !== false;
+          const isAllowed = isAccountActive && (!feat || hasAccessToFeature(feat));
+
+          return (
+            <TouchableOpacity
+              key={st.id}
+              style={[
+                styles.studioCard,
+                {
+                  backgroundColor: currentTheme.cardBackground,
+                  borderColor: isAllowed ? currentTheme.border : 'rgba(239, 68, 68, 0.4)',
+                  opacity: isAllowed ? 1 : 0.65,
+                },
+              ]}
+              activeOpacity={0.7}
+              onPress={() => handlePressStudio(st.route)}
+            >
+              <View style={[styles.cardLeftIcon, !isAllowed && { opacity: 0.6 }]}>
+                <MaterialCommunityIcons
+                  name={st.iconName as any}
+                  size={24}
+                  color={isAllowed ? currentTheme.primary : '#64748B'}
+                />
               </View>
-              <Text style={[styles.cardSub, { color: currentTheme.textSecondary }]}>{st.subtitle}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={currentTheme.textSecondary} />
-          </TouchableOpacity>
-        ))}
+              <View style={styles.cardInfo}>
+                <View style={styles.cardTitleRow}>
+                  <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]}>{st.title}</Text>
+                  {isAllowed ? (
+                    <View style={[styles.badgeTag, { backgroundColor: `${st.badgeColor}18` }]}>
+                      <Text style={[styles.badgeTagText, { color: st.badgeColor }]}>{st.badge}</Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.badgeTag, { backgroundColor: 'rgba(239, 68, 68, 0.15)', flexDirection: 'row', alignItems: 'center', gap: 3 }]}>
+                      <Ionicons name="lock-closed" size={10} color="#EF4444" />
+                      <Text style={[styles.badgeTagText, { color: '#EF4444' }]}>
+                        {!isAccountActive ? 'BLOQUÉ' : 'VERROUILLÉ'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.cardSub, { color: currentTheme.textSecondary }]}>{st.subtitle}</Text>
+              </View>
+              <Ionicons
+                name={isAllowed ? "chevron-forward" : "lock-closed-outline"}
+                size={18}
+                color={isAllowed ? currentTheme.textSecondary : '#EF4444'}
+              />
+            </TouchableOpacity>
+          );
+        })}
 
         {/* Quick Admin Footer Card */}
         <TouchableOpacity
@@ -304,5 +429,50 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: '600',
+  },
+  simulationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+    gap: 10,
+  },
+  simIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  simulationTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#F59E0B',
+    letterSpacing: 0.3,
+  },
+  simulationSub: {
+    fontSize: 11,
+    color: '#CBD5E1',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  exitSimBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    gap: 4,
+  },
+  exitSimBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0F172A',
   },
 });

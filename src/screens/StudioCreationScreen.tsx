@@ -975,8 +975,17 @@ export default function StudioCreationScreen({ navigation }: any) {
     }
 
     const finalId = customId.trim() !== '' ? customId.trim() : generateCouponId();
+    const hasFifa = eventsToSave.some(
+      (e) =>
+        e.isFifa ||
+        e.sport === 'FIFA' ||
+        (e.league &&
+          (e.league.toUpperCase().includes('FIFA') ||
+            e.league.toUpperCase().includes('FC 2') ||
+            e.league.toUpperCase().includes('5X5 RUSH')))
+    );
     const hasLive =
-      isLiveBadge || eventsToSave.some((e) => e.isLive || e.isFifa || e.sport === 'FIFA');
+      isLiveBadge || hasFifa || eventsToSave.some((e) => e.isLive || e.isFifa || e.sport === 'FIFA');
     const calculatedOdds = eventsToSave.reduce((acc, ev) => acc * (ev.odd || 1), 1);
     const calculatedPayout = Math.round(numericStake * calculatedOdds * 100) / 100;
 
@@ -994,6 +1003,8 @@ export default function StudioCreationScreen({ navigation }: any) {
       potentialPayout: calculatedPayout,
       status: 'Accepté',
       isLive: hasLive,
+      sport: hasFifa ? 'FIFA' : 'Football',
+      league: eventsToSave[0]?.league || selectedLeague || (hasFifa ? 'FIFA. FC 26. 5x5 Rush. Superligue' : 'Football'),
       events: eventsToSave.map((ev) => {
         const evTime = eventsToSave.length === 1 || !ev.matchTime ? finalTime : ev.matchTime;
         const evDateStr = eventsToSave.length === 1 || !ev.matchDate ? finalDate : ev.matchDate;
@@ -1011,6 +1022,7 @@ export default function StudioCreationScreen({ navigation }: any) {
 
         const mappedEv: MatchEvent = {
           ...ev,
+          sport: evIsFifa ? 'FIFA' : (ev.sport || 'Football'),
           prediction: normalizeBetSelectionLabel(ev.prediction, evHomeName, evAwayName),
           date: evDate,
           startDate: evStartDate,
@@ -1029,7 +1041,7 @@ export default function StudioCreationScreen({ navigation }: any) {
       isForSale: enableCashout,
       cashoutAmount: parseInt(customCashoutAmount, 10) || Math.round(numericStake * 0.94),
       shareCode: generateShareCode(),
-      gameCategory: 'sports',
+      gameCategory: hasFifa ? 'esports' : 'sports',
     };
 
     addCoupon(newCoupon);

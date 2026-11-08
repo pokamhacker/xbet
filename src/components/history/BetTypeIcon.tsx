@@ -34,8 +34,44 @@ export const BetTypeIcon: React.FC<BetTypeIconProps> = ({
   imageStyle,
   containerBg,
 }) => {
-  const { currentTheme } = useThemeStore();
-  const iconColor = color || currentTheme?.primary || '#2563EB';
+  const { currentTheme, brandChoice } = useThemeStore();
+  const iconColor =
+    color ||
+    currentTheme?.primary ||
+    currentTheme?.colors?.primary ||
+    (brandChoice === 'melbet'
+      ? '#E58B05'
+      : brandChoice === 'winwin'
+        ? '#7CBD17'
+        : brandChoice === 'betwinner'
+          ? '#007348'
+          : brandChoice === 'paripesa'
+            ? '#1E5BBB'
+            : brandChoice === 'megaparis' || brandChoice === 'megapari'
+              ? '#D3242A'
+              : '#2563EB');
+
+  const isMelbet = Boolean(
+    brandChoice === 'melbet' ||
+    (currentTheme?.name || '').toLowerCase().includes('melbet')
+  );
+
+  const isMegaPari = Boolean(
+    brandChoice === 'megaparis' ||
+    brandChoice === 'megapari' ||
+    (currentTheme?.name || '').toLowerCase().includes('megapari')
+  );
+
+  const detailPokerColor =
+    currentTheme.textSecondary ||
+    currentTheme.colors?.textSecondary ||
+    (currentTheme.isDark ? '#8A96A3' : '#64748B');
+
+  const pokerIconTint = isMelbet
+    ? '#1B365D'
+    : isMegaPari
+      ? detailPokerColor
+      : '#507694';
 
   // RÈGLE 1 : Si c'est un Combiné (ou plus de 1 événement), on force l'icône Combiné vectorielle
   if (type === 'Combiné' || eventsCount > 1) {
@@ -56,20 +92,15 @@ export const BetTypeIcon: React.FC<BetTypeIconProps> = ({
         />
       );
     }
-    if (normalizedCategory.includes('tvbet')) {
+    if (normalizedCategory.includes('tvbet') || normalizedCategory.includes('poker')) {
       return (
         <Image
           source={require('../../../assets/icons/ic_tvbet_gamepad.png')}
-          style={[{ width: size, height: size }, imageStyle]}
-          resizeMode="contain"
-        />
-      );
-    }
-    if (normalizedCategory.includes('poker')) {
-      return (
-        <Image
-          source={require('../../../assets/icons/poker.png')}
-          style={[{ width: size, height: size }, imageStyle]}
+          style={[
+            { width: size, height: size },
+            pokerIconTint ? { tintColor: pokerIconTint } : null,
+            imageStyle,
+          ]}
           resizeMode="contain"
         />
       );
@@ -95,8 +126,18 @@ export const BetTypeIcon: React.FC<BetTypeIconProps> = ({
   }
 
   // Rendu vectoriel selon la catégorie avec adaptation à la charte graphique
-  if (normalizedCategory.includes('poker')) {
-    return <MaterialCommunityIcons color={iconColor} name="cards-playing-outline" size={size} />;
+  if (normalizedCategory.includes('poker') || normalizedCategory.includes('tvbet')) {
+    return (
+      <Image
+        source={require('../../../assets/icons/ic_tvbet_gamepad.png')}
+        style={[
+          { width: size, height: size },
+          pokerIconTint ? { tintColor: pokerIconTint } : null,
+          imageStyle,
+        ]}
+        resizeMode="contain"
+      />
+    );
   }
   if (normalizedCategory.includes('fifa')) {
     return <Ionicons color={iconColor} name="game-controller-outline" size={size} />;

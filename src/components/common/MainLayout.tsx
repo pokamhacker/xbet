@@ -42,7 +42,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     <SafeAreaView style={[styles.safeArea, { backgroundColor: bg }]}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={currentTheme?.headerBackground || bg}
       />
       <View
         style={[

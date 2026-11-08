@@ -33,7 +33,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   const { moderateScale, font } = useResponsive();
 
   const brand = propBrand || (themeName as BrandKey) || '1xbet';
-  const isDark = propIsDark !== undefined ? propIsDark : currentTheme.isDark;
+  const isDark = propIsDark !== undefined ? propIsDark : (currentTheme?.isDark ?? false);
 
   // Détermination de la dimension de base
   let baseSize = 22;
@@ -50,9 +50,111 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   const fontSize = moderateScale(baseSize);
 
   // -------------------------------------------------------------------------
+  // 0. MARQUE : WINWIN
+  // -------------------------------------------------------------------------
+  if (brand.includes('winwin')) {
+    const wwColor = isDark ? '#FFFFFF' : '#1A2B49';
+    const content = (
+      <View style={[styles.logoRow, style]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ fontSize, fontWeight: '900', color: wwColor }}>WIN</Text>
+          <View style={{ backgroundColor: '#7CBD17', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3, marginLeft: 3 }}>
+            <Text style={{ fontSize: fontSize * 0.95, fontWeight: '900', color: '#FFFFFF' }}>WIN</Text>
+          </View>
+        </View>
+      </View>
+    );
+    if (onPress) return <TouchableOpacity activeOpacity={0.8} onPress={onPress}>{content}</TouchableOpacity>;
+    return content;
+  }
+
+  // -------------------------------------------------------------------------
+  // 0.5. MARQUE : BETWINNER
+  // -------------------------------------------------------------------------
+  if (brand.includes('betwinner')) {
+    const bwColor = isDark ? '#FFFFFF' : '#1A2B49';
+    const content = (
+      <View style={[styles.logoRow, style]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ fontSize, fontWeight: '900', color: '#007348' }}>BET</Text>
+          <Text style={{ fontSize, fontWeight: '900', color: bwColor, marginLeft: 2 }}>WINNER</Text>
+        </View>
+      </View>
+    );
+    if (onPress) return <TouchableOpacity activeOpacity={0.8} onPress={onPress}>{content}</TouchableOpacity>;
+    return content;
+  }
+
+  // -------------------------------------------------------------------------
+  // 0.7. MARQUE : PARIPESA
+  // -------------------------------------------------------------------------
+  if (brand.includes('paripesa')) {
+    const pariColor = isDark ? '#FFFFFF' : '#0F2648';
+    const content = (
+      <View style={[styles.logoRow, style]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ fontSize, fontWeight: '900', color: pariColor, letterSpacing: -0.3 }}>PARI</Text>
+          <View style={{ backgroundColor: '#1E5BBB', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3, marginLeft: 3 }}>
+            <Text style={{ fontSize: fontSize * 0.95, fontWeight: '900', color: '#FFFFFF' }}>PESA</Text>
+          </View>
+        </View>
+        {showTagline && (
+          <Text
+            style={[
+              styles.taglineText,
+              {
+                fontSize: Math.max(9, fontSize * 0.42),
+                color: isDark ? '#7C8B99' : '#6B7280',
+                marginTop: 2,
+              },
+            ]}
+          >
+            SPORTS BOOKMAKER
+          </Text>
+        )}
+      </View>
+    );
+    if (onPress) return <TouchableOpacity activeOpacity={0.8} onPress={onPress}>{content}</TouchableOpacity>;
+    return content;
+  }
+
+  // -------------------------------------------------------------------------
+  // 0.8. MARQUE : MEGAPARI / MEGAPARIS
+  // -------------------------------------------------------------------------
+  if (brand.includes('megapari')) {
+    const megaColor = isDark ? '#FFFFFF' : '#0F2648';
+    const content = (
+      <View style={[styles.logoRow, style]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ fontSize, fontWeight: '900', color: megaColor, letterSpacing: -0.3 }}>MEGA</Text>
+          <View style={{ backgroundColor: '#D3242A', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3, marginLeft: 3 }}>
+            <Text style={{ fontSize: fontSize * 0.95, fontWeight: '900', color: '#FFFFFF' }}>PARI</Text>
+          </View>
+        </View>
+        {showTagline && (
+          <Text
+            style={[
+              styles.taglineText,
+              {
+                fontSize: Math.max(9, fontSize * 0.42),
+                color: isDark ? '#7C8B99' : '#6B7280',
+                marginTop: 2,
+              },
+            ]}
+          >
+            SPORTS BOOKMAKER
+          </Text>
+        )}
+      </View>
+    );
+    if (onPress) return <TouchableOpacity activeOpacity={0.8} onPress={onPress}>{content}</TouchableOpacity>;
+    return content;
+  }
+
+  // -------------------------------------------------------------------------
   // 1. MARQUE : MELBET (DARK ou LIGHT)
   // -------------------------------------------------------------------------
-  if (brand === 'melbet' || brand === 'melbet-light') {
+  if (brand === 'melbet' || brand === 'melbet-light' || brand === 'melbet-black') {
     const isLightBrand = brand === 'melbet-light';
     const melColor = isLightBrand ? '#00325E' : '#FFFFFF';
     const betBoxBg = isLightBrand ? '#E7B12C' : '#E58B05';
@@ -127,83 +229,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   }
 
   // -------------------------------------------------------------------------
-  // 2. MARQUE : PARIPESA
-  // -------------------------------------------------------------------------
-  if (brand === 'paripesa') {
-    const pariColor = isDark ? '#FFFFFF' : '#0F172A';
-    const pesaBg = '#DC2626';
-    const pesaText = '#FFFFFF';
-
-    const content = (
-      <View style={[styles.logoRow, style]}>
-        <View style={styles.paripesaContainer}>
-          <Text
-            style={[
-              styles.paripesaPariText,
-              {
-                fontSize,
-                color: pariColor,
-                letterSpacing: -0.5,
-              },
-            ]}
-          >
-            PARI
-          </Text>
-          <View
-            style={[
-              styles.paripesaPesaBadge,
-              {
-                backgroundColor: pesaBg,
-                paddingHorizontal: Math.max(4, fontSize * 0.28),
-                paddingVertical: Math.max(1, fontSize * 0.08),
-                borderRadius: Math.max(3, fontSize * 0.18),
-                marginLeft: Math.max(2, fontSize * 0.1),
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.paripesaPesaText,
-                {
-                  fontSize: fontSize * 0.95,
-                  color: pesaText,
-                },
-              ]}
-            >
-              PESA
-            </Text>
-          </View>
-        </View>
-
-        {showTagline && (
-          <Text
-            style={[
-              styles.taglineText,
-              {
-                fontSize: Math.max(9, fontSize * 0.42),
-                color: isDark ? '#94A3B8' : '#64748B',
-                marginTop: 2,
-              },
-            ]}
-          >
-            BETTING COMPANY
-          </Text>
-        )}
-      </View>
-    );
-
-    if (onPress) {
-      return (
-        <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
-          {content}
-        </TouchableOpacity>
-      );
-    }
-    return content;
-  }
-
-  // -------------------------------------------------------------------------
-  // 3. MARQUE : 1XBET (Par défaut)
+  // 2. MARQUE : 1XBET / 1XBET LIGHT (Par défaut et pour le profil paripesa / 1xBet Light)
   // -------------------------------------------------------------------------
   const primaryBlue = currentTheme.primary || '#2563EB';
   const betColor = isDark ? '#FFFFFF' : '#1A2B49';

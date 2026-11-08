@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,27 +13,37 @@ import {
   Platform,
   Dimensions,
   StatusBar,
+  Share,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 import { useResponsive } from '../utils/responsive';
 import { useThemeStore } from '../store/themeStore';
 import { useBetStore } from '../store/useBetStore';
 import { useCouponStore } from '../store/couponStore';
 import { useAuthStore } from '../store/authStore';
-import { EventCard } from '../components/coupon/EventCard';
+import { formatCleanOdds } from '../utils/oddsFormatter';
+import { EventCard, OddTrendDirection } from '../components/coupon/EventCard';
 import { BetBottomSheet } from '../components/coupon/BetBottomSheet';
 import { SaveCouponModal } from '../components/coupon/SaveCouponModal';
 import { CouponActionSheet } from '../components/coupon/CouponActionSheet';
 import { EmptyCouponActions } from '../components/coupon/EmptyCouponActions';
 import { LoadCouponModal } from '../components/coupon/LoadCouponModal';
 import { BrandLogo } from '../components/common/BrandLogo';
+import { TrashBinIcon } from '../components/common/CouponIcons';
+import {
+  createAppRefreshControl,
+  useAppRefresh,
+} from '../components/common/AppRefreshControl';
 
 export default function CouponScreen({ navigation }: any) {
-  const { theme, currentTheme: rawCurrentTheme } = useThemeStore();
+  const { theme, currentTheme: rawCurrentTheme, currentBrand } = useThemeStore();
   const currentTheme = rawCurrentTheme || theme;
   const { balance, deposit } = useBetStore();
   const { currentUser } = useAuthStore();
-  const { font, moderateScale, isTablet, contentContainerStyle } = useResponsive();
+  const isFocused = useIsFocused();
+  const { font, moderateScale, isTablet, insets, contentContainerStyle } = useResponsive();
+  const { refreshing, onRefresh } = useAppRefresh();
 
   const {
     activeEvents,
@@ -80,6 +90,7 @@ export default function CouponScreen({ navigation }: any) {
   const [show3DotsMenu, setShow3DotsMenu] = useState(false);
   const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
   const [savedCouponCode, setSavedCouponCode] = useState('');
+  const [isBoosterDismissed, setIsBoosterDismissed] = useState(false);
 
   // Panneau de Pari (3 Onglets) : Mise | Code promo | Cote de référence
   const [betTab, setBetTab] = useState<'Mise' | 'Code promo' | 'Cote de référence'>('Mise');
@@ -90,14 +101,151 @@ export default function CouponScreen({ navigation }: any) {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState('50000');
 
-  // Formatage de la cote globale pour l'affichage (ex: 8800 ou 3.98)
+  // Réaffiche le Booster de Combiné si l'utilisateur vide puis regarnit le coupon
+  useEffect(() => {
+    if (!hasSelections) {
+      setIsBoosterDismissed(false);
+    }
+  }, [hasSelections]);
+
+  // Suivi dynamique temps réel des variations de cotes (hausse verte / baisse rouge + ancienne cote barrée)
+  const [liveEventOdds, setLiveEventOdds] = useState<
+    Record<string, { odd: number; trend: OddTrendDirection }>
+  >({});
+  const [totalOddsTrend, setTotalOddsTrend] = useState<OddTrendDirection>('stable');
+  const [previousTotalOddsStr, setPreviousTotalOddsStr] = useState<string | null>(null);
+  const tickStepRef = useRef<number>(0);
+
+  // Synchronise les cotes de base dès que la liste des sélections change
+  useEffect(() => {
+    if (!hasSelections) {
+      setLiveEventOdds({});
+      setTotalOddsTrend('stable');
+      setPreviousTotalOddsStr(null);
+      return;
+    }
+    setLiveEventOdds((prev) => {
+      const next: Record<string, { odd: number; trend: OddTrendDirection }> = {};
+      currentSelections.forEach((ev) => {
+        if (prev[ev.id]) {
+          next[ev.id] = prev[ev.id];
+        } else {
+          next[ev.id] = { odd: Number(ev.odd) || 1.5, trend: 'stable' };
+        }
+      });
+      return next;
+    });
+  }, [hasSelections, currentSelections]);
+
+  const effectiveTotalOdds = useMemo(() => {
+    if (!hasSelections) return 1;
+    if (ticketType === 'Simple') {
+      const first = currentSelections[0];
+      return liveEventOdds[first.id]?.odd ?? (Number(first.odd) || 1);
+    }
+    return currentSelections.reduce((acc, ev) => {
+      const o = liveEventOdds[ev.id]?.odd ?? (Number(ev.odd) || 1);
+      return acc * o;
+    }, 1);
+  }, [hasSelections, currentSelections, liveEventOdds, ticketType]);
+
+  // Simulation réaliste d'oscillations de cotes en direct tant que l'écran Coupon est actif
+  useEffect(() => {
+    if (!isFocused || !hasSelections) return;
+
+    let strikeClearTimer: ReturnType<typeof setTimeout> | null = null;
+    const interval = setInterval(() => {
+      tickStepRef.current += 1;
+      const step = tickStepRef.current;
+
+      setLiveEventOdds((prev) => {
+        const ids = currentSelections.map((e) => e.id);
+        if (ids.length === 0) return prev;
+        const targetId = ids[step % ids.length];
+        const baseEv = currentSelections.find((e) => e.id === targetId);
+        const currentVal = prev[targetId]?.odd ?? (Number(baseEv?.odd) || 1.8);
+
+        // Alternance hausse / baisse réaliste
+        const delta = step % 3 === 1 ? -0.02 : step % 3 === 2 ? 0.025 : -0.015;
+        const updatedOdd = Math.max(1.05, Number((currentVal + delta).toFixed(3)));
+        const direction: OddTrendDirection =
+          updatedOdd > currentVal ? 'up' : updatedOdd < currentVal ? 'down' : 'stable';
+
+        const prevProd = currentSelections.reduce((acc, ev) => {
+          const val = prev[ev.id]?.odd ?? (Number(ev.odd) || 1);
+          return acc * val;
+        }, 1);
+
+        const nextMap: Record<string, { odd: number; trend: OddTrendDirection }> = {};
+        currentSelections.forEach((ev) => {
+          if (ev.id === targetId) {
+            nextMap[ev.id] = { odd: updatedOdd, trend: direction };
+          } else {
+            nextMap[ev.id] = prev[ev.id] || { odd: Number(ev.odd) || 1.5, trend: 'stable' };
+          }
+        });
+
+        const nextProd = currentSelections.reduce((acc, ev) => {
+          return acc * (nextMap[ev.id]?.odd ?? 1);
+        }, 1);
+
+        if (nextProd < prevProd) {
+          setPreviousTotalOddsStr(formatCleanOdds(prevProd));
+          setTotalOddsTrend('down');
+          if (strikeClearTimer) clearTimeout(strikeClearTimer);
+          strikeClearTimer = setTimeout(() => {
+            setPreviousTotalOddsStr(null);
+          }, 3200);
+        } else if (nextProd > prevProd) {
+          setPreviousTotalOddsStr(null);
+          setTotalOddsTrend('up');
+        }
+
+        return nextMap;
+      });
+    }, 4200);
+
+    return () => {
+      clearInterval(interval);
+      if (strikeClearTimer) clearTimeout(strikeClearTimer);
+    };
+  }, [isFocused, hasSelections, currentSelections]);
+
+  // Formatage de la cote globale pour l'affichage
   const totalOddsDisplay = useMemo(() => {
-    if (!hasSelections) return '1.00';
-    return Number.isInteger(totalOdds) ? totalOdds.toString() : totalOdds.toFixed(2);
-  }, [hasSelections, totalOdds]);
+    if (!hasSelections) return '1';
+    return formatCleanOdds(effectiveTotalOdds);
+  }, [hasSelections, effectiveTotalOdds]);
+
+  const effectivePotentialPayout = useMemo(() => {
+    if (!hasSelections) return potentialPayout;
+    return Math.round((stake || 0) * effectiveTotalOdds * 100) / 100;
+  }, [hasSelections, stake, effectiveTotalOdds, potentialPayout]);
+
+  // Nombre de sélections qualifiées (cote >= 1.2) pour le Booster de Combiné
+  const remainingBoosterSelections = useMemo(() => {
+    const qualifying = currentSelections.filter((ev) => {
+      const oddVal = liveEventOdds[ev.id]?.odd ?? Number(ev.odd ?? 0);
+      return oddVal >= 1.2;
+    }).length;
+    return Math.max(0, 4 - qualifying);
+  }, [currentSelections, liveEventOdds]);
 
   // Solde utilisateur actuel (avec support authStore ou betStore)
   const userBalance = currentUser?.balance ?? balance;
+
+  // Partage natif du coupon
+  const handleShareCoupon = async () => {
+    const code = saveCouponCode() || savedCouponCode || 'LU631';
+    setSavedCouponCode(code);
+    try {
+      await Share.share({
+        message: `Voici mon code de coupon de pari : ${code}. Chargez-le dans l'application pour jouer ensemble !`,
+      });
+    } catch {
+      setIsSaveModalVisible(true);
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // HANDLERS
@@ -166,6 +314,7 @@ export default function CouponScreen({ navigation }: any) {
     } else {
       Alert.alert('Erreur', res.message || 'Code de coupon invalide.');
     }
+    return res;
   };
 
   // Recharger le compte
@@ -185,87 +334,196 @@ export default function CouponScreen({ navigation }: any) {
   // RENDU PRINCIPAL
   // ---------------------------------------------------------------------------
 
-  const isDark = currentTheme.isDark;
-  const screenBg = currentTheme.background;
-  const headerBg = currentTheme.headerBackground;
-  const textPrimary = currentTheme.textPrimary;
-  const textSecondary = currentTheme.textSecondary;
+  const isDark = Boolean(currentTheme.isDark);
+  const themeName = String(
+    currentTheme?.name || currentTheme?.key || currentBrand || '1xbet'
+  ).toLowerCase();
+  const isParipesa = themeName.includes('paripesa');
+  const isMegaPari = themeName.includes('megapari');
+  const isMelbet = themeName.includes('melbet');
+  const isBlack = themeName.includes('black');
+
+  const screenBg = isParipesa
+    ? isDark
+      ? isBlack
+        ? '#000000'
+        : '#1D212A'
+      : '#EBEEF3'
+    : isMegaPari
+      ? isDark
+        ? isBlack
+          ? '#000000'
+          : '#111111'
+        : '#EEF0F4'
+      : isMelbet
+        ? isDark
+          ? isBlack
+            ? '#000000'
+            : '#24292F'
+          : '#F2F4F7'
+        : isDark
+          ? isBlack
+            ? '#000000'
+            : '#233040'
+          : '#EBEEF3';
+
+  const headerBg = isParipesa
+    ? isDark
+      ? isBlack
+        ? '#0C0E13'
+        : '#282F39'
+      : '#FFFFFF'
+    : isMegaPari
+      ? isDark
+        ? isBlack
+          ? '#0B0E12'
+          : '#1A1F25'
+        : '#FFFFFF'
+      : isMelbet
+        ? isDark
+          ? isBlack
+            ? '#0D0E12'
+            : '#30353B'
+          : '#FFFFFF'
+        : isDark
+          ? isBlack
+            ? '#0B0F14'
+            : '#2A3F54'
+          : '#FFFFFF';
+
+  const textPrimary = currentTheme.textPrimary || (isDark ? '#FFFFFF' : '#00325E');
+  const textSecondary = currentTheme.textSecondary || (isDark ? '#8FA2B6' : '#6E849B');
+
+  // Couleur unifiée pour le sélecteur "Pari simple ⌄" / "Combiné ⌄", la Corbeille et les 3 points
+  const headerIconAndTextColor = isParipesa
+    ? isDark
+      ? '#9BA1AF'
+      : '#48658D'
+    : isMegaPari
+      ? isDark
+        ? '#8C92A2'
+        : '#586474'
+      : isMelbet
+        ? isDark
+          ? '#9CA3AF'
+          : '#557089'
+        : isDark
+          ? '#94A1B4'
+          : '#557089';
+
+  const headerSelectorColor = headerIconAndTextColor;
+  const trashIconColor = headerIconAndTextColor;
+  const dotsIconColor = headerIconAndTextColor;
+
+  const effectiveTicketLabel =
+    currentSelections.length > 1 && ticketType === 'Simple'
+      ? 'Combiné'
+      : ticketType === 'Simple'
+        ? 'Pari simple'
+        : ticketType;
+
+  const topSafeInset =
+    (insets?.top ?? 0) > 0
+      ? insets.top
+      : Platform.OS === 'android'
+        ? StatusBar.currentHeight || 0
+        : 0;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: screenBg }]}>
+    <View
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: headerBg,
+          paddingTop: topSafeInset,
+        },
+      ]}
+    >
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={headerBg || '#FFFFFF'}
-        translucent={Platform.OS === 'android'}
       />
-      <View style={styles.mainContainer}>
+      <View style={[styles.mainContainer, { backgroundColor: screenBg }]}>
         {/* ===================================================================== */}
         {/* 1. BARRE SUPÉRIEURE (HEADER)                                          */}
         {/* ===================================================================== */}
-        <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: theme.barBorder }]}>
-          {/* Titre centré : Texte Combiné centré horizontalement avec chevron vers le bas */}
-          {hasSelections && (
-            <View style={styles.headerCenterTitleWrap} pointerEvents="box-none">
-              <TouchableOpacity
-                style={styles.ticketTypeDropdown}
-                onPress={() => setShowTicketTypeMenu(true)}
-                activeOpacity={0.7}
-                accessibilityLabel="Type de pari"
-                accessibilityRole="button"
-              >
-                <Text style={[styles.ticketTypeDropdownText, { color: textPrimary }]}>
-                  {ticketType === 'Simple' ? 'Pari simple' : ticketType}
-                </Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={16}
-                  color={textSecondary}
-                  style={{ marginLeft: 4 }}
-                />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Espace gauche pour le centrage horizontal strict */}
-          <View style={{ width: 44 }} />
-
-          {/* Icônes d'actions (droite) : trash-can-outline + dots-vertical */}
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: headerBg,
+              borderBottomColor: isDark ? screenBg : '#EBEEF3',
+            },
+          ]}
+        >
           {hasSelections ? (
-            <View style={styles.headerRightActions}>
-              <TouchableOpacity
-                onPress={handleClearAll}
-                style={styles.headerActionBtn}
-                activeOpacity={0.7}
-                accessibilityLabel="Vider le coupon"
-              >
-                <MaterialCommunityIcons
-                  name="trash-can-outline"
-                  size={22}
-                  color={textSecondary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.headerActionBtn}
-                onPress={() => setShow3DotsMenu(true)}
-                accessibilityLabel="Options du coupon"
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons
-                  name="dots-vertical"
-                  size={22}
-                  color={textPrimary}
-                />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.emptyHeaderWrap}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <BrandLogo size={18} variant="compact" />
-                <Text style={[styles.emptyHeaderTitle, { color: textPrimary }]}>
-                  Coupon
-                </Text>
+            <>
+              {/* Titre centré : Texte Pari simple / Combiné centré horizontalement avec chevron vers le bas */}
+              <View style={styles.headerCenterTitleWrap} pointerEvents="box-none">
+                <TouchableOpacity
+                  style={styles.ticketTypeDropdown}
+                  onPress={() => setShowTicketTypeMenu(true)}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Type de pari"
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.ticketTypeDropdownText, { color: headerSelectorColor }]}>
+                    {effectiveTicketLabel}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color={headerSelectorColor}
+                    style={{ marginLeft: 5 }}
+                  />
+                </TouchableOpacity>
               </View>
+
+              {/* Espace gauche pour le centrage horizontal strict */}
+              <View style={{ width: 44 }} />
+
+              {/* Icônes d'actions (droite) : Corbeille + 3 points (verticaux sur MegaPari, horizontaux ailleurs) */}
+              <View style={styles.headerRightActions}>
+                <TouchableOpacity
+                  onPress={handleClearAll}
+                  style={styles.headerActionBtn}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Vider le coupon"
+                >
+                  <TrashBinIcon
+                    size={20}
+                    color={trashIconColor}
+                    cutoutColor={headerBg}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.headerActionBtn}
+                  onPress={() => setShow3DotsMenu(true)}
+                  accessibilityLabel="Options du coupon"
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons
+                    name={isMegaPari ? 'dots-vertical' : 'dots-horizontal'}
+                    size={22}
+                    color={dotsIconColor}
+                  />
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <View style={styles.emptyHeaderContainer}>
+              <Text
+                style={[
+                  styles.emptyHeaderTitle,
+                  {
+                    color: isDark
+                      ? (currentTheme?.textPrimary || '#FFFFFF')
+                      : (currentTheme?.primary || currentTheme?.colors?.primary || '#376996'),
+                  },
+                ]}
+              >
+                Coupon
+              </Text>
             </View>
           )}
         </View>
@@ -280,46 +538,63 @@ export default function CouponScreen({ navigation }: any) {
             styles.scrollContent,
             contentContainerStyle,
             hasSelections && {
-              paddingBottom: isExpanded ? 460 : 130,
+              paddingBottom: isExpanded ? 460 : 145,
             },
           ]}
           showsVerticalScrollIndicator={false}
+          refreshControl={createAppRefreshControl({
+            refreshing,
+            onRefresh,
+            theme: currentTheme,
+            progressViewOffset: 15,
+          })}
         >
           {!hasSelections ? (
             /* ================================================================= */
             /* ÉTAT VIDE : LES 5 CARTES D'ACTIONS (EmptyCouponActions)           */
             /* ================================================================= */
-            <EmptyCouponActions
-              navigation={navigation}
-              userBalance={`${userBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} ₣`}
-              onDeposit={() => setShowDepositModal(true)}
-              onSearch={() => navigation.navigate('Populaire')}
-              onCombine={() => {
-                Alert.alert(
-                  'Pari combiné du jour 🚀',
-                  'Charger le combiné exclusif boosté (Cote : 4.01) ?',
-                  [
-                    { text: 'Annuler', style: 'cancel' },
-                    { text: 'Charger', onPress: () => loadByCode('LR5CP') },
-                  ]
-                );
-              }}
-              onCreateCoupon={() => navigation.navigate('StudioCreation')}
-              onLoadCoupon={() => setLoadSheetVisible(true)}
-            />
+            <View style={{ paddingHorizontal: 12 }}>
+              <EmptyCouponActions
+                navigation={navigation}
+                userBalance={
+                  typeof userBalance === 'number'
+                    ? `${Math.round(userBalance)} F`
+                    : `${userBalance} F`
+                }
+                onDeposit={() => setShowDepositModal(true)}
+                onSearch={() => navigation.navigate('Populaire')}
+                onCombine={() => {
+                  Alert.alert(
+                    'Pari combiné du jour 🚀',
+                    'Charger le combiné exclusif boosté (Cote : 4.01) ?',
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      { text: 'Charger', onPress: () => loadByCode('LR5CP') },
+                    ]
+                  );
+                }}
+                onCreateCoupon={() => navigation.navigate('StudioCreation')}
+                onLoadCoupon={() => setLoadSheetVisible(true)}
+              />
+            </View>
           ) : (
             /* ================================================================= */
-            /* ÉTAT ACTIF : CARTES DES ÉVÉNEMENTS ACTIFS (EventCard)             */
+            /* ÉTAT ACTIF : CARTES DES ÉVÉNEMENTS ACTIFS                         */
             /* ================================================================= */
             <View style={styles.activeListContainer}>
-              {currentSelections.map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  onRemove={removeEvent}
-                  theme={theme}
-                />
-              ))}
+              {currentSelections.map((event) => {
+                const liveInfo = liveEventOdds[event.id];
+                return (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    liveOdd={liveInfo?.odd}
+                    oddTrend={liveInfo?.trend || 'stable'}
+                    onRemove={removeEvent}
+                    theme={currentTheme}
+                  />
+                );
+              })}
             </View>
           )}
         </ScrollView>
@@ -334,7 +609,7 @@ export default function CouponScreen({ navigation }: any) {
             stake={stake}
             onStakeChange={setStake}
             userBalance={userBalance}
-            potentialPayout={potentialPayout}
+            potentialPayout={effectivePotentialPayout}
             isExpanded={isExpanded}
             onToggleExpand={() => setIsExpanded(!isExpanded)}
             onPlaceBet={handleConfirmBet}
@@ -345,7 +620,9 @@ export default function CouponScreen({ navigation }: any) {
             onPromoCodeChange={setPromoCodeInput}
             oddsPolicy={oddsPolicy}
             onOddsPolicyChange={setOddsPolicy}
-            theme={theme}
+            oddsTrend={totalOddsTrend}
+            previousTotalOdds={previousTotalOddsStr}
+            theme={currentTheme}
           />
         )}
       </View>
@@ -368,8 +645,8 @@ export default function CouponScreen({ navigation }: any) {
             style={[
               styles.dropdownMenuCard,
               {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
+                backgroundColor: currentTheme.cardBackground || theme.cardBackground,
+                borderColor: currentTheme.border || theme.border,
               },
             ]}
           >
@@ -406,7 +683,7 @@ export default function CouponScreen({ navigation }: any) {
                     <Text
                       style={[
                         styles.dropdownItemTitle,
-                        { color: isSelected ? theme.primary : textPrimary },
+                        { color: isSelected ? currentTheme.primary : textPrimary },
                         isSelected && { fontWeight: '700' },
                       ]}
                     >
@@ -420,7 +697,7 @@ export default function CouponScreen({ navigation }: any) {
                     <Ionicons
                       name="checkmark-circle"
                       size={20}
-                      color={theme.primary}
+                      color={currentTheme.primary}
                     />
                   )}
                 </TouchableOpacity>
@@ -439,6 +716,7 @@ export default function CouponScreen({ navigation }: any) {
         onSaveCoupon={handleSaveCoupon}
         onLoadCoupon={() => setLoadSheetVisible(true)}
         onCreateCoupon={() => navigation.navigate('StudioCreation')}
+        onShareCoupon={handleShareCoupon}
       />
 
       {/* ===================================================================== */}
@@ -455,8 +733,8 @@ export default function CouponScreen({ navigation }: any) {
             style={[
               styles.depositCard,
               {
-                backgroundColor: theme.cardBackground,
-                borderColor: theme.border,
+                backgroundColor: currentTheme.cardBackground || headerBg,
+                borderColor: currentTheme.border || screenBg,
               },
             ]}
           >
@@ -471,7 +749,7 @@ export default function CouponScreen({ navigation }: any) {
 
             <Text style={[styles.tabSectionHint, { color: textSecondary }]}>
               Solde actuel :{' '}
-              <Text style={{ fontWeight: '700', color: theme.primary }}>
+              <Text style={{ fontWeight: '700', color: currentTheme.primary }}>
                 {userBalance.toLocaleString('fr-FR')} ₣
               </Text>
             </Text>
@@ -493,7 +771,7 @@ export default function CouponScreen({ navigation }: any) {
                     style={[
                       styles.quickStakePillText,
                       depositAmount === amt && {
-                        color: theme.primary,
+                        color: currentTheme.primary,
                         fontWeight: '700',
                       },
                     ]}
@@ -509,8 +787,8 @@ export default function CouponScreen({ navigation }: any) {
                 styles.stakeInputContainer,
                 styles.promoTextInput,
                 {
-                  backgroundColor: isDark ? theme.background : '#F8FAFC',
-                  borderColor: theme.border,
+                  backgroundColor: isDark ? currentTheme.background : '#F8FAFC',
+                  borderColor: currentTheme.border || theme.border,
                   color: textPrimary,
                   marginTop: 10,
                 },
@@ -524,7 +802,7 @@ export default function CouponScreen({ navigation }: any) {
 
             <View style={styles.depositBtnRow}>
               <TouchableOpacity
-                style={[styles.depositCancelBtn, { borderColor: theme.border }]}
+                style={[styles.depositCancelBtn, { borderColor: currentTheme.border || theme.border }]}
                 onPress={() => setShowDepositModal(false)}
                 activeOpacity={0.7}
               >
@@ -534,7 +812,7 @@ export default function CouponScreen({ navigation }: any) {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.depositSubmitBtn, { backgroundColor: theme.primary }]}
+                style={[styles.depositSubmitBtn, { backgroundColor: currentTheme.primary }]}
                 onPress={handleDeposit}
                 activeOpacity={0.85}
               >
@@ -562,7 +840,7 @@ export default function CouponScreen({ navigation }: any) {
         onClose={() => setLoadSheetVisible(false)}
         onLoadCoupon={handleLoadCouponByCode}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -575,13 +853,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F8FAFC', // Fond d'écran principal
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   mainContainer: {
     flex: 1,
     width: '100%',          // 100% de la largeur disponible
     height: '100%',         // 100% de la hauteur disponible
-    paddingHorizontal: 8,   // Marges latérales réduites à 8px pour coller aux bords
+    paddingHorizontal: 0,
     justifyContent: 'space-between',
   },
   contentScrollView: {
@@ -594,7 +871,6 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 52,
-    marginHorizontal: -8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -618,17 +894,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   ticketTypeDropdownText: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     letterSpacing: -0.3,
   },
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
   headerActionBtn: {
     padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyHeaderContainer: {
+    flex: 1,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -638,14 +920,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyHeaderTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
   scrollContent: {
     paddingBottom: 110,
   },
   activeListContainer: {
-    paddingTop: 12,
+    paddingTop: 2,
+  },
+  boosterCard: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#E5B022',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  boosterHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  boosterTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  boosterTitleText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E242B',
+    marginLeft: 6,
+  },
+  boosterBodyText: {
+    fontSize: 12.5,
+    lineHeight: 17.5,
+    color: '#6E7C8C',
+    fontWeight: '400',
   },
 
   /* Empty State */
@@ -676,20 +993,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 2,
-      },
-      default: {
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-      },
-    }),
   },
   iconBadge: {
     width: 40,

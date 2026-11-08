@@ -1,4 +1,5 @@
-import BetHistoryScreen, { MainHistoryScreen } from './BetHistoryScreen';
+import HistoryListScreen from './history/HistoryListScreen';
 
-export { MainHistoryScreen };
-export default BetHistoryScreen;
+export const MainHistoryScreen = HistoryListScreen;
+export const HistoryScreen = HistoryListScreen;
+export default HistoryListScreen;

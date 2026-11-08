@@ -2,42 +2,88 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MatchEvent } from '../types/bet';
-import { Colors, Typography } from '../theme/theme';
-import { generateWinningPokerDraw, renderCardsWithSuits } from '../utils/pokerGenerator';
+import { Typography } from '../theme/theme';
+import { generateWinningPokerDraw, renderCardsWithSuits, getStableRandomHand } from '../utils/pokerGenerator';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
-import { formatBetDate } from '../utils/dateFormatter';
+import { formatBetDate, combineDateAndTime, replaceMonthNamesWithNumbers } from '../utils/dateFormatter';
+import { formatCleanOdds } from '../utils/oddsFormatter';
+import { LiveBadge } from './LiveBadge';
 
 export interface TvBetPokerCardProps {
   event: MatchEvent;
   isWon?: boolean;
+  couponStatus?: string;
+  isLive?: boolean;
   onPress?: () => void;
 }
+
+const formatTvBetNumericDate = (dateInput?: any, timeOverride?: string): string => {
+  if (!dateInput) return '';
+  const str = String(dateInput).trim();
+  // Remplacement immédiat des mois textuels par des chiffres (ex: "21 oct 2026" -> "21.10.2026")
+  const withNumericMonths = replaceMonthNamesWithNumbers(str);
+  if (timeOverride && timeOverride.trim()) {
+    return combineDateAndTime(withNumericMonths, timeOverride.trim()).formatted;
+  }
+  // Si déjà sous forme "JJ.MM.AAAA (HH:mm)" ou "JJ.MM.AAAA"
+  if (/^\d{1,2}\.\d{1,2}\.\d{4}(\s*\(\d{1,2}:\d{2}\))?$/.test(withNumericMonths)) {
+    return withNumericMonths;
+  }
+  return formatBetDate(withNumericMonths, timeOverride);
+};
 
 export const TvBetPokerCard: React.FC<TvBetPokerCardProps> = ({
   event,
   isWon = false,
+  couponStatus,
+  isLive,
   onPress,
 }) => {
-  const { currentTheme } = useThemeStore();
-  const { font, scale, verticalScale, moderateScale, isTablet } = useResponsive();
-  const isEventWon = event.status === 'Gain' || event.status === 'Gagné' || isWon;
-  const isEventLost = event.status === 'Perdu';
+  const { currentTheme, brandChoice } = useThemeStore();
+  const { font, moderateScale, verticalScale } = useResponsive();
 
-  // Formatage date et heure
-  const dateDisplay = formatBetDate(event.date || '05.09.2026 (01:50)');
+  // Détection stricte des statuts
+  const isEventWon = Boolean(
+    isWon ||
+    event.status === 'Gain' ||
+    event.status === 'Gagné' ||
+    event.status === 'Payé' ||
+    couponStatus === 'Payé' ||
+    couponStatus === 'Gagné' ||
+    couponStatus === 'Gain'
+  );
+  const isEventLost = !isEventWon && (event.status === 'Perdu' || couponStatus === 'Perdu');
+  const isCouponFinished = isEventWon || isEventLost || couponStatus === 'Annulé' || couponStatus === 'Vendu';
 
-  // Formatage de la cote (ex: 1000 ou 5.00)
-  const oddDisplay =
-    typeof event.odd === 'number'
-      ? Number.isInteger(event.odd)
-        ? event.odd.toString()
-        : event.odd.toFixed(2)
-      : event.odd || '1.00';
+  // Le badge en direct disparaît dès que le coupon ou l'événement poker est validé / gagné / terminé
+  const showLiveBadge = !isCouponFinished && Boolean(
+    isLive !== undefined ? isLive : event.isLive
+  );
 
-  // Tirage poker dynamique basé sur la combinaison du pronostic
+  const isCouponAccepted = !isEventWon && !isEventLost;
+
+  // Formatage date et heure précis en format numérique strict (ex: "21.10.2026 (17:25)" ou "21.10.2026")
+  const dateDisplay = React.useMemo(() => {
+    const rawDate = event.matchDate || event.startDate || event.date || event.eventDate;
+    if (event.matchTime) {
+      return formatTvBetNumericDate(rawDate, event.matchTime);
+    }
+    return formatTvBetNumericDate(rawDate);
+  }, [event.matchTime, event.matchDate, event.startDate, event.date, event.eventDate]);
+
+  // Formatage de la cote (ex: 5.8 sans zéros superflus)
+  const oddDisplay = formatCleanOdds(event.odd);
+
+  // Tirage poker dynamique basé sur la combinaison du pronostic (avec main gagnante aléatoire)
   const pokerDraw = React.useMemo(() => {
+    const seed = event.id || event.roundCode || (event as any).additionalInfo || event.prediction || 'poker-seed';
     if (event.pokerResult && event.pokerResult.hands && event.pokerResult.hands.length === 6) {
+      let resolvedWinner = getStableRandomHand(seed);
+      if (event.pokerResult.winnerLabel) {
+        const m = event.pokerResult.winnerLabel.match(/([1-6])/);
+        if (m) resolvedWinner = parseInt(m[1], 10);
+      }
       return {
         hand1: event.pokerResult.hands[0]?.cards || 'K♠, A♠',
         hand2: event.pokerResult.hands[1]?.cards || '4♦, 4♣',
@@ -46,21 +92,24 @@ export const TvBetPokerCard: React.FC<TvBetPokerCardProps> = ({
         hand5: event.pokerResult.hands[4]?.cards || '2♥, J♦',
         hand6: event.pokerResult.hands[5]?.cards || 'A♣, 9♦',
         table: event.pokerResult.board || '10♠, J♣, Q♠, 3♥, 6♣',
-        winnerHand: 1,
-        combinationName: event.prediction || 'Quinte flush',
+        winnerHand: resolvedWinner,
+        combinationName: event.prediction || 'Une Paire',
       };
     }
-    return generateWinningPokerDraw(event.prediction || 'Quinte flush');
-  }, [event.pokerResult, event.prediction]);
+    return generateWinningPokerDraw(event.prediction || 'Une Paire', seed);
+  }, [event.pokerResult, event.prediction, event.id, event.roundCode]);
 
   const cleanCombinationName = React.useMemo(() => {
-    const raw = pokerDraw.combinationName || 'Quinte flush';
+    const raw = pokerDraw.combinationName || 'Une Paire';
     return raw.replace(/^Combinaison gagnante\.\s*/i, '').trim();
   }, [pokerDraw.combinationName]);
 
-  // Dynamic colors for Texas Hold'em cards & labels
-  const labelPrefixColor = currentTheme.name.startsWith('melbet') ? '#94A3B8' : '#64748B';
-  const cardTextColor = currentTheme.name.startsWith('melbet') ? '#94A3B8' : '#334155';
+  // Couleurs conditionnelles adaptées à la marque et au thème
+  const labelPrefixColor =
+    currentTheme.textSecondary ||
+    currentTheme.colors?.textSecondary ||
+    (currentTheme.isDark ? '#8EA3B8' : (brandChoice === '1xbet' ? '#5B7B9A' : '#708A9E'));
+  const cardTextColor = currentTheme.isDark ? '#E2E8F0' : '#334155';
   const redCardStyle = { color: '#EF4444', fontWeight: '700' as const };
   const baseCardTextStyle = [
     styles.pokerLine,
@@ -70,7 +119,13 @@ export const TvBetPokerCard: React.FC<TvBetPokerCardProps> = ({
       fontWeight: '600' as const,
     },
   ];
-  const accordionColor = currentTheme.name.startsWith('melbet') ? '#E58B05' : currentTheme.primary;
+  const dividerColor = currentTheme.isDark ? '#2C3A4B' : '#E8EEF5';
+  const mainTextColor = currentTheme.isDark ? currentTheme.textPrimary : '#0C2340';
+  const additionalInfoColor = currentTheme.primary || '#3B82F6';
+  const isMelbet = Boolean(
+    brandChoice === 'melbet' ||
+    (currentTheme?.name || '').toLowerCase().includes('melbet')
+  );
 
   return (
     <TouchableOpacity
@@ -80,7 +135,7 @@ export const TvBetPokerCard: React.FC<TvBetPokerCardProps> = ({
         styles.cardContainer,
         {
           paddingHorizontal: moderateScale(10),
-          paddingVertical: verticalScale(14),
+          paddingVertical: verticalScale(10),
         },
       ]}
     >
@@ -92,84 +147,94 @@ export const TvBetPokerCard: React.FC<TvBetPokerCardProps> = ({
             style={[
               styles.gamepadIcon,
               {
-                width: moderateScale(20),
-                height: moderateScale(20),
-                tintColor: currentTheme.textSecondary,
+                width: 20,
+                height: 18,
+                tintColor: isMelbet ? '#1B365D' : '#507694',
               },
             ]}
             resizeMode="contain"
           />
           <View style={styles.headerTextGroup}>
-            <Text style={[styles.disciplineTitle, { color: currentTheme.textSecondary, fontSize: font(12.5) }]}>TvBet. POKER</Text>
-            <Text style={[styles.dateSubtitle, { color: currentTheme.textSecondary, fontSize: font(12) }]}>{dateDisplay}</Text>
+            <Text style={[styles.disciplineTitle, { color: isMelbet ? '#1B365D' : '#507694', fontSize: font(12.5), fontWeight: '700' }]}>
+              TvBet. POKER
+            </Text>
+            <View style={styles.dateTimeLiveRow}>
+              <Text style={[styles.dateSubtitle, { color: isMelbet ? '#3A5070' : '#7B96AB', fontSize: font(12) }]}>
+                {dateDisplay}
+              </Text>
+              {showLiveBadge && (
+                <LiveBadge style={{ marginLeft: moderateScale(8) }} />
+              )}
+            </View>
           </View>
         </View>
       </View>
 
-      {/* 2. BLOC CENTRAL SELON L'ÉTAT DU PARI */}
-      {!isEventWon ? (
-        /* État 1 : « Accepté » (En cours) */
-        <View style={styles.pendingCenterBox}>
-          <Text style={[styles.pokerTitle, { color: currentTheme.textPrimary }]}>POKER</Text>
-        </View>
-      ) : (
-        /* État 2 : « Validé Gagné » (Formatage strict pixel-perfect mobile) */
-        <View style={styles.pokerDrawContainer}>
-          <Text style={[styles.pokerTitle, { color: currentTheme.textPrimary }]}>POKER</Text>
+      {/* 2. BLOC CENTRAL : TITRE POKER TOUJOURS PRÉSENT (+ TIRAGE DÉTAILLÉ UNIQUEMENT SI GAGNANT) */}
+      <View style={[styles.pokerCenterContainer, !isEventWon && styles.pokerAcceptedCenterSpacing]}>
+        <Text style={[styles.pokerTitle, { color: mainTextColor, fontSize: font(14.5) }]}>
+          POKER
+        </Text>
 
-          <Text style={baseCardTextStyle}>
-            <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 1 : </Text>
-            {renderCardsWithSuits(pokerDraw.hand1, baseCardTextStyle, redCardStyle)}
-          </Text>
-          <Text style={baseCardTextStyle}>
-            <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 2 : </Text>
-            {renderCardsWithSuits(pokerDraw.hand2, baseCardTextStyle, redCardStyle)}
-          </Text>
-          <Text style={baseCardTextStyle}>
-            <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 3 : </Text>
-            {renderCardsWithSuits(pokerDraw.hand3, baseCardTextStyle, redCardStyle)}
-          </Text>
-          <Text style={baseCardTextStyle}>
-            <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 4 : </Text>
-            {renderCardsWithSuits(pokerDraw.hand4, baseCardTextStyle, redCardStyle)}
-          </Text>
-          <Text style={baseCardTextStyle}>
-            <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 5 : </Text>
-            {renderCardsWithSuits(pokerDraw.hand5, baseCardTextStyle, redCardStyle)}
-          </Text>
-          <Text style={baseCardTextStyle}>
-            <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 6 : </Text>
-            {renderCardsWithSuits(pokerDraw.hand6, baseCardTextStyle, redCardStyle)}
-          </Text>
+        {isEventWon && (
+          <View style={styles.pokerHandsBlock}>
+            <Text style={baseCardTextStyle}>
+              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 1 : </Text>
+              {renderCardsWithSuits(pokerDraw.hand1, baseCardTextStyle, redCardStyle)}
+            </Text>
+            <Text style={baseCardTextStyle}>
+              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 2 : </Text>
+              {renderCardsWithSuits(pokerDraw.hand2, baseCardTextStyle, redCardStyle)}
+            </Text>
+            <Text style={baseCardTextStyle}>
+              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 3 : </Text>
+              {renderCardsWithSuits(pokerDraw.hand3, baseCardTextStyle, redCardStyle)}
+            </Text>
+            <Text style={baseCardTextStyle}>
+              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 4 : </Text>
+              {renderCardsWithSuits(pokerDraw.hand4, baseCardTextStyle, redCardStyle)}
+            </Text>
+            <Text style={baseCardTextStyle}>
+              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 5 : </Text>
+              {renderCardsWithSuits(pokerDraw.hand5, baseCardTextStyle, redCardStyle)}
+            </Text>
+            <Text style={baseCardTextStyle}>
+              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 6 : </Text>
+              {renderCardsWithSuits(pokerDraw.hand6, baseCardTextStyle, redCardStyle)}
+            </Text>
 
-          <Text style={[styles.pokerLine, styles.tableLine, { color: cardTextColor }]}>
-            <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Table : </Text>
-            {renderCardsWithSuits(pokerDraw.table, baseCardTextStyle, redCardStyle)}
-          </Text>
+            <Text style={[styles.pokerLine, styles.tableLine, { color: cardTextColor }]}>
+              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Table : </Text>
+              {renderCardsWithSuits(pokerDraw.table, baseCardTextStyle, redCardStyle)}
+            </Text>
 
-          <Text style={[styles.pokerLine, styles.winnerLine, { color: labelPrefixColor }]}>
-            <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Gagnant : </Text>
-            {pokerDraw.winnerHand} ({cleanCombinationName})
-          </Text>
-        </View>
-      )}
+            <Text style={[styles.pokerLine, styles.winnerLine, { color: labelPrefixColor }]}>
+              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>
+                Gagnant :{' '}
+              </Text>
+              {pokerDraw.winnerHand} ({cleanCombinationName})
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* SÉPARATEUR 1 */}
+      <View style={[styles.cardDivider, { backgroundColor: dividerColor }]} />
 
       {/* 3. PRONOSTIC / SÉLECTION DU MARCHÉ & COTE */}
       <View style={styles.marketSelectionRow}>
         <View style={styles.marketSelectionLeft}>
           <Text
-            style={[styles.marketSelectionText, { color: currentTheme.textPrimary, fontSize: font(13) }]}
+            style={[styles.marketSelectionText, { color: mainTextColor, fontSize: font(14) }]}
             numberOfLines={2}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
           >
-            {event.prediction || 'Combinaison gagnante. Deux Paires'}
+            {event.prediction || 'Combinaison gagnante. Une Paire'}
           </Text>
         </View>
 
         <View style={styles.marketOddsRight}>
           <Text
-            style={[styles.marketOddsText, { color: currentTheme.textPrimary, fontSize: font(13.5) }]}
+            style={[styles.marketOddsText, { color: mainTextColor, fontSize: font(12) }]}
           >
             {oddDisplay}
           </Text>
@@ -178,38 +243,65 @@ export const TvBetPokerCard: React.FC<TvBetPokerCardProps> = ({
 
       {/* 4. STATUT */}
       <View style={styles.statusRow}>
-        <Text style={[styles.statusLabel, { color: currentTheme.textSecondary, fontSize: font(13) }]}>Statut :</Text>
+        <Text style={[styles.statusLabel, { color: labelPrefixColor, fontSize: font(13.5) }]}>
+          Statut:
+        </Text>
+
         {isEventWon ? (
           <View style={styles.gainStatusWrap}>
-            <View style={[styles.greenCheckCircle, { backgroundColor: currentTheme.status.paye, width: moderateScale(18), height: moderateScale(18), borderRadius: moderateScale(9) }]}>
-              <Ionicons name="checkmark" size={moderateScale(11)} color={currentTheme.isDark ? '#000000' : '#FFFFFF'} />
+            <View
+              style={[
+                styles.greenCheckCircle,
+                {
+                  backgroundColor: currentTheme.status?.paye || '#22C55E',
+                  width: moderateScale(16),
+                  height: moderateScale(16),
+                  borderRadius: moderateScale(8),
+                },
+              ]}
+            >
+              <Ionicons name="checkmark" size={moderateScale(10)} color="#FFFFFF" />
             </View>
-            <Text style={[styles.gainStatusText, { color: currentTheme.status.paye, fontSize: font(13.5) }]}>Gain</Text>
+            <Text style={[styles.gainStatusText, { color: currentTheme.status?.paye || '#22C55E', fontSize: font(13.5) }]}>
+              Gain
+            </Text>
           </View>
         ) : isEventLost ? (
           <View style={styles.lostStatusWrap}>
-            <View style={[styles.redCloseCircle, { backgroundColor: currentTheme.status.perdu, width: moderateScale(16), height: moderateScale(16), borderRadius: moderateScale(8) }]}>
-              <Ionicons name="close" size={moderateScale(11)} color="#FFFFFF" />
+            <View
+              style={[
+                styles.redCloseCircle,
+                {
+                  backgroundColor: currentTheme.status?.perdu || '#DC2626',
+                  width: moderateScale(16),
+                  height: moderateScale(16),
+                  borderRadius: moderateScale(8),
+                },
+              ]}
+            >
+              <Ionicons name="close" size={moderateScale(10)} color="#FFFFFF" />
             </View>
-            <Text style={[styles.lostStatusText, { color: currentTheme.status.perdu, fontSize: font(13) }]}>Perdu</Text>
+            <Text style={[styles.lostStatusText, { color: currentTheme.status?.perdu || '#DC2626', fontSize: font(13) }]}>
+              Perdu
+            </Text>
           </View>
         ) : (
-          <View style={styles.acceptStatusWrap}>
-            <View style={[styles.blueCheckCircle, { backgroundColor: currentTheme.status.accepte, width: moderateScale(16), height: moderateScale(16), borderRadius: moderateScale(8) }]}>
-              <Ionicons name="checkmark" size={moderateScale(10)} color={currentTheme.isDark ? '#000000' : '#FFFFFF'} />
-            </View>
-            <Text style={[styles.acceptStatusText, { color: currentTheme.status.accepte, fontSize: font(12.5) }]}>Accepté</Text>
-          </View>
+          <Text style={[styles.plainAcceptStatusText, { color: currentTheme.status?.accepte || currentTheme.primary, fontSize: font(13.5) }]}>
+            Accepté
+          </Text>
         )}
       </View>
 
+      {/* SÉPARATEUR 2 */}
+      <View style={[styles.cardDivider, { backgroundColor: dividerColor }]} />
+
       {/* 5. INFORMATIONS SUPPLÉMENTAIRES */}
       <View style={styles.infoSection}>
-        <Text style={[styles.infoLabel, { color: accordionColor, fontSize: font(12) }]}>
+        <Text style={[styles.infoLabel, { color: additionalInfoColor, fontSize: font(13) }]}>
           Informations supplémentaires :
         </Text>
-        <Text style={[styles.infoValue, { color: currentTheme.textPrimary, fontSize: font(13) }]}>
-          {event.roundCode || 'PB781011'}
+        <Text style={[styles.infoValue, { color: mainTextColor, fontSize: font(14.5) }]}>
+          {event.roundCode || (event as any).id || 'PB220781'}
         </Text>
       </View>
     </TouchableOpacity>
@@ -221,7 +313,7 @@ export default TvBetPokerCard;
 const styles = StyleSheet.create({
   cardContainer: {
     paddingHorizontal: 10,
-    paddingVertical: 14,
+    paddingVertical: 10,
   },
   headerSection: {
     flexDirection: 'row',
@@ -236,75 +328,47 @@ const styles = StyleSheet.create({
   },
   gamepadIcon: {
     width: 20,
-    height: 20,
-    marginRight: 8,
+    height: 18,
+    marginRight: 7,
   },
   headerTextGroup: {
     justifyContent: 'center',
   },
   disciplineTitle: {
     fontSize: 12.5,
-    fontWeight: '400',
-    color: '#7C8B99',
+    fontWeight: '700',
     fontFamily: Typography.fontFamily,
+  },
+  dateTimeLiveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
   dateSubtitle: {
     fontSize: 12,
-    color: '#7C8B99',
     fontFamily: Typography.fontFamily,
-    marginTop: 2,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  roundCodeBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  roundCodeText: {
-    fontSize: 10,
-    color: '#64748B',
-    fontWeight: '600',
-    fontFamily: Typography.fontFamily,
-  },
-  liveBadge: {
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  liveBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9.5,
-    fontWeight: '800',
-    fontFamily: Typography.fontFamily,
-    letterSpacing: 0.3,
   },
 
-  // Bloc Central « Accepté » (En cours)
-  pendingCenterBox: {
+  // 2. Bloc Central : POKER
+  pokerCenterContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // Bloc Central « Validé Gagné » (Formatage strict pixel-perfect mobile)
-  pokerDrawContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 6,
+  pokerAcceptedCenterSpacing: {
+    paddingVertical: 14,
   },
   pokerTitle: {
-    fontSize: 13.5,
+    fontSize: 14.5,
     fontWeight: '700',
     letterSpacing: 0.5,
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 6,
     fontFamily: Typography.fontFamily,
+  },
+  pokerHandsBlock: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    marginBottom: 4,
   },
   pokerLine: {
     fontSize: 12.5,
@@ -312,12 +376,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: Typography.fontFamily,
   },
-  redCard: {
-    color: '#EF4444',
-    fontWeight: '700',
-  },
   labelPrefix: {
-    color: '#7C8B99',
     fontWeight: '400',
   },
   tableLine: {
@@ -328,65 +387,54 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 4,
     fontWeight: '400',
-    color: '#7C8B99',
   },
 
-  // Pronostic / Sélection du marché & Cote
+  // Séparateurs horizontaux pleine largeur
+  cardDivider: {
+    height: 1,
+    marginHorizontal: -10,
+    marginVertical: 10,
+  },
+
+  // 3. Pronostic / Sélection du marché & Cote
   marketSelectionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   marketSelectionLeft: {
     flex: 1,
-    paddingRight: 8,
+    paddingRight: 10,
   },
   marketSelectionText: {
-    fontSize: 13,
-    fontWeight: '400',
+    fontSize: 14,
+    fontWeight: '700',
     fontFamily: Typography.fontFamily,
   },
   marketOddsRight: {
     alignItems: 'flex-end',
   },
   marketOddsText: {
-    fontSize: 13.5,
-    fontWeight: '500',
-    fontFamily: Typography.fontFamily,
-  },
-  predictionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 6,
-  },
-  predictionText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '400',
-    fontFamily: Typography.fontFamily,
-    paddingRight: 8,
-  },
-  oddText: {
-    fontSize: 13.5,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '700',
     fontFamily: Typography.fontFamily,
   },
 
-  // Statut
+  // 4. Statut
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
   },
   statusLabel: {
-    fontSize: 13,
-    color: '#7C8B99',
-    fontWeight: '400',
+    fontSize: 13.5,
+    fontWeight: '700',
+    fontFamily: Typography.fontFamily,
+  },
+  plainAcceptStatusText: {
+    fontSize: 13.5,
+    fontWeight: '700',
     fontFamily: Typography.fontFamily,
   },
   gainStatusWrap: {
@@ -394,18 +442,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   greenCheckCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#22C55E',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 6,
   },
   gainStatusText: {
     fontSize: 13.5,
-    fontWeight: '500',
-    color: '#22C55E',
+    fontWeight: '700',
     fontFamily: Typography.fontFamily,
   },
   lostStatusWrap: {
@@ -417,47 +463,29 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#DC2626',
     alignItems: 'center',
     justifyContent: 'center',
   },
   lostStatusText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#DC2626',
     fontFamily: Typography.fontFamily,
   },
-  acceptStatusWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  blueCheckCircle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  acceptStatusText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: Colors.primary,
-    fontFamily: Typography.fontFamily,
-  },
+
+  // 5. Informations supplémentaires
   infoSection: {
-    marginTop: 8,
+    marginTop: 2,
+    marginBottom: 2,
   },
   infoLabel: {
-    fontSize: 12,
-    fontWeight: '400',
+    fontSize: 13,
+    fontWeight: '700',
     fontFamily: Typography.fontFamily,
   },
   infoValue: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14.5,
+    fontWeight: '700',
     fontFamily: Typography.fontFamily,
-    marginTop: 2,
+    marginTop: 3,
   },
 });

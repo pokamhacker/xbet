@@ -21,6 +21,7 @@ export const NAV_ICONS = {
   populaire: require('../../assets/icons/populaire.png'),
   favoris: require('../../assets/icons/favoris.png'),
   coupon: require('../../assets/icons/coupon.png'),
+  couponWinWin: require('../../assets/icons/couponwinwin.png'),
   historique: require('../../assets/icons/historique.png'),
   menu: require('../../assets/icons/menu.png'),
 };
@@ -97,6 +98,21 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
   const couponCount = useCouponStore((state) => state.activeEvents.length);
   const { font, isTablet, insets } = useResponsive();
 
+  const isBottomBarHidden = useThemeStore((state) => state.isBottomBarHidden);
+
+  // Ne pas afficher la barre de navigation si masquée ou sur les jeux
+  if (
+    isBottomBarHidden ||
+    currentRoute === 'RoyalFeast' ||
+    currentRoute === 'Kamikaze' ||
+    currentRoute === 'AppleOfFortune' ||
+    currentRoute === 'CrashGame' ||
+    currentRoute === 'StudioTV' ||
+    currentRoute === 'StudioMortalKombat'
+  ) {
+    return null;
+  }
+
   const handlePress = (targetRoute: string) => {
     if (onTabPress) {
       onTabPress(targetRoute);
@@ -109,6 +125,8 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
       navigate('MainTabs', { screen: targetRoute });
     }
   };
+
+  const isWinWin = (theme?.name || '').toLowerCase().includes('winwin');
 
   const isPopulaireActive = currentRoute === 'Populaire';
   const isFavorisActive = currentRoute === 'Favoris';
@@ -124,15 +142,56 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
     currentRoute === 'TicketDetails' ||
     currentRoute === 'BetDetails' ||
     currentRoute === 'BetDetailsScreen' ||
+    currentRoute === 'MatchStatistics' ||
+    currentRoute === 'MatchStatisticsScreen' ||
+    currentRoute === 'MatchMarkets' ||
+    currentRoute === 'MatchMarketsScreen' ||
+    currentRoute === 'FifaLiveMatch' ||
+    currentRoute === 'FifaLiveMatchScreen' ||
     currentRoute === 'HistoryListScreen' ||
     currentRoute === 'BetHistory' ||
     currentRoute === 'BetHistoryScreen';
   const isMenuActive = currentRoute === 'Menu';
 
-  // Palette dynamique iGaming selon le thème (1xBet / Melbet / Paripesa)
+  // Palette dynamique iGaming selon le thème (1xBet / Melbet / Paripesa / MegaPari)
+  const themeName = String(theme?.name || theme?.key || '').toLowerCase();
+  const isDark = Boolean(theme?.isDark);
+  const isBlack = themeName.includes('black');
+  const isParipesa = themeName.includes('paripesa');
+  const isMegaPari = themeName.includes('megapari');
+  const isMelbet = themeName.includes('melbet');
+
+  const isFusedWithCouponSheet =
+    (currentRoute === 'CouponTab' ||
+      currentRoute === 'Coupon' ||
+      currentRoute === 'CouponScreen') &&
+    couponCount > 0;
+
+  const couponSheetLowerBg = isParipesa
+    ? isDark
+      ? isBlack
+        ? '#0C0E13'
+        : '#282F39'
+      : '#FFFFFF'
+    : isMegaPari
+      ? isDark
+        ? isBlack
+          ? '#0B0E12'
+          : '#1A1F25'
+        : '#FFFFFF'
+      : isDark
+        ? isBlack
+          ? '#0B0F14'
+          : isMelbet
+            ? '#30353B'
+            : '#2A3F54'
+        : '#FFFFFF';
+
   const activeColor = theme?.bottomBar?.active || theme?.active || Colors.primary;
   const inactiveColor = theme?.bottomBar?.inactive || theme?.inactive || Colors.textSecondary;
-  const barBg = theme?.bottomBar?.barBg || theme?.barBg || Colors.surface;
+  const barBg = isFusedWithCouponSheet
+    ? couponSheetLowerBg
+    : (theme?.bottomBar?.barBg || theme?.barBg || Colors.surface);
   const barBorder = theme?.bottomBar?.barBorder || theme?.barBorder || Colors.border;
   const centerBg = theme?.bottomBar?.centerBg || theme?.centerBg || Colors.primary;
   const centerTint = theme?.bottomBar?.centerTint || theme?.centerTint || (theme?.name?.startsWith('melbet') && theme?.isDark ? '#000000' : '#FFFFFF');
@@ -153,6 +212,12 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
           borderTopWidth: 0,
           height: barHeight,
           paddingBottom: bottomInset,
+        },
+        isFusedWithCouponSheet && {
+          elevation: 0,
+          shadowOpacity: 0,
+          shadowRadius: 0,
+          ...(Platform.OS === 'web' ? ({ boxShadow: 'none' } as any) : {}),
         },
       ]}
       pointerEvents="box-none"
@@ -235,12 +300,20 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
               },
             ]}
           >
-            <TintedNavIcon
-              source={NAV_ICONS.coupon}
-              color={centerTint}
-              size={30}
-              style={{ transform: [{ rotate: '-15deg' }] }}
-            />
+            {isWinWin ? (
+              <Image
+                source={NAV_ICONS.couponWinWin}
+                style={{ width: 52, height: 52, borderRadius: 26 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <TintedNavIcon
+                source={NAV_ICONS.coupon}
+                color={centerTint}
+                size={30}
+                style={{ transform: [{ rotate: '-15deg' }] }}
+              />
+            )}
 
             {/* Badge numérique orange réactif si événements actifs dans le coupon */}
             {couponCount > 0 && (
@@ -369,6 +442,8 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
     backgroundColor: '#243DB5',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#243DB5',

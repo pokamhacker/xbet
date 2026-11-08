@@ -1,0 +1,41 @@
+# EAS Build Ignore File
+node_modules/
+.expo/
+dist/
+.git/
+.eas/
+android/
+ios/
+apk/
+tools/
+x-game/
+scratch/
+*.log
+*.zip
+*.mp4
+*.pdf
+*.psd
+*.jfif
+*.apk
+*.exe
+*.ai
+*.db*
+.env
+.env*.local
+.vercel/
+bot-kamikaze/
+bot-royal-feast/
+WhatsApp*/
+assets/cloche.zip
+assets/crash.zip
+assets/kamikaze_zip.zip
+assets/kamikaze_zip/
+assets/module-cloches-react-native.zip
+assets/module-cloches-react-native/
+assets/interface web.zip
+assets/interface web/
+assets/dishes_orig/
+assets/icons/7383/
+assets/Video crash.mp4
+assets/my app.mp4
+assets/vrai.mp4

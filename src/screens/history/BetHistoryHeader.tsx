@@ -12,112 +12,112 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
 import { useThemeStore } from '../../stores/themeStore';
+import {
+  CouponScanHeaderIcon,
+  DepositCardPlusIcon,
+  FilterFunnelIcon,
+  HistoryHeaderIconProps,
+  SaleTagHeaderIcon,
+} from '../../components/icons/HistoryHeaderIcons';
 
 // ============================================================================
 // CONSTANTES D'ARCHITECTURE
 // ============================================================================
 export const TOP_BAR_HEIGHT = 48;
 
-// ============================================================================
-// EMPLACEMENTS / IMPORTS DES ICÔNES DU PROJET
-// Remplacez ces imports ou injectez directement vos composants via les props
-// ============================================================================
-/*
-import {
-  ChevronDownIcon,
-  FilterIcon,
-  WalletIcon,
-  PlusIcon,
-  CalendarIcon,
-  TagIcon,
-} from '@/components/icons';
-*/
-
 export interface IconBaseProps {
   size?: number;
   color?: string;
+  cutoutColor?: string;
 }
 
-// Fallbacks d'icônes par défaut
+// ============================================================================
+// ICÔNES PAR DÉFAUT DU HEADER HISTORIQUE DES PARIS (PIXEL-PERFECT)
+// ============================================================================
 export const DefaultFilterIcon: React.FC<IconBaseProps> = ({
-  size = 21,
+  size = 23,
   color,
-}) => {
-  const { currentTheme } = useThemeStore();
-  const c = color || currentTheme.textSecondary || '#3B566E';
-  return (
-    <Svg fill="none" height={size} viewBox="0 0 24 24" width={size}>
-      <Path d="M3 4H21V6.5L14 13.5V20L10 22V13.5L3 6.5V4Z" fill={c} />
-    </Svg>
-  );
-};
+}) => <FilterFunnelIcon size={size} color={color} />;
 
 export const DefaultWalletIcon: React.FC<IconBaseProps> = ({
-  size = 24,
+  size = 25,
   color,
-}) => {
-  const { currentTheme } = useThemeStore();
-  const c = color || currentTheme.textSecondary || '#3B566E';
-  return (
-    <Svg fill="none" height={size} viewBox="0 0 26 24" width={size}>
-      <Rect fill={c} height="2" rx="1" width="18" x="4" y="2" />
-      <Rect fill={c} height="12" rx="3.5" width="22" x="2" y="6" />
-      <Rect fill="#FFFFFF" height="2" rx="1" width="10" x="8" y="9" />
-      <Rect fill="#FFFFFF" height="2" rx="1" width="10" x="8" y="13" />
-      <Rect fill={c} height="2" rx="1" width="18" x="4" y="20" />
-    </Svg>
-  );
-};
+  cutoutColor,
+}) => (
+  <CouponScanHeaderIcon size={size} color={color} cutoutColor={cutoutColor} />
+);
 
 export const DefaultChevronDownIcon: React.FC<IconBaseProps> = ({
-  size = 16,
+  size = 15,
   color,
 }) => {
   const { currentTheme } = useThemeStore();
-  const c = color || currentTheme.textPrimary || '#233853';
-  return <Ionicons name="chevron-down" size={size} color={c} />;
+  const c = color || (currentTheme.isDark ? currentTheme.textPrimary : '#577089');
+  return (
+    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <Path
+        d="M3.6 6L8 10.4L12.4 6"
+        stroke={c}
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
 };
 
 export const DefaultPlusIcon: React.FC<IconBaseProps> = ({
-  size = 14,
-  color = '#FFFFFF',
-}) => <Ionicons name="add" size={size} color={color} />;
+  size = 25,
+  color = '#48B16E',
+  cutoutColor = '#DCF2E3',
+}) => (
+  <DepositCardPlusIcon size={size} color={color} cutoutColor={cutoutColor} />
+);
 
 export const DefaultCalendarIcon: React.FC<IconBaseProps> = ({
   size = 20,
   color,
 }) => {
   const { currentTheme } = useThemeStore();
-  const c = color || currentTheme.colors?.filterIconColor || currentTheme.filterIconColor || currentTheme.primary || '#3A86FF';
+  const c = color || currentTheme.primary || '#3982C6';
   return <Ionicons name="calendar-sharp" size={size} color={c} />;
 };
 
 export const DefaultTagIcon: React.FC<IconBaseProps> = ({
-  size = 20,
+  size = 23,
   color,
-}) => {
-  const { currentTheme } = useThemeStore();
-  const c = color || currentTheme.colors?.filterIconColor || currentTheme.filterIconColor || currentTheme.primary || '#3A86FF';
-  return <Ionicons name="pricetag-sharp" size={size} color={c} />;
-};
+  cutoutColor,
+}) => (
+  <SaleTagHeaderIcon size={size} color={color} cutoutColor={cutoutColor} />
+);
 
 // ============================================================================
-// UTILITAIRE : FORMATAGE DU SOLDE (ESPACES DE MILLIERS)
+// UTILITAIRE : FORMATAGE DU SOLDE (ESPACES DE MILLIERS + DÉCIMALES PRÉSERVÉES)
 // ============================================================================
 export const formatBalance = (amount: number | string): string => {
-  if (typeof amount === 'string') {
-    const num = parseFloat(amount.replace(/[^0-9.-]+/g, ''));
-    if (isNaN(num)) return amount;
-    return Math.round(num)
-      .toString()
-      .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  }
-  return Math.round(amount)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const num =
+    typeof amount === 'string'
+      ? parseFloat(
+          amount
+            .replace(/\s+/g, '')
+            .replace(',', '.')
+            .replace(/[^0-9.-]+/g, '')
+        )
+      : amount;
+
+  if (isNaN(num)) return String(amount);
+
+  const hasDecimals = Math.abs(num - Math.round(num)) >= 0.005;
+  const fixed = hasDecimals
+    ? num.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+    : Math.round(num).toString();
+
+  const [intPart, decPart] = fixed.split('.');
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return decPart ? `${formattedInt}.${decPart}` : formattedInt;
 };
 
 // ============================================================================
@@ -133,7 +133,7 @@ export interface BetHistoryTopBarProps {
   onWalletPress?: () => void;
   ChevronDownIcon?: React.ComponentType<IconBaseProps>;
   FilterIcon?: React.ComponentType<IconBaseProps>;
-  WalletIcon?: React.ComponentType<IconBaseProps>;
+  WalletIcon?: React.ComponentType<HistoryHeaderIconProps>;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -141,21 +141,26 @@ export const BetHistoryTopBar: React.FC<BetHistoryTopBarProps> = ({
   title = 'Historique des paris',
   scrollY,
   isSticky = true,
-  isFilterActive = false,
   onTitlePress,
-  onFilterPress,
   onWalletPress,
   ChevronDownIcon = DefaultChevronDownIcon,
-  FilterIcon = DefaultFilterIcon,
   WalletIcon = DefaultWalletIcon,
   style,
 }) => {
   const { currentTheme } = useThemeStore();
   const insets = useSafeAreaInsets();
-  const statusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight || insets.top || 0) : insets.top;
-  const filterIconColor = currentTheme.colors?.filterIconColor || currentTheme.filterIconColor || currentTheme.primary || '#3A86FF';
+  const statusBarHeight =
+    Platform.OS === 'android'
+      ? StatusBar.currentHeight || insets.top || 0
+      : insets.top;
 
-  // Animation de la bordure inférieure discrète au scroll (Native Driver 60/120 FPS)
+  const headerBg = currentTheme.headerBackground || '#FFFFFF';
+  const titleColor = currentTheme.isDark ? currentTheme.textPrimary : '#577089';
+  const rightIconColor = currentTheme.isDark
+    ? currentTheme.textSecondary
+    : '#577089';
+
+  // Bordure inférieure discrète uniquement lors du scroll
   const borderOpacity = scrollY
     ? scrollY.interpolate({
         inputRange: [0, 15],
@@ -169,7 +174,7 @@ export const BetHistoryTopBar: React.FC<BetHistoryTopBarProps> = ({
       style={[
         styles.topBar,
         {
-          backgroundColor: currentTheme.headerBackground,
+          backgroundColor: headerBg,
           height: TOP_BAR_HEIGHT + statusBarHeight,
           paddingTop: statusBarHeight,
         },
@@ -177,54 +182,53 @@ export const BetHistoryTopBar: React.FC<BetHistoryTopBarProps> = ({
         style,
       ]}
     >
-      {/* Titre centré horizontalement au milieu absolu de l'écran */}
-      <View style={[styles.topBarCenteredContainer, { top: statusBarHeight }]} pointerEvents="box-none">
+      {/* Titre centré horizontalement + chevron bas */}
+      <View
+        style={[styles.topBarCenteredContainer, { top: statusBarHeight }]}
+        pointerEvents="box-none"
+      >
         <TouchableOpacity
           style={styles.titleButton}
           activeOpacity={0.7}
           onPress={onTitlePress}
         >
-          <Text style={[styles.titleText, { color: currentTheme.textPrimary }]}>{title}</Text>
-          <ChevronDownIcon size={16} color={currentTheme.textPrimary} />
+          <Text style={[styles.titleText, { color: titleColor }]}>{title}</Text>
+          <ChevronDownIcon size={15} color={titleColor} />
         </TouchableOpacity>
       </View>
 
-      {/* Actions à l'extrême droite : FilterIcon et WalletIcon */}
+      {/* Action unique à droite : icône cartes empilées (comme sur la capture) */}
       <View style={[styles.topBarActionsRight, { height: TOP_BAR_HEIGHT }]}>
-        <TouchableOpacity
-          style={styles.actionIconBtn}
-          activeOpacity={0.7}
-          onPress={onFilterPress}
-          accessibilityLabel="Filtres"
-        >
-          <FilterIcon size={21} color={isFilterActive ? filterIconColor : currentTheme.textSecondary} />
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.actionIconBtn}
           activeOpacity={0.7}
           onPress={onWalletPress}
           accessibilityLabel="Portefeuille"
         >
-          <WalletIcon size={24} color={currentTheme.textSecondary} />
+          <WalletIcon
+            size={25}
+            color={rightIconColor}
+            cutoutColor={headerBg}
+          />
         </TouchableOpacity>
       </View>
 
-      {/* Bordure discrète animée lors du scroll */}
+      {/* Bordure discrète animée uniquement lors du défilement */}
       {scrollY ? (
         <Animated.View
-          style={[styles.topBarBottomBorder, { opacity: borderOpacity, backgroundColor: currentTheme.border }]}
+          style={[
+            styles.topBarBottomBorder,
+            { opacity: borderOpacity, backgroundColor: currentTheme.border },
+          ]}
           pointerEvents="none"
         />
-      ) : (
-        <View style={[styles.topBarBottomBorderStatic, { backgroundColor: currentTheme.border }]} pointerEvents="none" />
-      )}
+      ) : null}
     </View>
   );
 };
 
 // ============================================================================
-// 2. COMPOSANT COLLAPSIBLE CONTENT (LIGNES 2 & 3 QUI DÉFILENT)
+// 2. COMPOSANT COLLAPSIBLE CONTENT (SOLDE CENTRÉ + 3 CARTES D'ACTIONS)
 // ============================================================================
 export interface BetHistoryCollapsibleHeaderProps {
   balance?: number | string;
@@ -232,126 +236,185 @@ export interface BetHistoryCollapsibleHeaderProps {
   accountLabel?: string;
   selectedPeriod?: string;
   isSaleActive?: boolean;
+  isFilterActive?: boolean;
   onAccountSelect?: () => void;
   onDepositPress?: () => void;
   onPeriodPress?: () => void;
   onSalePress?: () => void;
+  onFilterPress?: () => void;
   ChevronDownIcon?: React.ComponentType<IconBaseProps>;
   PlusIcon?: React.ComponentType<IconBaseProps>;
   CalendarIcon?: React.ComponentType<IconBaseProps>;
   TagIcon?: React.ComponentType<IconBaseProps>;
+  FilterIcon?: React.ComponentType<IconBaseProps>;
   style?: StyleProp<ViewStyle>;
 }
 
-export const BetHistoryCollapsibleHeader: React.FC<BetHistoryCollapsibleHeaderProps> = ({
-  balance = 470307550,
-  currencySymbol = 'F',
+export const BetHistoryCollapsibleHeader: React.FC<
+  BetHistoryCollapsibleHeaderProps
+> = ({
+  balance = 10805581.37,
+  currencySymbol = '₣',
   accountLabel = 'Compte principal',
-  selectedPeriod = '1 mois',
   isSaleActive = false,
+  isFilterActive = false,
   onAccountSelect,
   onDepositPress,
   onPeriodPress,
   onSalePress,
+  onFilterPress,
   ChevronDownIcon = DefaultChevronDownIcon,
   PlusIcon = DefaultPlusIcon,
-  CalendarIcon = DefaultCalendarIcon,
   TagIcon = DefaultTagIcon,
+  FilterIcon = DefaultFilterIcon,
   style,
 }) => {
   const { currentTheme } = useThemeStore();
   const formattedBalance = `${formatBalance(balance)} ${currencySymbol}`;
-  const filterPillBg = currentTheme.colors?.filterChipBg
-    || currentTheme.filterChipBg
-    || (currentTheme.isDark ? (currentTheme.cardBackground || '#212D3B') : '#ECEFF4');
-  const filterChipTextColor = currentTheme.colors?.filterChipText
-    || currentTheme.filterChipText
-    || (currentTheme.isDark ? '#FFFFFF' : '#475569');
-  const filterIconColor = currentTheme.colors?.filterIconColor
-    || currentTheme.filterIconColor
-    || currentTheme.primary
-    || '#3A86FF';
+
+  const headerBg = currentTheme.headerBackground || '#FFFFFF';
+  const accountLabelColor = currentTheme.isDark
+    ? currentTheme.textSecondary
+    : '#5E768D';
+  const balanceTextColor = currentTheme.isDark ? '#FFFFFF' : '#0B2B4C';
+
+  // Couleurs des 3 cartes d'action conformément à la capture de référence
+  const depositCardBg = currentTheme.isDark
+    ? 'rgba(72, 177, 110, 0.16)'
+    : '#DCF2E3';
+  const depositAccent = '#48B16E';
+
+  const neutralCardBg = currentTheme.isDark
+    ? currentTheme.colors?.filterChipBg ||
+      currentTheme.cardBackground ||
+      '#212D3B'
+    : '#EAEEF4';
+  const activeCardBg =
+    currentTheme.primarySoft ||
+    (currentTheme.isDark ? '#2A3A4E' : '#D8E5F6');
+  const actionAccent = currentTheme.primary || '#3982C6';
+
+  const venteBg = isSaleActive ? activeCardBg : neutralCardBg;
+  const filtresBg = isFilterActive ? activeCardBg : neutralCardBg;
 
   return (
-    <View style={[styles.collapsibleContainer, { backgroundColor: currentTheme.headerBackground }, style]}>
+    <View
+      style={[
+        styles.collapsibleContainer,
+        { backgroundColor: headerBg },
+        style,
+      ]}
+    >
       {/* ----------------------------------------------------------------- */}
-      {/* LIGNE 2 : Solde & Bouton Dépôt                                    */}
+      {/* LIGNE 2 : Compte principal & Solde centrés                        */}
       {/* ----------------------------------------------------------------- */}
-      <View style={styles.balanceDepositRow}>
-        {/* Côté gauche : Compte principal + Montant avec Chevron */}
-        <TouchableOpacity
-          style={styles.balanceLeftBlock}
-          activeOpacity={0.75}
-          onPress={onAccountSelect}
-        >
-          <Text style={[styles.accountLabelText, { color: currentTheme.textSecondary }]}>{accountLabel}</Text>
-          <View style={styles.amountRow}>
-            <Text style={[styles.balanceAmountText, { color: currentTheme.textPrimary }]}>{formattedBalance}</Text>
-            <ChevronDownIcon size={18} color={currentTheme.textPrimary} />
-          </View>
-        </TouchableOpacity>
-
-        {/* Côté droit : Bouton de dépôt thémé selon la charte */}
-        <TouchableOpacity
-          style={[
-            styles.depositButton,
-            { backgroundColor: currentTheme.depositButton?.bg || '#27AE60' },
-          ]}
-          activeOpacity={0.85}
-          onPress={onDepositPress}
-        >
-          <PlusIcon size={14} color={currentTheme.depositButton?.text || '#FFFFFF'} />
-          <Text style={[styles.depositButtonText, { color: currentTheme.depositButton?.text || '#FFFFFF' }]}>
-            Effectuer un dépôt
+      <TouchableOpacity
+        style={styles.centeredBalanceBlock}
+        activeOpacity={0.75}
+        onPress={onAccountSelect}
+      >
+        <Text style={[styles.accountLabelText, { color: accountLabelColor }]}>
+          {accountLabel}
+        </Text>
+        <View style={styles.amountRow}>
+          <Text style={[styles.balanceAmountText, { color: balanceTextColor }]}>
+            {formattedBalance}
           </Text>
-        </TouchableOpacity>
-      </View>
+          <ChevronDownIcon size={15} color={accountLabelColor} />
+        </View>
+      </TouchableOpacity>
 
       {/* ----------------------------------------------------------------- */}
-      {/* LIGNE 3 : Deux Cartes de Filtres (« 1 mois » et « Vente »)         */}
+      {/* LIGNE 3 : Trois Cartes (« Effectuer un dépôt », « Vente », « Filtres ») */}
       {/* ----------------------------------------------------------------- */}
-      <View style={styles.filterCardsRow}>
-        {/* Carte 1 : Calendrier + 1 mois */}
+      <View style={styles.actionCardsRow}>
+        {/* Carte 1 : Effectuer un dépôt */}
         <TouchableOpacity
           style={[
-            styles.filterCard,
+            styles.actionCard,
             {
-              backgroundColor: filterPillBg,
-              borderColor: currentTheme.isDark ? (currentTheme.border || '#2C3A4B') : 'transparent',
+              backgroundColor: depositCardBg,
+              borderColor: currentTheme.isDark
+                ? 'rgba(72, 177, 110, 0.28)'
+                : 'transparent',
               borderWidth: currentTheme.isDark ? 1 : 0,
             },
           ]}
-          activeOpacity={0.75}
-          onPress={onPeriodPress}
+          activeOpacity={0.8}
+          onPress={onDepositPress}
         >
-          <CalendarIcon size={20} color={filterIconColor} />
-          <Text style={[styles.filterCardText, { color: filterChipTextColor }]}>{selectedPeriod}</Text>
+          <PlusIcon
+            size={25}
+            color={depositAccent}
+            cutoutColor={depositCardBg}
+          />
+          <Text
+            style={[styles.depositCardText, { color: depositAccent }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+          >
+            Effectuer un dépôt
+          </Text>
         </TouchableOpacity>
 
-        {/* Carte 2 : Étiquette + Vente */}
+        {/* Carte 2 : Vente */}
         <TouchableOpacity
           style={[
-            styles.filterCard,
+            styles.actionCard,
             {
-              backgroundColor: isSaleActive
-                ? (currentTheme.primarySoft || (currentTheme.isDark ? '#2A3A4E' : '#D8E5F6'))
-                : filterPillBg,
-              borderColor: isSaleActive ? (currentTheme.primary || '#3A86FF') : (currentTheme.isDark ? (currentTheme.border || '#2C3A4B') : 'transparent'),
+              backgroundColor: venteBg,
+              borderColor: isSaleActive
+                ? actionAccent
+                : currentTheme.isDark
+                  ? currentTheme.border || '#2C3A4B'
+                  : 'transparent',
               borderWidth: isSaleActive || currentTheme.isDark ? 1 : 0,
             },
           ]}
-          activeOpacity={0.75}
+          activeOpacity={0.8}
           onPress={onSalePress}
         >
-          <TagIcon size={20} color={isSaleActive ? (currentTheme.primary || '#3A86FF') : filterIconColor} />
+          <TagIcon size={23} color={actionAccent} cutoutColor={venteBg} />
           <Text
             style={[
-              styles.filterCardText,
-              { color: isSaleActive ? (currentTheme.primary || '#3A86FF') : filterChipTextColor },
-              isSaleActive && styles.filterCardTextActive,
+              styles.actionCardText,
+              { color: actionAccent },
+              isSaleActive && styles.actionCardTextActive,
             ]}
+            numberOfLines={1}
           >
             Vente
+          </Text>
+        </TouchableOpacity>
+
+        {/* Carte 3 : Filtres */}
+        <TouchableOpacity
+          style={[
+            styles.actionCard,
+            {
+              backgroundColor: filtresBg,
+              borderColor: isFilterActive
+                ? actionAccent
+                : currentTheme.isDark
+                  ? currentTheme.border || '#2C3A4B'
+                  : 'transparent',
+              borderWidth: isFilterActive || currentTheme.isDark ? 1 : 0,
+            },
+          ]}
+          activeOpacity={0.8}
+          onPress={onFilterPress || onPeriodPress}
+        >
+          <FilterIcon size={23} color={actionAccent} />
+          <Text
+            style={[
+              styles.actionCardText,
+              { color: actionAccent },
+              isFilterActive && styles.actionCardTextActive,
+            ]}
+            numberOfLines={1}
+          >
+            Filtres
           </Text>
         </TouchableOpacity>
       </View>
@@ -362,7 +425,9 @@ export const BetHistoryCollapsibleHeader: React.FC<BetHistoryCollapsibleHeaderPr
 // ============================================================================
 // 3. COMPOSANT UNIFIÉ : BetHistoryHeader
 // ============================================================================
-export interface BetHistoryHeaderProps extends BetHistoryTopBarProps, BetHistoryCollapsibleHeaderProps {
+export interface BetHistoryHeaderProps
+  extends BetHistoryTopBarProps,
+    BetHistoryCollapsibleHeaderProps {
   showTopBar?: boolean;
   showCollapsible?: boolean;
 }
@@ -397,7 +462,13 @@ export const BetHistoryHeader: React.FC<BetHistoryHeaderProps> = ({
   const { currentTheme } = useThemeStore();
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.headerBackground }, style]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: currentTheme.headerBackground || '#FFFFFF' },
+        style,
+      ]}
+    >
       {showTopBar && (
         <BetHistoryTopBar
           title={title}
@@ -419,24 +490,35 @@ export const BetHistoryHeader: React.FC<BetHistoryHeaderProps> = ({
           accountLabel={accountLabel}
           selectedPeriod={selectedPeriod}
           isSaleActive={isSaleActive}
+          isFilterActive={isFilterActive}
           onAccountSelect={onAccountSelect}
           onDepositPress={onDepositPress}
           onPeriodPress={onPeriodPress}
           onSalePress={onSalePress}
+          onFilterPress={onFilterPress}
           ChevronDownIcon={ChevronDownIcon}
           PlusIcon={PlusIcon}
           CalendarIcon={CalendarIcon}
           TagIcon={TagIcon}
+          FilterIcon={FilterIcon}
         />
       )}
     </View>
   );
 };
 
+export type HistoryTopBarProps = BetHistoryTopBarProps;
+export type HistoryCollapsibleHeaderProps = BetHistoryCollapsibleHeaderProps;
+export type HistoryHeaderProps = BetHistoryHeaderProps;
+
+export const HistoryTopBar = BetHistoryTopBar;
+export const HistoryCollapsibleHeader = BetHistoryCollapsibleHeader;
+export const HistoryHeader = BetHistoryHeader;
+
 export default BetHistoryHeader;
 
 // ============================================================================
-// STYLES PIXEL-PERFECT SOIGNÉS
+// STYLES PIXEL-PERFECT CONFORMES À LA CAPTURE DE RÉFÉRENCE
 // ============================================================================
 const styles = StyleSheet.create({
   container: {
@@ -475,18 +557,17 @@ const styles = StyleSheet.create({
   titleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   titleText: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#233853',
+    color: '#577089',
     letterSpacing: -0.2,
   },
   topBarActionsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
     zIndex: 2,
   },
   actionIconBtn: {
@@ -502,96 +583,71 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E2E8F0',
   },
-  topBarBottomBorderStatic: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#E2E8F0',
-  },
 
   // -------------------------------------------------------------------------
-  // CONTENEUR DÉFILANT (LIGNES 2 & 3)
+  // CONTENEUR DÉFILANT (SOLDE CENTRÉ + 3 CARTES)
   // -------------------------------------------------------------------------
   collapsibleContainer: {
     backgroundColor: '#FFFFFF',
     paddingBottom: 14,
   },
 
-  // LIGNE 2 : Solde & Bouton Dépôt
-  balanceDepositRow: {
-    flexDirection: 'row',
+  // LIGNE 2 : Compte principal + Montant centré
+  centeredBalanceBlock: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    marginTop: 10,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    marginTop: 6,
     marginBottom: 14,
   },
-  balanceLeftBlock: {
-    flex: 1,
-    justifyContent: 'center',
-  },
   accountLabelText: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: '#7C8BA0',
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#5E768D',
     marginBottom: 2,
   },
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
   },
   balanceAmountText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0D1F36',
-    letterSpacing: -0.5,
-  },
-  depositButton: {
-    height: 38,
-    backgroundColor: '#27AE60',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  depositButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 23.5,
+    fontWeight: '800',
+    color: '#0B2B4C',
+    letterSpacing: -0.35,
   },
 
-  // LIGNE 3 : Cartes de Filtres (« 1 mois » et « Vente »)
-  filterCardsRow: {
+  // LIGNE 3 : Trois Cartes (« Effectuer un dépôt », « Vente », « Filtres »)
+  actionCardsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
     gap: 10,
   },
-  filterCard: {
+  actionCard: {
     flex: 1,
-    height: 44,
-    backgroundColor: '#ECEFF4',
-    borderRadius: 12,
-    flexDirection: 'row',
+    height: 68,
+    borderRadius: 15,
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    paddingHorizontal: 6,
   },
-  filterCardActive: {
-    backgroundColor: '#D8E5F6',
+  depositCardText: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    marginTop: 5,
+    textAlign: 'center',
   },
-  filterCardText: {
-    color: '#475569',
-    fontSize: 13.5,
-    fontWeight: '600',
+  actionCardText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 6,
+    textAlign: 'center',
   },
-  filterCardTextActive: {
-    color: '#3A86FF',
+  actionCardTextActive: {
     fontWeight: '700',
   },
 });

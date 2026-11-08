@@ -106,8 +106,14 @@ const INITIAL_COUPONS: BetSlip[] = [
         sport: 'FIFA',
         league: 'FIFA. FC 26. 5x5 Rush. Superligue',
         date: '29.10.2026 (16:04)',
-        homeTeam: { name: 'Manchester City' },
-        awayTeam: { name: 'Real Madrid' },
+        homeTeam: {
+          name: 'Manchester City',
+          logo: 'https://media.api-sports.io/football/teams/50.png',
+        },
+        awayTeam: {
+          name: 'Real Madrid',
+          logo: 'https://media.api-sports.io/football/teams/541.png',
+        },
         prediction: '1X2. V1',
         odd: 1.59,
         status: 'Gain',

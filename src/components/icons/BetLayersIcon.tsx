@@ -1,42 +1,48 @@
 import React from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import { StyleProp, ViewStyle, Image, ImageStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useThemeStore } from '../../stores/themeStore';
+import { Colors } from '../../theme/theme';
 
 export interface BetLayersIconProps {
   /** Taille en pixels (largeur et hauteur), par défaut 15 */
   size?: number;
-  /** Couleur principale (défaut #56728A ou #64748B) */
+  /** Couleur principale (par défaut : couleur primary du thème actif) */
   color?: string;
-  /** Couleur spécifique de la plaque supérieure en mode relief (défaut #56728A) */
+  /** Couleur spécifique de la plaque supérieure en mode relief */
   primaryColor?: string;
-  /** Couleur des tranches inférieures et ombres en mode relief (défaut #3E5468) */
+  /** Couleur des tranches inférieures et ombres en mode relief */
   shadowColor?: string;
-  /** Couleur claire des faces supérieures des plaques inférieures en mode 3D (défaut #EBF1F6) */
+  /** Couleur claire des faces supérieures des plaques inférieures en mode 3D */
   lightColor?: string;
-  /** Mode de rendu : 'flat' (silhouette vectorielle exacte 7383.ai / 7383.jpg) ou '3d' (relief isométrique ombré) */
-  variant?: 'flat' | '3d';
-  style?: StyleProp<ViewStyle>;
+  /** Mode de rendu : 'flat' (vectoriel SVG), '3d' (isométrique ombré) ou 'image' (PNG ic_events_layers teinté) */
+  variant?: 'flat' | '3d' | 'image';
+  /** Utiliser l'asset PNG ic_events_layers.png teinté plutôt que le SVG */
+  useImageAsset?: boolean;
+  /** Rayon d'arrondi (par défaut 1px) */
+  borderRadius?: number;
+  style?: StyleProp<ViewStyle | ImageStyle>;
 }
 
 // ============================================================================
-// TRACÉS VECTORIELS MATHEMATIQUEMENT EXACTS EXTRAITS DE 7383.ai / 7383.jpg
-// Repères d'origine : Canvas 800x800, Vue isométrique orthogonale à 30°
+// TRACÉS VECTORIELS OFFICIELS CALIBRÉS SUR LA CAPTURE NATIVE (ic_events_layers)
+// Repères : viewBox 0 0 24 24 — Losange supérieur + 2 chevrons avec arrondi 1px
 // ============================================================================
-const EXACT_7383_TOP =
-  'M 400.00 484.47 C 397.83 484.47, 395.65 483.86, 393.75 482.64 L 125.98 310.56 C 122.67 308.43, 120.67 304.77, 120.67 300.84 C 120.67 296.90, 122.67 293.24, 125.98 291.11 L 393.75 119.03 C 395.65 117.81, 397.83 117.20, 400.00 117.20 C 402.17 117.20, 404.35 117.81, 406.25 119.03 L 674.02 291.11 C 677.33 293.24, 679.33 296.90, 679.33 300.84 C 679.33 304.77, 677.33 308.43, 674.02 310.56 L 406.25 482.64 C 404.35 483.86, 402.17 484.47, 400.00 484.47 Z';
+const OFFICIAL_LAYERS_TOP =
+  'M 10.50 2.81 L 3.15 6.78 Q 1.65 7.50 3.15 8.22 L 10.50 12.19 Q 12.00 13.00 13.50 12.19 L 20.85 8.22 Q 22.35 7.50 20.85 6.78 L 13.50 2.81 Q 12.00 2.00 10.50 2.81 Z';
 
-const EXACT_7383_MID =
-  'M 400.00 583.64 C 397.83 583.64, 395.65 583.03, 393.75 581.80 L 125.98 409.72 C 122.67 407.60, 120.67 403.93, 120.67 400.00 C 120.67 396.07, 122.67 392.40, 125.98 390.28 L 151.18 374.08 C 153.09 372.86, 155.26 372.24, 157.43 372.24 C 159.60 372.24, 161.78 372.86, 163.68 374.08 L 400.00 525.94 L 636.32 374.08 C 638.22 372.86, 640.39 372.24, 642.57 372.24 C 644.74 372.24, 646.91 372.86, 648.82 374.08 L 674.02 390.28 C 677.33 392.40, 679.33 396.07, 679.33 400.00 C 679.33 403.93, 677.33 407.60, 674.02 409.72 L 406.25 581.80 C 404.35 583.03, 402.17 583.64, 400.00 583.64 Z';
+const OFFICIAL_LAYERS_MID =
+  'M 3.12 11.84 L 10.75 15.89 Q 12.00 16.55 13.25 15.89 L 20.88 11.84';
 
-const EXACT_7383_BOT =
-  'M 400.00 682.80 C 397.83 682.80, 395.65 682.19, 393.75 680.97 L 125.98 508.89 C 122.67 506.76, 120.67 503.10, 120.67 499.17 C 120.67 495.23, 122.67 491.57, 125.98 489.44 L 151.18 473.24 C 153.09 472.02, 155.26 471.41, 157.43 471.41 C 159.60 471.41, 161.78 472.02, 163.68 473.24 L 400.00 625.11 L 636.32 473.24 C 638.22 472.02, 640.39 471.41, 642.57 471.41 C 644.74 471.41, 646.91 472.02, 648.82 473.24 L 674.02 489.44 C 677.33 491.57, 679.33 495.23, 679.33 499.17 C 679.33 503.10, 677.33 506.76, 674.02 508.89 L 406.25 680.97 C 404.35 682.19, 402.17 682.80, 400.00 682.80 Z';
+const OFFICIAL_LAYERS_BOT =
+  'M 3.12 16.74 L 10.75 20.79 Q 12.00 21.45 13.25 20.79 L 20.88 16.74';
 
 /**
- * Composant d'icône vectorielle SVG représentant les 3 calques / disques
- * empilés en perspective isométrique à 30° (« Simple 1 », « Combiné 2 »,
- * et sélections multiples dans l'interface Coupon).
+ * Composant représentant les 3 calques / disques empilés (ic_events_layers)
+ * de l'interface coupon et historique.
  *
- * Directement extrait des courbes Bézier de l'asset vectoriel officiel 7383.ai.
+ * Applique systématiquement la couleur `primary` du thème actif
+ * (1xBet bleu #243DB5 / #488DD2, Melbet jaune/or, etc.).
  */
 export const BetLayersIcon: React.FC<BetLayersIconProps> = ({
   size = 15,
@@ -45,12 +51,37 @@ export const BetLayersIcon: React.FC<BetLayersIconProps> = ({
   shadowColor,
   lightColor,
   variant = 'flat',
+  useImageAsset = false,
+  borderRadius = 5,
   style,
 }) => {
-  const effectivePrimary = primaryColor || color || '#56728A';
-  const effectiveShadow = shadowColor || '#3E5468';
-  const effectiveLight = lightColor || '#EBF1F6';
+  const { currentTheme } = useThemeStore();
+  const themePrimary = currentTheme?.colors?.primary || currentTheme?.primary || Colors.primary;
 
+  const effectivePrimary = primaryColor || color || themePrimary;
+  const effectiveShadow = shadowColor || currentTheme?.border || '#243DB5';
+  const effectiveLight = lightColor || currentTheme?.primarySoft || '#243DB5';
+
+  // Rendu PNG teinté avec la couleur primaire du thème
+  if (variant === 'image' || useImageAsset) {
+    return (
+      <Image
+        source={require('../../../assets/icons/ic_events_layers.png')}
+        style={[
+          {
+            width: size,
+            height: size,
+            borderRadius,
+            tintColor: effectivePrimary,
+          },
+          style as StyleProp<ImageStyle>,
+        ]}
+        resizeMode="contain"
+      />
+    );
+  }
+
+  // Rendu 3D isométrique ombré
   if (variant === '3d') {
     return (
       <Svg
@@ -58,7 +89,7 @@ export const BetLayersIcon: React.FC<BetLayersIconProps> = ({
         height={size}
         viewBox="0 0 24 24"
         fill="none"
-        style={style}
+        style={[{ borderRadius }, style as StyleProp<ViewStyle>]}
       >
         {/* Étage 3 (Bas) */}
         <Path
@@ -93,24 +124,67 @@ export const BetLayersIcon: React.FC<BetLayersIconProps> = ({
     );
   }
 
-  // Rendu vectoriel exact 7383.ai / 7383.jpg (3 plaques empilées découpées)
+  // Rendu vectoriel officiel ic_events_layers (3 calques empilés avec arrondi 1px)
   return (
     <Svg
       width={size}
       height={size}
-      viewBox="100 100 600 600"
+      viewBox="0 0 24 24"
       fill="none"
-      style={style}
+      style={[{ borderRadius }, style as StyleProp<ViewStyle>]}
     >
-      {/* 1. Étage supérieur (Losange complet) */}
-      <Path d={EXACT_7383_TOP} fill={effectivePrimary} />
+      {/* 1. Étage supérieur (Losange arrondi 1px plein) */}
+      <Path d={OFFICIAL_LAYERS_TOP} fill={effectivePrimary} />
 
-      {/* 2. Étage intermédiaire (Chevron) */}
-      <Path d={EXACT_7383_MID} fill={effectivePrimary} />
+      {/* 2. Étage intermédiaire (Chevron à arrondi 1px) */}
+      <Path
+        d={OFFICIAL_LAYERS_MID}
+        stroke={effectivePrimary}
+        strokeWidth={2.25}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
 
-      {/* 3. Étage inférieur (Chevron) */}
-      <Path d={EXACT_7383_BOT} fill={effectivePrimary} />
+      {/* 3. Étage inférieur (Chevron à arrondi 1px) */}
+      <Path
+        d={OFFICIAL_LAYERS_BOT}
+        stroke={effectivePrimary}
+        strokeWidth={2.25}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
     </Svg>
+  );
+};
+
+/**
+ * Composant Image direct pour ic_events_layers.png avec tintColor automatique sur la couleur primary du thème
+ */
+export const EventsLayersImage: React.FC<{
+  size?: number;
+  color?: string;
+  borderRadius?: number;
+  style?: StyleProp<ImageStyle>;
+}> = ({ size = 16, color, borderRadius = 1, style }) => {
+  const { currentTheme } = useThemeStore();
+  const tintColor = color || currentTheme?.colors?.primary || currentTheme?.primary || Colors.primary;
+
+  return (
+    <Image
+      source={require('../../../assets/icons/ic_events_layers.png')}
+      style={[
+        {
+          width: size,
+          height: size,
+          borderRadius,
+          tintColor,
+        },
+        style,
+      ]}
+      resizeMode="contain"
+    />
   );
 };
 

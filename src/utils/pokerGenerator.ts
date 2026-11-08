@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { Text, TextStyle, StyleProp } from 'react-native';
 
 export interface PokerDrawResult {
@@ -28,7 +28,7 @@ interface ParsedCard {
 }
 
 function parseCard(c: string): ParsedCard {
-  const trimmed = c.trim();
+  const trimmed = c.trim().replace(/\uFE0F/g, '');
   const suit = trimmed.slice(-1);
   const rank = trimmed.slice(0, -1);
   return {
@@ -127,19 +127,36 @@ function evaluate7Cards(cards: string[]): { category: number; score: number } {
 }
 
 /**
+ * Génère un numéro de main aléatoire stable (1 à 6) basé sur une graine (seed)
+ * ou purement aléatoire si aucune graine n'est fournie.
+ */
+export function getStableRandomHand(seed?: string): number {
+  if (!seed) return Math.floor(Math.random() * 6) + 1;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return (Math.abs(hash) % 6) + 1;
+}
+
+/**
  * Normalise le marché sélectionné pour en extraire la combinaison exacte et la main gagnante
  */
-export function parsePokerMarket(chosenMarket: string): {
+export function parsePokerMarket(chosenMarket: string, seed?: string): {
   combinationName: string;
   winnerHand: number;
 } {
   const norm = chosenMarket.toLowerCase().trim();
 
-  // Extraction d'une main ciblée (ex: "Main 2", "Main 4", etc.)
-  let winnerHand = 1;
-  const mainMatch = norm.match(/main\s*([1-6])/);
+  // Extraction d'une main ciblée (ex: "Main 2", "Main 4", "(1)", etc.)
+  let winnerHand: number;
+  const mainMatch = norm.match(/main\s*([1-6])|\(([1-6])\)/);
   if (mainMatch) {
-    winnerHand = parseInt(mainMatch[1], 10);
+    winnerHand = parseInt(mainMatch[1] || mainMatch[2], 10);
+  } else {
+    // Si pari sur combinaison (ex: "Carte haute", "Une Paire"), la main gagnante est aléatoire entre 1 et 6
+    winnerHand = getStableRandomHand(seed || chosenMarket);
   }
 
   // Détection de la combinaison demandée
@@ -179,8 +196,11 @@ export function parsePokerMarket(chosenMarket: string): {
  * Générateur principal de tirage de Texas Hold'em avec combinaison gagnante garantie
  * @param chosenMarket Libellé du pronostic (ex: "Combinaison gagnante. Quinte flush", "Full", etc.)
  */
-export const generateWinningPokerDraw = (chosenMarket: string = 'Quinte flush'): PokerDrawResult => {
-  const { combinationName, winnerHand } = parsePokerMarket(chosenMarket);
+export const generateWinningPokerDraw = (
+  chosenMarket: string = 'Quinte flush',
+  seed?: string
+): PokerDrawResult => {
+  const { combinationName, winnerHand } = parsePokerMarket(chosenMarket, seed);
 
   // Configurations réalistes garantissant la combinaison exacte sur la table et la main gagnante
   const presets: Record<string, { winnerCards: string[]; tableCards: string[] }> = {
@@ -250,7 +270,7 @@ export const generateWinningPokerDraw = (chosenMarket: string = 'Quinte flush'):
   // Distribution des mains pour les 6 joueurs
   const hands: string[] = new Array(6).fill('');
   const winnerIdx = Math.max(0, Math.min(5, winnerHand - 1));
-  hands[winnerIdx] = `${winnerCards[0]}, ${winnerCards[1]}`;
+  hands[winnerIdx] = `${winnerCards[0]} ,${winnerCards[1]}`;
 
   let deckPtr = 0;
   for (let h = 0; h < 6; h++) {
@@ -264,7 +284,7 @@ export const generateWinningPokerDraw = (chosenMarket: string = 'Quinte flush'):
       const otherEval = evaluate7Cards([c1, c2, ...tableCards]);
 
       if (otherEval.score < winnerEval.score) {
-        hands[h] = `${c1}, ${c2}`;
+        hands[h] = `${c1} ,${c2}`;
         deckPtr += 2;
         assigned = true;
         break;
@@ -278,7 +298,7 @@ export const generateWinningPokerDraw = (chosenMarket: string = 'Quinte flush'):
       // Fallback sécurisé : attribue les cartes disponibles
       const c1 = deck[deckPtr++] || '2♣';
       const c2 = deck[deckPtr++] || '3♦';
-      hands[h] = `${c1}, ${c2}`;
+      hands[h] = `${c1} ,${c2}`;
     }
   }
 
@@ -289,7 +309,7 @@ export const generateWinningPokerDraw = (chosenMarket: string = 'Quinte flush'):
     hand4: hands[3],
     hand5: hands[4],
     hand6: hands[5],
-    table: tableCards.join(', '),
+    table: tableCards.join(' ,'),
     winnerHand,
     combinationName,
   };
@@ -307,7 +327,8 @@ export const renderCardsWithSuits = (
   if (!cardsText) return null;
 
   // Découpage par caractères pour styliser les symboles rouges
-  const parts = cardsText.split(/([♥♦])/g);
+  const normalized = cardsText.replace(/\uFE0F/g, '');
+  const parts = normalized.split(/([♥♦])/g);
 
   return parts.map((part, idx) => {
     if (part === '♥' || part === '♦') {

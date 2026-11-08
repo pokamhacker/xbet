@@ -18,10 +18,19 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#243DB5"
-      }
+      },
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "1xBet",
+      "shortName": "1xBet",
+      "themeColor": "#1A568C",
+      "backgroundColor": "#EEF2F6",
+      "display": "standalone",
+      "orientation": "portrait"
     },
     "plugins": [
       "expo-asset",
@@ -33,13 +42,21 @@
           "resizeMode": "contain",
           "backgroundColor": "#243DB5"
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
       ]
     ],
+    "owner": "tchassi",
     "extra": {
       "eas": {
-        "projectId": "4807a534-122c-46d3-890d-ec234d355c46"
+        "projectId": "03244d2a-98dd-4f12-84ff-89820949daf9"
       }
-    },
-    "owner": "dakenyo"
+    }
   }
 }

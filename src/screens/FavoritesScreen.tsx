@@ -13,26 +13,41 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
 import { BrandLogo } from '../components/common/BrandLogo';
+import {
+  createAppRefreshControl,
+  useAppRefresh,
+} from '../components/common/AppRefreshControl';
 
 export default function FavoritesScreen({ navigation }: any) {
   const { currentTheme } = useThemeStore();
   const { contentContainerStyle, font, moderateScale, insets } = useResponsive();
+  const { refreshing, onRefresh } = useAppRefresh();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
       <StatusBar
         barStyle={currentTheme.isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={currentTheme.headerBackground || '#FFFFFF'}
-        translucent={Platform.OS === 'android'}
       />
       <View style={[styles.header, { backgroundColor: currentTheme.headerBackground, borderBottomColor: currentTheme.border }]}>
-        <View style={[{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 8 }, contentContainerStyle]}>
+        <TouchableOpacity
+          style={[{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 8 }, contentContainerStyle]}
+          onPress={onRefresh}
+          activeOpacity={0.8}
+        >
           <BrandLogo size={18} variant="compact" />
           <Text style={[styles.headerTitle, { color: currentTheme.textPrimary, fontSize: font(17) }]}>Favoris</Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, contentContainerStyle, { paddingBottom: 100 + (insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 12 : 0)) }]}>
+      <ScrollView
+        contentContainerStyle={[styles.content, contentContainerStyle, { paddingBottom: 100 + (insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 12 : 0)) }]}
+        refreshControl={createAppRefreshControl({
+          refreshing,
+          onRefresh,
+          theme: currentTheme,
+          progressViewOffset: 15,
+        })}
+      >
         <View style={[styles.emptyCard, { backgroundColor: currentTheme.cardBackground, borderColor: currentTheme.border }]}>
           <View style={[styles.iconCircle, { backgroundColor: currentTheme.primarySoft, width: moderateScale(72), height: moderateScale(72), borderRadius: moderateScale(36) }]}>
             <Ionicons name="star-outline" size={moderateScale(44)} color={currentTheme.primary} />

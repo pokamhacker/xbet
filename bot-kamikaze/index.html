@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Bot Kamikaze — Signaux & Prédictions 1xBet / Melbet / Megapari (Cote x10)</title>
+  <meta name="description" content="Bot prédicteur intelligent pour le jeu Kamikaze avec 10 niveaux jusqu'à la cote x10. Signaux en temps réel et code promo personnalisable.">
+  <meta name="theme-color" content="#0D1B2A">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20%220%22%20100%22%20100%22><text y=%22.9em%22 font-size=%2290%22>✈️</text></svg>">
+  
+  <!-- Polices Google Fonts Modernes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800;900&family=Rajdhani:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Conteneur Global / Smartphone Mockup Responsive -->
+  <main class="app-viewport">
+    <div class="phone-wrapper" id="phoneContainer">
+      
+      <!-- Lueur d'ambiance d'arrière-plan -->
+      <div class="ambient-glow"></div>
+      
+      <!-- Contenu de l'application -->
+      <div class="app-screen">
+        
+        <!-- 1. BARRE DE STATUT SYSTÈME -->
+        <header class="status-bar">
+          <span class="status-time" id="liveClock">13:05</span>
+          <div class="camera-punch-hole"></div>
+          <div class="status-icons">
+            <svg class="sys-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+              <path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 18.25A9.957 9.957 0 012 12C2 6.48 6.48 2 12 2s10 4.48 10 10c0 2.32-.8 4.45-2.14 6.14l-.62-.62C20.35 16.03 21 14.1 21 12c0-4.97-4.03-9-9-9zm0 4c-2.76 0-5 2.24-5 5 0 1.25.46 2.39 1.21 3.27l.71-.71C8.36 13.9 8 13 8 12c0-2.21 1.79-4 4-4s4 1.79 4 4c0 1-.36 1.9-.92 2.56l.71.71C16.54 14.39 17 13.25 17 12c0-2.76-2.24-5-5-5zm0 4c-.55 0-1 .45-1 1 0 .28.11.53.29.71l.71.71.71-.71c.18-.18.29-.43.29-.71 0-.55-.45-1-1-1z"/>
+            </svg>
+            <svg class="sys-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+              <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.5c3.55 0 6.78 1.34 9.25 3.55L12 19.3 2.75 11.05C5.22 8.84 8.45 7.5 12 7.5z"/>
+            </svg>
+            <div class="battery-pill">
+              <div class="battery-level"></div>
+            </div>
+          </div>
+        </header>
+
+        <!-- 2. EN-TÊTE DU BOT (ID, CODE PROMO PERSONNALISABLE, RESET) -->
+        <section class="bot-header">
+          <!-- Carte ID Utilisateur -->
+          <div class="user-id-card" id="btnEditProfile" title="Modifier profil / identifiant">
+            <div class="user-avatar-box">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="white">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <span class="user-id-text" id="displayUserId">610954713</span>
+          </div>
+
+          <!-- Pilule Code Promo avec Bouton Modification Instantanée -->
+          <div class="promo-pill-wrapper">
+            <button class="promo-pill" id="btnCopyPromo" title="Cliquez pour copier le code promo">
+              <span class="promo-label">Code Promo :</span>
+              <span class="promo-code" id="displayPromoCode">25TOTO</span>
+              <svg class="copy-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+              </svg>
+            </button>
+            <!-- Bouton Crayon pour modifier à tout moment le code promo -->
+            <button class="btn-promo-quick-edit" id="btnQuickEditPromo" title="Personnaliser le Code Promo à tout moment">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Bouton Déconnexion / Reset -->
+          <button class="btn-logout" id="btnLogout" title="Réinitialiser session">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="white">
+              <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+            </svg>
+          </button>
+        </section>
+
+        <!-- 3. BARRE DE SÉLECTION DU BOOKMAKER & LANGUE -->
+        <section class="brand-bar">
+          <div class="lang-flag" title="Français">
+            <span class="flag-icon">🇫🇷</span>
+          </div>
+          
+          <div class="brand-tabs">
+            <button class="brand-tab active" data-brand="1XBET">
+              <span class="brand-name">1XBET</span>
+            </button>
+            <button class="brand-tab" data-brand="MELBET">
+              <span class="brand-name melbet-text">MELBET</span>
+            </button>
+            <button class="brand-tab" data-brand="MEGAPARI">
+              <span class="brand-name megapari-text">MEGA:PARI</span>
+            </button>
+          </div>
+
+          <button class="btn-settings-pencil" id="btnOpenSettings" title="Paramètres du Bot">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+            </svg>
+          </button>
+        </section>
+
+        <!-- 4. WHATSAPP & STATUT DES CONNECTÉS -->
+        <section class="sub-header">
+          <!-- Bouton Flottant WhatsApp -->
+          <a href="https://wa.me/" target="_blank" rel="noopener" class="whatsapp-btn" id="linkWhatsapp" title="Contactez le VIP WhatsApp">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="white">
+              <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2zm.01 18.06c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.04 8.04 0 01-1.23-4.29c0-4.47 3.64-8.11 8.12-8.11 2.17 0 4.21.85 5.75 2.38 1.53 1.54 2.38 3.58 2.38 5.75 0 4.47-3.64 8.12-8.12 8.12zm4.45-6.08c-.24-.12-1.45-.71-1.68-.79-.22-.09-.39-.12-.55.12-.17.24-.63.79-.78.95-.14.17-.29.19-.53.07-.24-.12-1.03-.38-1.96-1.21-.72-.65-1.21-1.45-1.35-1.69-.14-.24-.02-.37.1-.49.11-.11.24-.29.37-.43.12-.14.17-.24.25-.4.09-.17.04-.31-.02-.43-.07-.12-.55-1.33-.76-1.82-.2-.48-.41-.41-.56-.42-.14-.01-.31-.01-.48-.01-.17 0-.45.06-.69.31-.24.24-.91.89-.91 2.17 0 1.28.93 2.51 1.06 2.69.14.17 1.83 2.8 4.44 3.93.62.27 1.11.43 1.49.55.63.2 1.2.17 1.65.1.5-.07 1.45-.59 1.65-1.16.21-.57.21-1.06.15-1.16-.06-.1-.22-.16-.47-.28z"/>
+            </svg>
+          </a>
+
+          <!-- Badge des personnes connectées -->
+          <div class="online-pill">
+            <span class="pulsing-green-dot"></span>
+            <span class="online-count" id="onlineCounter">2 224</span>
+            <span class="online-text">personnes connectées</span>
+          </div>
+
+          <!-- Bouton Son Mute/Unmute -->
+          <button class="sound-toggle-btn" id="btnToggleSound" title="Activer / Désactiver les sons">
+            <svg id="iconSoundOn" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+            <svg id="iconSoundOff" class="hidden" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27l4.73 4.73H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+            </svg>
+          </button>
+        </section>
+
+        <!-- 5. ZONE PRINCIPALE : GRILLE 5x10 KAMIKAZE (10 LIGNES JUSQU'À COTE x10) -->
+        <section class="game-radar-section">
+          <div class="radar-board-container">
+            
+            <!-- Grille 5 colonnes x 10 rangées sur texture d'eau avec BORDURE LUMINEUSE BIEN VISIBLE -->
+            <div class="water-grid" id="waterGrid">
+              <!-- Effet de balayage radar -->
+              <div class="radar-scan-line" id="radarScanLine"></div>
+              
+              <!-- Les 50 cellules (10 rangées x 5 colonnes) générées par script -->
+              <div class="grid-cells" id="gridCells"></div>
+            </div>
+
+            <!-- Colonne des 10 Multiplicateurs (Pentagones de x10 jusqu'à x1.2) -->
+            <div class="multipliers-column" id="multipliersColumn">
+              <!-- Rangée 0 (Sommet) : x10 -->
+              <div class="multiplier-badge" data-row="0" id="multBadge-0">
+                <span class="mult-value">x10</span>
+              </div>
+              <!-- Rangée 1 : x9 -->
+              <div class="multiplier-badge" data-row="1" id="multBadge-1">
+                <span class="mult-value">x9</span>
+              </div>
+              <!-- Rangée 2 : x8 -->
+              <div class="multiplier-badge" data-row="2" id="multBadge-2">
+                <span class="mult-value">x8</span>
+              </div>
+              <!-- Rangée 3 : x7 -->
+              <div class="multiplier-badge" data-row="3" id="multBadge-3">
+                <span class="mult-value">x7</span>
+              </div>
+              <!-- Rangée 4 : x6 -->
+              <div class="multiplier-badge" data-row="4" id="multBadge-4">
+                <span class="mult-value">x6</span>
+              </div>
+              <!-- Rangée 5 : x5 -->
+              <div class="multiplier-badge" data-row="5" id="multBadge-5">
+                <span class="mult-value">x5</span>
+              </div>
+              <!-- Rangée 6 : x4 -->
+              <div class="multiplier-badge" data-row="6" id="multBadge-6">
+                <span class="mult-value">x4</span>
+              </div>
+              <!-- Rangée 7 : x3.5 -->
+              <div class="multiplier-badge" data-row="7" id="multBadge-7">
+                <span class="mult-value">x3.5</span>
+              </div>
+              <!-- Rangée 8 : x3 -->
+              <div class="multiplier-badge" data-row="8" id="multBadge-8">
+                <span class="mult-value">x3.0</span>
+              </div>
+              <!-- Rangée 9 : x2.5 -->
+              <div class="multiplier-badge" data-row="9" id="multBadge-9">
+                <span class="mult-value">x2.5</span>
+              </div>
+              <!-- Rangée 10 : x2 -->
+              <div class="multiplier-badge" data-row="10" id="multBadge-10">
+                <span class="mult-value">x2</span>
+              </div>
+              <!-- Rangée 11 : x1.6 -->
+              <div class="multiplier-badge" data-row="11" id="multBadge-11">
+                <span class="mult-value">x1.6</span>
+              </div>
+              <!-- Rangée 12 : x1.4 -->
+              <div class="multiplier-badge" data-row="12" id="multBadge-12">
+                <span class="mult-value">x1.4</span>
+              </div>
+              <!-- Rangée 13 (Départ / Bas) : x1.2 -->
+              <div class="multiplier-badge" data-row="13" id="multBadge-13">
+                <span class="mult-value">x1.2</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bannière de Statut Décodé / Victoire -->
+          <div class="prediction-status-banner" id="predictionStatusBanner">
+            <span class="status-pulse-dot"></span>
+            <span class="status-msg" id="statusMessage">En attente du prochain signal...</span>
+          </div>
+        </section>
+
+        <!-- 6. BOUTONS D'ACTION PRINCIPAUX -->
+        <section class="action-buttons-section">
+          <!-- Bouton Nouvelle Ligne -->
+          <button class="btn-action btn-new-line" id="btnNewLine">
+            <span class="btn-icon">+</span>
+            <span class="btn-text">NOUVELLE LIGNE</span>
+            <div class="btn-shine"></div>
+          </button>
+
+          <!-- Bouton Recommencer -->
+          <button class="btn-action btn-restart" id="btnRestart">
+            <span class="btn-icon">↻</span>
+            <span class="btn-text">RECOMMENCER</span>
+          </button>
+        </section>
+
+        <!-- 7. BARRE INFÉRIEURE RÉSEAUX SOCIAUX -->
+        <footer class="social-footer">
+          <a href="https://t.me/" target="_blank" rel="noopener" class="social-btn btn-telegram" id="linkTelegram">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="white">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+            </svg>
+            <span>Telegram</span>
+          </a>
+
+          <a href="https://youtube.com/" target="_blank" rel="noopener" class="social-btn btn-youtube" id="linkYoutube">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="white">
+              <path d="M21.58 7.19a2.71 2.71 0 00-1.91-1.92C17.98 4.8 12 4.8 12 4.8s-5.98 0-7.67.47c-.93.26-1.66.99-1.91 1.92C2 8.88 2 12 2 12s0 3.12.42 4.81c.25.93.98 1.66 1.91 1.92 1.69.47 7.67.47 7.67.47s5.98 0 7.67-.47a2.71 2.71 0 001.91-1.92C22 15.12 22 12 22 12s0-3.12-.42-4.81zM9.9 15.17V8.83L15.4 12l-5.5 3.17z"/>
+            </svg>
+            <span>YouTube</span>
+          </a>
+        </footer>
+
+        <!-- 8. NAVIGATION ANDROID DU BAS -->
+        <div class="android-nav-bar">
+          <div class="nav-btn nav-recents">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+              <rect x="5" y="5" width="14" height="14" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+          <div class="nav-btn nav-home" id="btnNavHome">
+            <div class="home-circle"></div>
+          </div>
+          <div class="nav-btn nav-back" id="btnNavBack">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+            </svg>
+          </div>
+        </div>
+
+      </div><!-- /.app-screen -->
+    </div><!-- /.phone-wrapper -->
+  </main>
+
+  <!-- MODALE RAPIDE POUR PERSONNALISER LE CODE PROMO EN 1 CLIC -->
+  <div class="modal-overlay hidden" id="quickPromoModal">
+    <div class="modal-card quick-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-box">
+          <span style="font-size: 18px;">🎁</span>
+          <h3>Personnaliser le Code Promo</h3>
+        </div>
+        <button class="modal-close-btn" id="btnCloseQuickPromo">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 12px; color: #94A3B8; margin-bottom: 8px;">
+          Définissez votre code promo personnel (enregistré en temps réel dans le bot) :
+        </p>
+        <div class="form-group">
+          <input type="text" id="quickPromoInput" value="MC8899" placeholder="Ex: MC8899, VIP777..." style="text-transform: uppercase; font-weight: 800; font-size: 17px; letter-spacing: 1.5px; text-align: center; color: #FFD54F; background: #0E1622; border: 2px solid #F5A623;">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="btnCancelQuickPromo">Annuler</button>
+        <button class="btn-modal-save" id="btnSaveQuickPromo">Valider le Code</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALE DES PARAMÈTRES GÉNÉRAUX / CONFIGURATION DU BOT -->
+  <div class="modal-overlay hidden" id="settingsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-box">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="#E5A93C">
+            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+          <h3>Configuration du Bot Kamikaze</h3>
+        </div>
+        <button class="modal-close-btn" id="btnCloseSettings">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="inputPromoCode">Code Promo Principal</label>
+          <input type="text" id="inputPromoCode" value="MC8899" placeholder="Ex: MC8899" style="text-transform: uppercase; font-weight: 800; color: #FFD54F;">
+        </div>
+
+        <div class="form-group">
+          <label for="inputUserId">ID Utilisateur Affiché</label>
+          <input type="text" id="inputUserId" value="610954713" placeholder="Ex: 610954713">
+        </div>
+
+        <div class="form-group">
+          <label for="inputTelegram">Lien Canal Telegram</label>
+          <input type="url" id="inputTelegram" value="https://t.me/" placeholder="https://t.me/mon_canal">
+        </div>
+
+        <div class="form-group">
+          <label for="inputYoutube">Lien Chaîne YouTube</label>
+          <input type="url" id="inputYoutube" value="https://youtube.com/" placeholder="https://youtube.com/@chaine">
+        </div>
+
+        <div class="form-group">
+          <label for="inputWhatsapp">Lien / Numéro WhatsApp</label>
+          <input type="text" id="inputWhatsapp" value="https://wa.me/" placeholder="https://wa.me/237699000000">
+        </div>
+
+        <div class="form-group">
+          <label for="selectAccuracy">Précision Algorithmique</label>
+          <select id="selectAccuracy">
+            <option value="98.8%">98.8% — Mode VIP Précision Maximale</option>
+            <option value="96.5%">96.5% — Mode Sécurité Équilibrée</option>
+            <option value="99.4%">99.4% — Mode Détection Server Seed (Kamikaze x10)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="btnCancelSettings">Annuler</button>
+        <button class="btn-modal-save" id="btnSaveSettings">Enregistrer les réglages</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST DE NOTIFICATION FLOTTANT -->
+  <div class="toast-notification hidden" id="toastBox">
+    <span class="toast-icon">✓</span>
+    <span class="toast-text" id="toastMessage">Notification</span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

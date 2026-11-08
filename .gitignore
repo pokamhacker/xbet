@@ -19,3 +19,14 @@ assets/icons_backup/
 .env*.local
 *.db*
 scratch/
+android/
+ios/
+.eas/
+*.zip
+*.mp4
+*.exe
+apk/
+x-game/
+tools/
+dist/
+

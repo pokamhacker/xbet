@@ -15,6 +15,7 @@ import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
+import { adaptEventResultToPrediction } from '../utils/scoreAdapter';
 
 interface ScoreEditorModalProps {
   visible: boolean;
@@ -39,8 +40,9 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   }>(() => {
     const map: { [id: string]: { score: string; status: BetStatus } } = {};
     coupon.events.forEach((e) => {
+      const adapted = adaptEventResultToPrediction(e, e.status === 'Gain' || e.status === 'Payé' || coupon.status === 'Payé');
       map[e.id] = {
-        score: e.actualScore || (e.prediction.includes(':') ? e.prediction.split(':')?.[1]?.trim() || '2-1' : '1-0'),
+        score: e.actualScore || adapted.actualScore,
         status: e.status,
       };
     });
@@ -61,14 +63,40 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
     }));
   };
 
+  const handleAutoAdaptScores = (isWin: boolean = true) => {
+    const newStates: { [id: string]: { score: string; status: BetStatus } } = {};
+    coupon.events.forEach((e) => {
+      const adapted = adaptEventResultToPrediction(e, isWin);
+      newStates[e.id] = {
+        score: adapted.actualScore,
+        status: adapted.status,
+      };
+    });
+    setEventStates(newStates);
+  };
+
   const handleQuickValidateAll = (isWin: boolean) => {
-    validateCouponWithResult(coupon.id, isWin);
+    // 1. Adapter tous les scores locaux selon les pronostics choisis au départ
+    const adaptedScores: { [id: string]: string } = {};
+    const newStates: { [id: string]: { score: string; status: BetStatus } } = {};
+    coupon.events.forEach((e) => {
+      const adapted = adaptEventResultToPrediction(e, isWin);
+      adaptedScores[e.id] = adapted.actualScore;
+      newStates[e.id] = {
+        score: adapted.actualScore,
+        status: adapted.status,
+      };
+    });
+    setEventStates(newStates);
+
+    // 2. Mettre à jour le coupon dans le store avec les scores et statuts synchronisés
+    validateCouponWithResult(coupon.id, isWin, adaptedScores);
     onClose();
     Alert.alert(
       isWin ? 'Coupon validé en Gain !' : 'Coupon marqué comme Perdu',
       isWin
-        ? `Le statut est passé à Payé et ${coupon.potentialPayout.toLocaleString('fr-FR')} ₣ ont été crédités.`
-        : 'Le statut est passé à Perdu.'
+        ? `Les résultats des matchs ont été adaptés à vos pronostics. Le statut est passé à Payé et ${coupon.potentialPayout.toLocaleString('fr-FR')} ₣ ont été crédités.`
+        : 'Le statut est passé à Perdu avec les résultats adaptés.'
     );
   };
 
@@ -136,20 +164,36 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
             </TouchableOpacity>
           </View>
 
+          <TouchableOpacity
+            style={[
+              styles.adaptScoresBtn,
+              {
+                borderColor: currentTheme.border || '#CBD5E1',
+                backgroundColor: currentTheme.isDark ? (currentTheme.surface || '#1E293B') : '#F1F5F9',
+              },
+            ]}
+            onPress={() => handleAutoAdaptScores(true)}
+          >
+            <Ionicons name="sparkles" size={moderateScale(14)} color={currentTheme.primary} style={{ marginRight: 6 }} />
+            <Text style={[styles.adaptScoresBtnText, { color: currentTheme.primary, fontSize: font(12) }]}>
+              Adapter les scores aux pronostics
+            </Text>
+          </TouchableOpacity>
+
           <ScrollView style={styles.eventsScroll} showsVerticalScrollIndicator={false}>
             {coupon.events.map((ev, index) => {
               const current = eventStates[ev.id] || { score: '1-0', status: ev.status };
               return (
-                <View
-                  key={ev.id}
-                  style={[
-                    styles.eventCard,
-                    {
-                      backgroundColor: currentTheme.isDark ? currentTheme.surface : '#F8FAFC',
-                      borderColor: currentTheme.border,
-                    },
-                  ]}
-                >
+                <React.Fragment key={ev.id}>
+                  <View
+                    style={[
+                      styles.eventCard,
+                      {
+                        backgroundColor: currentTheme.isDark ? currentTheme.surface : '#F8FAFC',
+                        borderColor: currentTheme.border,
+                      },
+                    ]}
+                  >
                   <View style={styles.eventHeader}>
                     <Text style={[styles.eventIndex, { color: currentTheme.primary }]}>Match {index + 1}</Text>
                     <Text style={[styles.eventLeague, { color: currentTheme.textSecondary }]}>{ev.league}</Text>
@@ -248,6 +292,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                     </View>
                   </View>
                 </View>
+              </React.Fragment>
               );
             })}
           </ScrollView>
@@ -346,6 +391,18 @@ const styles = StyleSheet.create({
   quickBtnText: {
     color: '#fff',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  adaptScoresBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  adaptScoresBtnText: {
     fontWeight: '700',
   },
   eventsScroll: {

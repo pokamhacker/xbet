@@ -42,9 +42,31 @@ interface CouponState {
   getPotentialPayout: () => number;
 }
 
+export const DEFAULT_COUPON_EVENT: MatchEvent = {
+  id: 'ev-vil-psg-0311',
+  sport: 'Football',
+  league: 'Football . Europe. Ligue des Champions',
+  date: '03 nov. 2026 (21:00)',
+  matchDate: '03 nov. 2026',
+  matchTime: '21:00',
+  homeTeam: {
+    name: 'Villarreal',
+    logo: 'https://media.api-sports.io/football/teams/533.png',
+  },
+  awayTeam: {
+    name: 'Paris Saint-Germain',
+    logo: 'https://media.api-sports.io/football/teams/85.png',
+  },
+  prediction: 'Temps réglementaire, 1X2: V1',
+  odd: 4.98,
+  status: 'Accepté',
+  gameCategory: 'sports',
+};
+
 export const useCouponStore = create<CouponState>((set, get) => ({
-  activeEvents: [],
-  currentSelections: [],
+  activeEvents: [DEFAULT_COUPON_EVENT],
+  currentSelections: [DEFAULT_COUPON_EVENT],
+  ticketType: 'Simple',
   stake: 500,
   isLoadSheetVisible: false,
   isBetSheetVisible: false,
@@ -99,7 +121,6 @@ export const useCouponStore = create<CouponState>((set, get) => ({
     },
   },
 
-  ticketType: 'Combiné',
   setTicketType: (type: 'Simple' | 'Combiné' | 'Système') => set({ ticketType: type }),
 
   addEvent: (event: MatchEvent) => {

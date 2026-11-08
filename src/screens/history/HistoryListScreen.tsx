@@ -182,7 +182,13 @@ export const HistoryAvatarBadge: React.FC<{
   const isFifa =
     !isCombine &&
     !isPoker &&
-    (typeStr.includes('fifa') || sportStr.includes('fifa') || leagueStr.includes('fifa'));
+    (typeStr.includes('fifa') ||
+      sportStr.includes('fifa') ||
+      leagueStr.includes('fifa') ||
+      leagueStr.includes('fc 24') ||
+      leagueStr.includes('fc 25') ||
+      leagueStr.includes('fc 26') ||
+      leagueStr.includes('5x5 rush'));
 
   // Couleurs adaptées dynamiquement à tous les thèmes
   const badgeBg = isPaid
@@ -295,11 +301,16 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
     !isPoker &&
     (String(coupon.sport || '').toLowerCase().includes('fifa') ||
       String(coupon.league || '').toLowerCase().includes('fifa') ||
+      String(coupon.league || '').toLowerCase().includes('fc 2') ||
+      String(coupon.league || '').toLowerCase().includes('5x5 rush') ||
       Boolean(
         coupon.events?.some(
           (ev: any) =>
+            Boolean(ev?.isFifa) ||
             String(ev?.sport || '').toLowerCase().includes('fifa') ||
-            String(ev?.league || '').toLowerCase().includes('fifa')
+            String(ev?.league || '').toLowerCase().includes('fifa') ||
+            String(ev?.league || '').toLowerCase().includes('fc 2') ||
+            String(ev?.league || '').toLowerCase().includes('5x5 rush')
         )
       ));
 
