@@ -330,11 +330,8 @@ export async function resetDevice(req: Request, res: Response): Promise<void> {
 
     user.boundDeviceId = null;
     user.sessionToken = null;
-    // On débloque aussi le compte si la seule raison était la tentative sur un autre appareil
-    if (user.blockedReason === 'Tentative de connexion sur un autre appareil non autorisé') {
-      user.isBlocked = false;
-      user.blockedReason = null;
-    }
+    user.isBlocked = false;
+    user.blockedReason = null;
 
     await user.save();
 
