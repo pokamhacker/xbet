@@ -142,14 +142,6 @@ export const getEventSportIcon = (
  * 4. Si pari simple et sport === 'football' => Logo Football
  */
 export const getBetTypeIcon = (bet: BetTicketData): ImageSourcePropType => {
-  // 1. Si le coupon concerne TVBet / Poker (même en Combiné, comme sur la capture officielle)
-  if (
-    isTvBetOrPokerSport(bet) ||
-    (Array.isArray(bet?.events) && bet.events.some((e: any) => isTvBetOrPokerSport(e)))
-  ) {
-    return pokerIcon;
-  }
-
   const betType = (bet?.type || '').toLowerCase();
   const isCombine =
     betType === 'combiné' ||

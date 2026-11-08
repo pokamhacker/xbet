@@ -153,15 +153,13 @@ export const formatCurrency = (
 ): string => {
   if (value === undefined || value === null || value === '') return `0 ${currency}`;
   if (typeof value === 'string') {
-    if (value.includes('F') || value.includes('₣')) {
-      // Supprimer les espaces situés entre les chiffres
-      return value.replace(/(\d)\s+(\d)/g, '$1$2').trim();
-    }
-    const num = parseFloat(value.replace(/[^0-9.-]+/g, ''));
+    const num = parseFloat(value.replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.-]+/g, ''));
     if (isNaN(num)) return value;
-    return `${Math.round(num).toString()} ${currency}`;
+    const formatted = Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return `${formatted} ${currency}`;
   }
-  return `${Math.round(value).toString()} ${currency}`;
+  const formatted = Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return `${formatted} ${currency}`;
 };
 
 export const getStatusColor = (status?: string): string => {
@@ -205,8 +203,6 @@ export interface BetHistoryCardProps {
 
   /** Catégorie du sport ou jeu (ex: 'fifa' | 'poker' | 'football') */
   sportCategory?: string;
-  /** Liste des événements du coupon (pour détection combiné poker/tvbet) */
-  events?: any[];
   /** Slot ou source pour le logo du sport / type de pari (ImageSource, Composant React ou JSX Element) */
   sportLogo?: any;
 
@@ -233,7 +229,6 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
   date = '27.09.2026 (08:30)',
   type = 'Simple',
   eventsCount = 1,
-  events,
   isLive = false,
   sportCategory,
   odds = '58',
@@ -329,7 +324,6 @@ export const BetHistoryCard: React.FC<BetHistoryCardProps> = ({
     type,
     sportCategory,
     eventsCount,
-    events,
   });
   const resolvedLogoSource = customLogo ?? dynamicIconSource;
   const isCombineLogo = resolvedLogoSource === combineIcon;
