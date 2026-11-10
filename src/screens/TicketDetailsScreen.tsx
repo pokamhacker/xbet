@@ -1078,23 +1078,25 @@ export default function TicketDetailsScreen({
               </Text>
             </View>
 
-            {/* Badge • En direct rouge (Correction 4 : Toujours affiché pour les événements FIFA, ou si un événement est en cours) */}
-            {(isFifaCoupon ||
-              events.some(
-                (e) =>
-                  Boolean(e.isFifa) ||
+            {/* Badge • En direct rouge (uniquement si un événement a commencé et est en direct, ou FIFA déjà démarré) */}
+            {(events.some((e) => {
+              if (e.isBonus) return false;
+              const prog = getEventLiveProgress(e, currentTime);
+              const evSettled =
+                e.status === 'Gain' ||
+                e.status === 'gagne' ||
+                e.status === 'Perte' ||
+                e.status === 'perdu' ||
+                isPaid ||
+                isLost;
+              const evFifa = Boolean(
+                e.isFifa ||
                   e.sport === 'FIFA' ||
                   String(e.league || '').toUpperCase().startsWith('FIFA')
-              ) ||
-              (!isPaid &&
-                !isLost &&
-                events.some(
-                  (e) =>
-                    !e.isBonus &&
-                    e.status !== 'Gain' &&
-                    e.status !== 'Perte' &&
-                    getEventLiveProgress(e, currentTime).isLive
-                ))) ? (
+              );
+              const evStarted = evSettled || prog.hasStarted;
+              return (evFifa && evStarted) || (!evSettled && prog.isLive);
+            })) ? (
               <View style={styles.liveRedBadge}>
                 <View style={styles.liveRedBadgeDot} />
                 <Text style={styles.liveRedBadgeText}>En direct</Text>
@@ -1204,20 +1206,17 @@ export default function TicketDetailsScreen({
           );
 
           // État C : Terminé ou coupon résolu (Gain / Payé / Perte)
-          // Note (Correction 4) : Un événement FIFA non réglé reste toujours en mode En direct
-          const isEventFinished = isEventSettled || (!isFifaEvent && liveProgress.isFinished);
-          // État B : En direct (FIFA est toujours en direct tant que non réglé, sinon selon liveProgress.isLive)
-          const isEventLive = !isEventSettled && (isFifaEvent || (!liveProgress.isFinished && liveProgress.isLive));
+          const isEventFinished = isEventSettled || liveProgress.isFinished;
+          // État B : En direct uniquement lorsque l'heure de début est atteinte (now >= startTime et now < startTime + durationSeconds, non terminé)
+          const isEventLive = !isEventFinished && liveProgress.isLive;
           // État A : Avant le début de l'événement (now < startTime et non terminé)
           const isPreMatch = !isEventFinished && !isEventLive;
 
           const hasEventStarted = !isPreMatch;
           const showElapsedRow = isEventLive;
-          const elapsedSec = isFifaEvent && liveProgress.elapsedSeconds <= 0
-            ? Math.floor(((currentTime / 1000) % 240) + 35)
-            : liveProgress.elapsedSeconds;
+          const elapsedSec = liveProgress.elapsedSeconds;
 
-          const displayDate = isEventLive || isFifaEvent
+          const displayDate = isEventLive || (isFifaEvent && hasEventStarted)
             ? ev.matchDate && ev.matchTime
               ? `${ev.matchDate} (${ev.matchTime})`
               : formatBetDate(ev.rawDate || ev.date)
@@ -1351,8 +1350,8 @@ export default function TicketDetailsScreen({
                   </Text>
                 </View>
 
-                {/* Badge • En direct rouge (Correction 4 : Toujours affiché pour les événements FIFA, ou si en direct) ou Serie A */}
-                {(isFifaEvent || isEventLive) ? (
+                {/* Badge • En direct rouge (uniquement si l'événement a commencé : en direct ou FIFA démarré) ou Serie A */}
+                {((isFifaEvent && hasEventStarted) || isEventLive) ? (
                   <View style={styles.liveRedBadge}>
                     <View style={styles.liveRedBadgeDot} />
                     <Text style={styles.liveRedBadgeText}>En direct</Text>
