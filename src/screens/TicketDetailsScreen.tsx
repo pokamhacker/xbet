@@ -18,7 +18,6 @@ import {
 } from '../theme/themes';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect } from 'react-native-svg';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -1002,16 +1001,6 @@ export default function TicketDetailsScreen({
             { backgroundColor: currentTheme.cardBackground, overflow: 'hidden' },
           ]}
         >
-          {isPaid && (
-            <LinearGradient
-              colors={['rgba(78, 186, 111, 0)', 'rgba(78, 186, 111, 0)', 'rgba(78, 186, 111, 0.08)']}
-              locations={[0, 0.55, 1]}
-              start={{ x: 0.3, y: 0.2 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
-          )}
           {/* En-tête du ticket : Avatar + Type + Date + Badge ligue */}
           <View style={styles.summaryHeaderRow}>
             <View style={styles.avatarWrap}>
@@ -1331,17 +1320,6 @@ export default function TicketDetailsScreen({
               onPress={() => handlePressEvent(ev)}
               style={[styles.eventCard, { backgroundColor: currentTheme.cardBackground }]}
             >
-              {isEventGain && (
-                <LinearGradient
-                  colors={['rgba(78, 186, 111, 0)', 'rgba(78, 186, 111, 0)', 'rgba(78, 186, 111, 0.08)']}
-                  locations={[0, 0.55, 1]}
-                  start={{ x: 0.3, y: 0.2 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                  pointerEvents="none"
-                />
-              )}
-
               {/* En-tête de carte d'événement */}
               <View style={styles.eventCardHeader}>
                 <View style={styles.eventSportIconWrap}>
