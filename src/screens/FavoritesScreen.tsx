@@ -11,6 +11,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../stores/themeStore';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from '../theme/themes';
 import { useResponsive } from '../utils/responsive';
 import { BrandLogo } from '../components/common/BrandLogo';
 import {
@@ -22,13 +27,27 @@ export default function FavoritesScreen({ navigation }: any) {
   const { currentTheme } = useThemeStore();
   const { contentContainerStyle, font, moderateScale, insets } = useResponsive();
   const { refreshing, onRefresh } = useAppRefresh();
+  const headerBg = getHeaderBgColor(currentTheme);
+  const screenBg = getScreenBgColor(currentTheme);
+  const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
+    <View style={[styles.container, { backgroundColor: screenBg }]}>
       <StatusBar
-        barStyle={currentTheme.isDark ? 'light-content' : 'dark-content'}
+        animated
+        barStyle={statusBarStyle}
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
       />
-      <View style={[styles.header, { backgroundColor: currentTheme.headerBackground, borderBottomColor: currentTheme.border }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: headerBg,
+            borderBottomColor: currentTheme.border,
+            paddingTop: 14 + insets.top,
+          },
+        ]}
+      >
         <TouchableOpacity
           style={[{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 8 }, contentContainerStyle]}
           onPress={onRefresh}
@@ -68,14 +87,13 @@ export default function FavoritesScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   header: {
     paddingHorizontal: 16,

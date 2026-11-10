@@ -15,6 +15,11 @@ import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../stores/themeStore';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from '../theme/themes';
 import { useResponsive } from '../utils/responsive';
 import { BrandLogo } from '../components/common/BrandLogo';
 import { ROUTE_TO_FEATURE_MAP } from '../types/permissions';
@@ -134,13 +139,28 @@ export default function PopularScreen({ navigation }: any) {
     },
   ];
 
+  const headerBg = getHeaderBgColor(currentTheme);
+  const screenBg = getScreenBgColor(currentTheme);
+  const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
+    <View style={[styles.container, { backgroundColor: screenBg }]}>
       <StatusBar
-        barStyle={currentTheme.isDark ? 'light-content' : 'dark-content'}
+        animated
+        barStyle={statusBarStyle}
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
       />
-      {/* Top Header Bar */}
-      <View style={[styles.topHeader, { backgroundColor: currentTheme.headerBackground, borderBottomColor: currentTheme.border }]}>
+      {/* Top Header Bar (Edge-to-Edge avec insets.top) */}
+      <View
+        style={[
+          styles.topHeader,
+          {
+            backgroundColor: headerBg,
+            borderBottomColor: currentTheme.border,
+            paddingTop: 12 + insets.top,
+          },
+        ]}
+      >
         <View style={[{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, contentContainerStyle]}>
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
@@ -297,14 +317,13 @@ export default function PopularScreen({ navigation }: any) {
           <Ionicons name="arrow-forward" size={16} color={currentTheme.primary} />
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   topHeader: {
     flexDirection: 'row',

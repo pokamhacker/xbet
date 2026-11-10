@@ -10,7 +10,12 @@ import {
   Image,
   Animated,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from '../theme/themes';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -840,24 +845,34 @@ export default function TicketDetailsScreen({
     extrapolate: 'clamp',
   });
 
+  const headerBg = getHeaderBgColor(currentTheme);
+  const screenBg = getScreenBgColor(currentTheme);
+  const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
+  const topInset = insets.top;
+
   return (
-    <SafeAreaView
+    <View
       style={[
         styles.safeContainer,
-        { backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground },
+        { backgroundColor: screenBg },
       ]}
-      edges={['top']}
     >
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <StatusBar
+        animated
+        barStyle={statusBarStyle}
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
+      />
 
       {/* ================================================================== */}
-      {/* 1. HEADER SUPÉRIEUR FIXE                                           */}
+      {/* 1. HEADER SUPÉRIEUR FIXE (Couverture Edge-to-Edge avec insets.top) */}
       {/* ================================================================== */}
       <View
         style={[
           styles.header,
           {
-            backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground,
+            backgroundColor: headerBg,
+            paddingTop: topInset,
+            height: 52 + topInset,
           },
         ]}
       >
@@ -904,8 +919,9 @@ export default function TicketDetailsScreen({
         style={[
           styles.stickyFinancialBar,
           {
+            top: 52 + topInset,
             opacity: stickyBarOpacity,
-            backgroundColor: currentTheme.cardBackground,
+            backgroundColor: currentTheme.colors?.cardBackground || currentTheme.cardBackground,
           },
         ]}
       >
@@ -1663,7 +1679,7 @@ export default function TicketDetailsScreen({
           </TouchableOpacity>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -1678,12 +1694,9 @@ export const BetDetailScreen = TicketDetailsScreen;
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#F0F3F8',
-    
   },
   scrollContent: {
     paddingBottom: 32,
@@ -1692,7 +1705,6 @@ const styles = StyleSheet.create({
   // 1. Header
   header: {
     height: 52,
-    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1750,7 +1762,6 @@ const styles = StyleSheet.create({
     top: 52,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 10,
@@ -1766,7 +1777,6 @@ const styles = StyleSheet.create({
 
   // 2. Bloc Résumé Supérieur
   summaryCard: {
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 12,

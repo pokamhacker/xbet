@@ -1765,7 +1765,11 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar
+        animated
+        barStyle="light-content"
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
+      />
 
       {/* ===================================================================== */}
       {/* 1. EN-TÊTE FIFA 24 FIXE EN HAUT (Adapté Avant-match / Direct / Fini) */}

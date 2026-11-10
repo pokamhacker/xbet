@@ -182,6 +182,10 @@ export const xbetTheme: AppTheme = {
     bottomBarBg: '#FFFFFF',
     bottomBarActive: '#4A84C4',
     bottomBarInactive: '#6E849B',
+    headerBackground: '#FFFFFF',
+    dividerBorder: '#E6ECF2',
+    notchBg: '#FFFFFF',
+    modalBackground: '#FFFFFF',
   },
 
   background: '#EEF2F6',
@@ -521,6 +525,10 @@ export const melbetLightTheme: AppTheme = {
     bottomBarBg: '#FFFFFF',
     bottomBarActive: '#E7B12C',
     bottomBarInactive: '#9CA3AF',
+    headerBackground: '#FFFFFF',
+    dividerBorder: '#E5E7EB',
+    notchBg: '#FFFFFF',
+    modalBackground: '#FFFFFF',
   },
 
   // Surfaces & Backgrounds
@@ -1493,3 +1501,71 @@ export const themes: Record<ThemeName, AppTheme> = {
 };
 
 export const oneXBetDarkThemeAppTheme = xbetDarkTheme;
+
+// =============================================================================
+// HELPERS MULTI-THÈMES POUR SAFE AREA TOP / STATUSBAR / SAFE AREA BOTTOM
+// =============================================================================
+
+export function getHeaderBgColor(theme?: Partial<AppTheme> | null): string {
+  return (
+    theme?.colors?.headerBackground ||
+    theme?.headerBackground ||
+    theme?.colors?.cardBackground ||
+    theme?.cardBackground ||
+    theme?.surface ||
+    (theme?.isDark ? '#1A242D' : '#FFFFFF')
+  );
+}
+
+export function getScreenBgColor(theme?: Partial<AppTheme> | null): string {
+  return (
+    theme?.colors?.background ||
+    theme?.background ||
+    (theme?.isDark ? '#151B22' : '#EEF2F6')
+  );
+}
+
+export function getBottomBarBgColor(theme?: Partial<AppTheme> | null): string {
+  return (
+    theme?.bottomBar?.barBg ||
+    theme?.colors?.bottomBarBg ||
+    theme?.bottomBarBg ||
+    theme?.barBg ||
+    theme?.colors?.cardBackground ||
+    theme?.cardBackground ||
+    (theme?.isDark ? '#1A242D' : '#FFFFFF')
+  );
+}
+
+export function isHexColorDark(hex?: string, fallbackIsDark = false): boolean {
+  if (!hex || typeof hex !== 'string') return fallbackIsDark;
+  const clean = hex.trim().replace('#', '');
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (clean.length === 3) {
+    r = parseInt(clean[0] + clean[0], 16);
+    g = parseInt(clean[1] + clean[1], 16);
+    b = parseInt(clean[2] + clean[2], 16);
+  } else if (clean.length >= 6) {
+    r = parseInt(clean.substring(0, 2), 16);
+    g = parseInt(clean.substring(2, 4), 16);
+    b = parseInt(clean.substring(4, 6), 16);
+  } else {
+    return fallbackIsDark;
+  }
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    return fallbackIsDark;
+  }
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.5;
+}
+
+export function getStatusBarStyleForTheme(
+  theme?: Partial<AppTheme> | null,
+  overrideHeaderBg?: string
+): 'light-content' | 'dark-content' {
+  const bg = overrideHeaderBg || getHeaderBgColor(theme);
+  return isHexColorDark(bg, Boolean(theme?.isDark)) ? 'light-content' : 'dark-content';
+}
+

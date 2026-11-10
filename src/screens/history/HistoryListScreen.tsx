@@ -17,11 +17,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBetStore } from '../../store/useBetStore';
 import { useCouponStore } from '../../store/couponStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { BetSlip } from '../../types/bet';
 import { getEventLiveProgress } from '../../utils/dateFormatter';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from '../../theme/themes';
 
 // ============================================================================
 // ICÔNES LOCALES DEPUIS LE DOSSIER ASSETS
@@ -626,10 +632,14 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
 // ============================================================================
 export default function HistoryListScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { coupons, balance, deposit, validateCouponWithResult, deleteCoupon, deleteCoupons } =
     useBetStore();
   const { currentTheme, brandChoice } = useThemeStore();
   const isDark = Boolean(currentTheme?.isDark);
+  const headerBg = getHeaderBgColor(currentTheme);
+  const screenBg = getScreenBgColor(currentTheme);
+  const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
   const isParipesa =
     brandChoice === 'paripesa' ||
     (currentTheme?.name || '').toLowerCase().includes('paripesa');
@@ -806,23 +816,29 @@ export default function HistoryListScreen() {
   };
 
   return (
-    <SafeAreaView
+    <View
       style={[
         styles.safeArea,
-        { backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground || '#FFFFFF' },
+        { backgroundColor: screenBg },
       ]}
     >
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <StatusBar
+        animated
+        barStyle={statusBarStyle}
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
+      />
 
       {/* ================================================================== */}
-      {/* 1. HEADER FIXE SUPÉRIEUR                                           */}
+      {/* 1. HEADER FIXE SUPÉRIEUR (Couverture Edge-to-Edge avec insets.top) */}
       {/* ================================================================== */}
       <View
         style={[
           styles.fixedHeader,
           {
-            backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground || '#FFFFFF',
-            borderBottomColor: currentTheme.divider || currentTheme.border || '#E6ECF2',
+            backgroundColor: headerBg,
+            borderBottomColor: currentTheme.divider || currentTheme.border,
+            paddingTop: insets.top,
+            height: 52 + insets.top,
           },
         ]}
       >
@@ -1659,7 +1675,7 @@ export default function HistoryListScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -1675,11 +1691,9 @@ export type BetItem = any;
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#F0F3F8',
   },
   scrollContent: {
     paddingBottom: 24,
@@ -1688,13 +1702,11 @@ const styles = StyleSheet.create({
   // 1. Header supérieur fixe
   fixedHeader: {
     height: 52,
-    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E6ECF2',
   },
   headerLeftSpacer: {
     width: 96,

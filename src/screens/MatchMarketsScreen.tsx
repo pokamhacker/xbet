@@ -539,7 +539,11 @@ export const MatchMarketsScreen: React.FC<{ route?: any; navigation?: any }> = (
 
   return (
     <View style={[styles.screenRoot, { backgroundColor: cardBg }]}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar
+        animated
+        barStyle="light-content"
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
+      />
 
       {/* =====================================================================
           1. HEADER STADE PLEINE LARGEUR (identique à la capture de référence)

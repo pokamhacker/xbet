@@ -102,8 +102,8 @@ const manifestConfig = {
     }
   ],
   start_url: "/",
-  background_color: "#EEF2F6",
-  theme_color: "#1A568C",
+  background_color: "#FFFFFF",
+  theme_color: "#FFFFFF",
   display: "standalone",
   orientation: "portrait"
 };
@@ -132,7 +132,7 @@ if (fs.existsSync(indexHtmlPath)) {
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="1xBet" />
     <meta name="application-name" content="1xBet" />
-    <meta name="theme-color" content="#1A568C" />
+    <meta name="theme-color" content="#FFFFFF" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -146,7 +146,6 @@ if (fs.existsSync(indexHtmlPath)) {
         user-select: none;
         -webkit-touch-callout: none;
         -webkit-tap-highlight-color: transparent;
-        background-color: #EEF2F6;
       }
       input, textarea {
         -webkit-user-select: auto;

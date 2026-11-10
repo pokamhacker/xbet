@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { Platform, Text, TextInput, View } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { Platform, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
@@ -12,10 +11,21 @@ import {
 } from '@expo/vector-icons';
 import AppNavigator from './src/navigation/AppNavigator';
 import { setupCleanLogging } from './src/utils/logger';
+import { useThemeStore } from './src/store/themeStore';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from './src/theme/themes';
 
 setupCleanLogging();
 
 export default function App() {
+  const { currentTheme } = useThemeStore();
+  const headerBg = getHeaderBgColor(currentTheme);
+  const screenBg = getScreenBgColor(currentTheme);
+  const barStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
+
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
     ...MaterialCommunityIcons.font,
@@ -23,6 +33,25 @@ export default function App() {
     ...FontAwesome.font,
     ...Feather.font,
   });
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      let metaTheme = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+      if (!metaTheme) {
+        metaTheme = document.createElement('meta');
+        metaTheme.name = 'theme-color';
+        document.head.appendChild(metaTheme);
+      }
+      metaTheme.content = headerBg;
+
+      document.documentElement.style.backgroundColor = headerBg;
+      document.body.style.backgroundColor = screenBg;
+      const rootEl = document.getElementById('root');
+      if (rootEl) {
+        rootEl.style.backgroundColor = screenBg;
+      }
+    }
+  }, [headerBg, screenBg]);
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -104,8 +133,12 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider style={{ flex: 1, width: '100%', height: '100%' }}>
-      <StatusBar style="dark" />
+    <SafeAreaProvider style={{ flex: 1, width: '100%', height: '100%', backgroundColor: screenBg }}>
+      <StatusBar
+        animated
+        barStyle={barStyle}
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
+      />
       <AppNavigator />
     </SafeAreaProvider>
   );

@@ -39,18 +39,22 @@ import { ThemeSwitcherModal } from '../components/ThemeSwitcherModal';
 import { useThemeStore, isIPhoneModeActive } from '../store/themeStore';
 import { useAuthStore } from '../store/authStore';
 import { useSocketSync } from '../services/socketClientService';
+import { getHeaderBgColor, getScreenBgColor } from '../theme/themes';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function MainTabs() {
   const deviceInterface = useThemeStore((s) => s.deviceInterface);
+  const currentTheme = useThemeStore((s) => s.currentTheme);
   const isIPhone = isIPhoneModeActive(deviceInterface);
+  const screenBg = getScreenBgColor(currentTheme);
 
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
+        sceneStyle: { backgroundColor: screenBg },
         // Hide internal tab bar as PersistentBottomBar is rendered globally as persistent overlay
         tabBarStyle: { display: 'none' },
       }}
@@ -173,12 +177,32 @@ export default function AppNavigator() {
   ];
   const shouldShowBottomBar = !HIDDEN_BOTTOM_BAR_ROUTES.includes(currentRoute) && !isBottomBarHidden;
 
+  const screenBg = getScreenBgColor(currentTheme);
+  const headerBg = getHeaderBgColor(currentTheme);
+  const navTheme = {
+    dark: Boolean(currentTheme?.isDark),
+    colors: {
+      primary: currentTheme?.primary || '#4A84C4',
+      background: screenBg,
+      card: headerBg,
+      text: currentTheme?.textPrimary || '#002B49',
+      border: currentTheme?.border || '#E2E8F0',
+      notification: currentTheme?.primary || '#4A84C4',
+    },
+    fonts: {
+      regular: { fontFamily: 'System', fontWeight: '400' as const },
+      medium: { fontFamily: 'System', fontWeight: '500' as const },
+      bold: { fontFamily: 'System', fontWeight: '700' as const },
+      heavy: { fontFamily: 'System', fontWeight: '900' as const },
+    },
+  };
+
   return (
-    <View style={[styles.desktopOuterContainer, !isDesktopLandscape && { backgroundColor: currentTheme?.background || '#0F172A' }]}>
+    <View style={[styles.desktopOuterContainer, !isDesktopLandscape && { backgroundColor: screenBg }]}>
       <View
         style={[
           styles.responsiveAppViewport,
-          { backgroundColor: currentTheme?.background || '#0F172A' },
+          { backgroundColor: screenBg },
           isDesktopLandscape && styles.desktopFramedViewport,
           isDesktopLandscape && windowHeight > 900 && styles.desktopMaxHeight,
         ]}
@@ -212,8 +236,8 @@ export default function AppNavigator() {
           </View>
         )}
 
-        <NavigationContainer ref={navigationRef} onStateChange={handleStateChange}>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <NavigationContainer ref={navigationRef} onStateChange={handleStateChange} theme={navTheme as any}>
+          <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: screenBg } }}>
             <Stack.Screen name="MainTabs" component={MainTabs} />
             <Stack.Screen name="StudioCreation" component={StudioCreationScreen} />
             <Stack.Screen name="CouponStudio" component={StudioCreationScreen} />

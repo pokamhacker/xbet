@@ -232,7 +232,11 @@ export const MatchStatisticsScreen: React.FC<{ route?: any; navigation?: any }> 
 
   return (
     <View style={[styles.screenRoot, { backgroundColor: sheetOuterBg }]}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar
+        animated
+        barStyle="light-content"
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
+      />
 
       {/* =====================================================================
           HEADER STADE PLEINE LARGEUR (identique à la capture de référence)

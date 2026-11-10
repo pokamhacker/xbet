@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../store/themeStore';
+import { getBottomBarBgColor } from '../theme/themes';
 import { useCouponStore } from '../store/couponStore';
 import { navigate } from '../navigation/navigationRef';
 import { Colors, Typography } from '../theme/theme';
@@ -167,31 +168,9 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
       currentRoute === 'CouponScreen') &&
     couponCount > 0;
 
-  const couponSheetLowerBg = isParipesa
-    ? isDark
-      ? isBlack
-        ? '#0C0E13'
-        : '#282F39'
-      : '#FFFFFF'
-    : isMegaPari
-      ? isDark
-        ? isBlack
-          ? '#0B0E12'
-          : '#1A1F25'
-        : '#FFFFFF'
-      : isDark
-        ? isBlack
-          ? '#0B0F14'
-          : isMelbet
-            ? '#30353B'
-            : '#2A3F54'
-        : '#FFFFFF';
-
   const activeColor = theme?.bottomBar?.active || theme?.active || Colors.primary;
   const inactiveColor = theme?.bottomBar?.inactive || theme?.inactive || Colors.textSecondary;
-  const barBg = isFusedWithCouponSheet
-    ? couponSheetLowerBg
-    : (theme?.bottomBar?.barBg || theme?.barBg || Colors.surface);
+  const barBg = getBottomBarBgColor(theme);
   const barBorder = theme?.bottomBar?.barBorder || theme?.barBorder || Colors.border;
   const centerBg = theme?.bottomBar?.centerBg || theme?.centerBg || Colors.primary;
   const centerTint = theme?.bottomBar?.centerTint || theme?.centerTint || (theme?.name?.startsWith('melbet') && theme?.isDark ? '#000000' : '#FFFFFF');
@@ -297,6 +276,7 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
               {
                 backgroundColor: centerBg,
                 shadowColor: centerBg,
+                borderColor: barBg,
               },
             ]}
           >
@@ -388,7 +368,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
     borderTopWidth: 0,
     zIndex: 9999,
     elevation: 8,

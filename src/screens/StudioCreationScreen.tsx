@@ -16,9 +16,15 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
 import { Colors } from '../theme/theme';
 import { useThemeStore } from '../stores/themeStore';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from '../theme/themes';
 import { useBetStore } from '../store/useBetStore';
 import { useAuthStore } from '../store/authStore';
 import { generateCouponId, generateShareCode } from '../utils/pokerEngine';
@@ -179,7 +185,11 @@ interface TeamItem {
 
 export default function StudioCreationScreen({ navigation }: any) {
   const { currentTheme } = useThemeStore();
+  const insets = useSafeAreaInsets();
   const isDark = Boolean(currentTheme?.isDark);
+  const headerBg = getHeaderBgColor(currentTheme);
+  const screenBg = getScreenBgColor(currentTheme);
+  const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
   const hasAccess = useAuthStore((s) => s.hasAccessToFeature('studio_match'));
 
   useEffect(() => {
@@ -1089,16 +1099,21 @@ export default function StudioCreationScreen({ navigation }: any) {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <View style={[styles.container, { backgroundColor: screenBg }]}>
+      <StatusBar
+        animated
+        barStyle={statusBarStyle}
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
+      />
 
-      {/* Header Bar */}
+      {/* Header Bar (Edge-to-Edge avec insets.top) */}
       <View
         style={[
           styles.header,
           {
-            backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground,
+            backgroundColor: headerBg,
             borderBottomColor: currentTheme.border,
+            paddingTop: 10 + insets.top,
           },
         ]}
       >
@@ -2259,15 +2274,13 @@ export default function StudioCreationScreen({ navigation }: any) {
           </View>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   },
   header: {
     flexDirection: 'row',
@@ -2275,9 +2288,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   backBtn: {
     padding: 6,

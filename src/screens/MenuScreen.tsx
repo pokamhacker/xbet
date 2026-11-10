@@ -16,6 +16,11 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
 import { useThemeStore } from '../store/themeStore';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from '../theme/themes';
 import { useAuthStore } from '../store/authStore';
 import { useResponsive } from '../utils/responsive';
 import { BrandLogo } from '../components/common/BrandLogo';
@@ -76,13 +81,28 @@ export default function MenuScreen({ navigation }: any) {
     logout();
   };
 
+  const headerBg = getHeaderBgColor(currentTheme);
+  const screenBg = getScreenBgColor(currentTheme);
+  const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
+    <View style={[styles.container, { backgroundColor: screenBg }]}>
       <StatusBar
-        barStyle={currentTheme.isDark ? 'light-content' : 'dark-content'}
+        animated
+        barStyle={statusBarStyle}
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
       />
-      {/* Top Bar */}
-      <View style={[styles.topBar, { backgroundColor: currentTheme.cardBackground, borderBottomColor: currentTheme.border }]}>
+      {/* Top Bar (Edge-to-Edge avec insets.top) */}
+      <View
+        style={[
+          styles.topBar,
+          {
+            backgroundColor: headerBg,
+            borderBottomColor: currentTheme.border,
+            paddingTop: 12 + insets.top,
+          },
+        ]}
+      >
         <View style={[{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, contentContainerStyle]}>
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
@@ -479,15 +499,13 @@ export default function MenuScreen({ navigation }: any) {
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   topBar: {
     flexDirection: 'row',
@@ -495,9 +513,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   topBarTitle: {
     fontSize: 17,

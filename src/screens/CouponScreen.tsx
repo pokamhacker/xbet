@@ -19,6 +19,11 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { useResponsive } from '../utils/responsive';
 import { useThemeStore } from '../store/themeStore';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from '../theme/themes';
 import { useBetStore } from '../store/useBetStore';
 import { useCouponStore } from '../store/couponStore';
 import { useAuthStore } from '../store/authStore';
@@ -343,53 +348,9 @@ export default function CouponScreen({ navigation }: any) {
   const isMelbet = themeName.includes('melbet');
   const isBlack = themeName.includes('black');
 
-  const screenBg = isParipesa
-    ? isDark
-      ? isBlack
-        ? '#000000'
-        : '#1D212A'
-      : '#EBEEF3'
-    : isMegaPari
-      ? isDark
-        ? isBlack
-          ? '#000000'
-          : '#111111'
-        : '#EEF0F4'
-      : isMelbet
-        ? isDark
-          ? isBlack
-            ? '#000000'
-            : '#24292F'
-          : '#F2F4F7'
-        : isDark
-          ? isBlack
-            ? '#000000'
-            : '#233040'
-          : '#EBEEF3';
-
-  const headerBg = isParipesa
-    ? isDark
-      ? isBlack
-        ? '#0C0E13'
-        : '#282F39'
-      : '#FFFFFF'
-    : isMegaPari
-      ? isDark
-        ? isBlack
-          ? '#0B0E12'
-          : '#1A1F25'
-        : '#FFFFFF'
-      : isMelbet
-        ? isDark
-          ? isBlack
-            ? '#0D0E12'
-            : '#30353B'
-          : '#FFFFFF'
-        : isDark
-          ? isBlack
-            ? '#0B0F14'
-            : '#2A3F54'
-          : '#FFFFFF';
+  const screenBg = getScreenBgColor(currentTheme);
+  const headerBg = getHeaderBgColor(currentTheme);
+  const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
 
   const textPrimary = currentTheme.textPrimary || (isDark ? '#FFFFFF' : '#00325E');
   const textSecondary = currentTheme.textSecondary || (isDark ? '#8FA2B6' : '#6E849B');
@@ -434,31 +395,34 @@ export default function CouponScreen({ navigation }: any) {
       style={[
         styles.safeArea,
         {
-          backgroundColor: headerBg,
-          paddingTop: topSafeInset,
+          backgroundColor: screenBg,
         },
       ]}
     >
       <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
+        animated
+        barStyle={statusBarStyle}
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
       />
       <View style={[styles.mainContainer, { backgroundColor: screenBg }]}>
         {/* ===================================================================== */}
-        {/* 1. BARRE SUPÉRIEURE (HEADER)                                          */}
+        {/* 1. BARRE SUPÉRIEURE (HEADER — Edge-to-Edge avec insets.top)           */}
         {/* ===================================================================== */}
         <View
           style={[
             styles.header,
             {
               backgroundColor: headerBg,
-              borderBottomColor: isDark ? screenBg : '#EBEEF3',
+              borderBottomColor: currentTheme.divider || currentTheme.border || screenBg,
+              paddingTop: topSafeInset,
+              height: 52 + topSafeInset,
             },
           ]}
         >
           {hasSelections ? (
             <>
               {/* Titre centré : Texte Pari simple / Combiné centré horizontalement avec chevron vers le bas */}
-              <View style={styles.headerCenterTitleWrap} pointerEvents="box-none">
+              <View style={[styles.headerCenterTitleWrap, { top: topSafeInset }]} pointerEvents="box-none">
                 <TouchableOpacity
                   style={styles.ticketTypeDropdown}
                   onPress={() => setShowTicketTypeMenu(true)}
@@ -852,7 +816,6 @@ export { CouponScreen };
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC', // Fond d'écran principal
   },
   mainContainer: {
     flex: 1,
