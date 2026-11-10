@@ -161,27 +161,27 @@ export const xbetTheme: AppTheme = {
   isDark: false,
 
   colors: {
-    primary: '#4A8FD6',
+    primary: '#4A84C4',
     primaryText: '#FFFFFF',
     background: '#EEF2F6',
     cardBackground: '#FFFFFF',
     cardBorder: '#E2E8F0',
-    textPrimary: '#00325E',
+    textPrimary: '#002B49',
     textSecondary: '#6E849B',
-    accentGreen: '#16A34A',
+    accentGreen: '#4EBA6F',
     accentRed: '#E53935',
     depositButtonBg: '#48B254',
     depositButtonText: '#FFFFFF',
-    duplicateButtonBg: '#E8F1FD',
-    duplicateButtonText: '#D8E8F8',
+    duplicateButtonBg: '#EEF2F6',
+    duplicateButtonText: '#4A84C4',
     filterPillBg: '#ECEFF4',
     filterPillText: '#475569',
     filterChipBg: '#ECEFF4',
     filterChipText: '#475569',
-    filterIconColor: '#4A8FD6',
+    filterIconColor: '#4A84C4',
     bottomBarBg: '#FFFFFF',
-    bottomBarActive: '#235795',
-    bottomBarInactive: '#7E95AC',
+    bottomBarActive: '#4A84C4',
+    bottomBarInactive: '#6E849B',
   },
 
   background: '#EEF2F6',
@@ -191,13 +191,13 @@ export const xbetTheme: AppTheme = {
   border: '#E2E8F0',
   divider: '#E6ECF2',
 
-  primary: '#488DD2',
-  primaryAccent: '#488DD2',
+  primary: '#4A84C4',
+  primaryAccent: '#4A84C4',
   primarySoft: '#D8E5F6',
-  activeIcon: '#488DD2',
+  activeIcon: '#4A84C4',
 
-  textPrimary: '#00325E',
-  textSecondary: '#7E95AC',
+  textPrimary: '#002B49',
+  textSecondary: '#6E849B',
   textMuted: '#94A3B8',
   textWhite: '#FFFFFF',
 
@@ -206,11 +206,11 @@ export const xbetTheme: AppTheme = {
     text: '#FFFFFF',
   },
   duplicateButton: {
-    bg: '#E8F1FD',
-    text: '#6C9AD9',
+    bg: '#EEF2F6',
+    text: '#4A84C4',
   },
   cashoutButton: {
-    bg: '#2B4C9B',
+    bg: '#4A8AE8',
     text: '#FFFFFF',
   },
 
@@ -220,22 +220,22 @@ export const xbetTheme: AppTheme = {
   },
   filterChipBg: '#ECEFF4',
   filterChipText: '#475569',
-  filterIconColor: '#6C9AD9',
+  filterIconColor: '#4A84C4',
 
   bottomBar: {
     barBg: '#FFFFFF',
     barBorder: '#E2E8F0',
-    inactive: '#7E95AC',
-    active: '#6C9AD9',
-    centerBg: '#6C9AD9',
+    inactive: '#6E849B',
+    active: '#4A84C4',
+    centerBg: '#4A84C4',
     centerTint: '#FFFFFF',
   },
 
   status: {
-    paye: '#16A34A',
-    accepte: '#6C9AD9',
+    paye: '#4EBA6F',
+    accepte: '#4A84C4',
     perdu: '#E53935',
-    gagne: '#16A34A',
+    gagne: '#4EBA6F',
   },
 
   // Compatibility aliases
@@ -243,13 +243,13 @@ export const xbetTheme: AppTheme = {
   tagline: 'Leader Mondial des Paris Sportifs',
   barBg: '#FFFFFF',
   barBorder: '#E2E8F0',
-  inactive: '#7E95AC',
-  active: '#6C9AD9',
-  centerBg: '#6C9AD9',
+  inactive: '#6E849B',
+  active: '#4A84C4',
+  centerBg: '#4A84C4',
   centerTint: '#FFFFFF',
-  dotColor: '#6C9AD9',
+  dotColor: '#4A84C4',
   badgeBg: '#D8E5F6',
-  accentColor: '#6C9AD9',
+  accentColor: '#4A84C4',
 };
 
 // ✅ 1XBET SOMBRE (Extrait au pixel près de la vidéo 1xBet Sombre)

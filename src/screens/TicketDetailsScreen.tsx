@@ -13,6 +13,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -236,11 +237,12 @@ export default function TicketDetailsScreen({
   const isLost = rawStatus === 'Perdu' || rawStatus.toLowerCase() === 'lost';
   const isAccepted = !isPaid && !isLost;
 
-  // Couleurs dynamiques selon le thème actif
+  // Couleurs dynamiques selon le thème actif (Correction 2 : Unification de SUCCESS_GREEN = '#4EBA6F')
+  const SUCCESS_GREEN = '#4EBA6F';
   const primaryActionColor = isDark
     ? '#FFFFFF'
     : (currentTheme?.activeIcon || currentTheme?.primary || '#557089');
-  const payeColor = currentTheme?.status?.paye || currentTheme?.status?.gagne || '#3BB54A';
+  const payeColor = SUCCESS_GREEN;
   const accepteColor = currentTheme?.status?.accepte || '#4A83C4';
   const perduColor = currentTheme?.status?.perdu || '#E74C3C';
 
@@ -952,7 +954,10 @@ export default function TicketDetailsScreen({
         style={[styles.scrollView, { backgroundColor: currentTheme.background }]}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: bottomBarHeight + (showDuplicateFooter ? 85 : 28) },
+          {
+            paddingBottom:
+              bottomBarHeight + (showDuplicateFooter ? (showSellButton ? 140 : 88) : 28),
+          },
         ]}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
@@ -974,7 +979,22 @@ export default function TicketDetailsScreen({
         {/* ================================================================ */}
         {/* BLOC RÉSUMÉ SUPÉRIEUR (FOND BLANC DYNAMIQUE THÈME)                */}
         {/* ================================================================ */}
-        <View style={[styles.summaryCard, { backgroundColor: currentTheme.cardBackground }]}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: currentTheme.cardBackground, overflow: 'hidden' },
+          ]}
+        >
+          {isPaid && (
+            <LinearGradient
+              colors={['rgba(78, 186, 111, 0)', 'rgba(78, 186, 111, 0)', 'rgba(78, 186, 111, 0.08)']}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0.3, y: 0.2 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          )}
           {/* En-tête du ticket : Avatar + Type + Date + Badge ligue */}
           <View style={styles.summaryHeaderRow}>
             <View style={styles.avatarWrap}>
@@ -1018,7 +1038,7 @@ export default function TicketDetailsScreen({
                   styles.statusMiniDot,
                   {
                     backgroundColor: isPaid
-                      ? (currentTheme.status?.paye || currentTheme.status?.gagne || '#52B76E')
+                      ? '#52B76E'
                       : isLost
                       ? (currentTheme.status?.perdu || '#E74C3C')
                       : (currentTheme.status?.accepte || currentTheme.primary || '#4A8FE7'),
@@ -1058,23 +1078,26 @@ export default function TicketDetailsScreen({
               </Text>
             </View>
 
-            {/* Badge • En direct rouge (uniquement si au moins un événement a atteint son startTime et est en cours) ou Serie A */}
-            {(!isPaid &&
-              !isLost &&
+            {/* Badge • En direct rouge (Correction 4 : Toujours affiché pour les événements FIFA, ou si un événement est en cours) */}
+            {(isFifaCoupon ||
               events.some(
                 (e) =>
-                  !e.isBonus &&
-                  e.status !== 'Gain' &&
-                  e.status !== 'Perte' &&
-                  getEventLiveProgress(e, currentTime).isLive
-              )) ? (
-              <View
-                style={[
-                  styles.liveRedBadge,
-                  { backgroundColor: (currentTheme as any).liveBadge || '#D7453E' },
-                ]}
-              >
-                <Text style={styles.liveRedBadgeText}>• En direct</Text>
+                  Boolean(e.isFifa) ||
+                  e.sport === 'FIFA' ||
+                  String(e.league || '').toUpperCase().startsWith('FIFA')
+              ) ||
+              (!isPaid &&
+                !isLost &&
+                events.some(
+                  (e) =>
+                    !e.isBonus &&
+                    e.status !== 'Gain' &&
+                    e.status !== 'Perte' &&
+                    getEventLiveProgress(e, currentTime).isLive
+                ))) ? (
+              <View style={styles.liveRedBadge}>
+                <View style={styles.liveRedBadgeDot} />
+                <Text style={styles.liveRedBadgeText}>En direct</Text>
               </View>
             ) : currentCoupon?.badge === 'Serie A' ? (
               <View style={styles.leagueBadge}>
@@ -1141,7 +1164,7 @@ export default function TicketDetailsScreen({
           {isPaid && (
             <View style={styles.financialRow}>
               <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Gains:</Text>
-              <Text style={[styles.financialValueBold, { color: payeColor }]}>
+              <Text style={[styles.financialValueBold, { color: payeColor, fontWeight: '600' }]}>
                 {actualPayoutFormatted}
               </Text>
             </View>
@@ -1150,7 +1173,12 @@ export default function TicketDetailsScreen({
           {/* Ligne Statut parfaitement alignée (sans boîte verte décalée) */}
           <View style={styles.financialRow}>
             <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Statut:</Text>
-            <Text style={[styles.financialValueStatus, { color: statusColor }]}>
+            <Text
+              style={[
+                styles.financialValueStatus,
+                { color: statusColor, fontWeight: isPaid ? '600' : '500' },
+              ]}
+            >
               {statusLabel}
             </Text>
           </View>
@@ -1171,21 +1199,25 @@ export default function TicketDetailsScreen({
           const isFifaEvent = Boolean(
             ev.isFifa ||
               ev.sport === 'FIFA' ||
-              String(ev.league || '').toLowerCase().includes('fifa')
+              String(ev.league || '').toLowerCase().includes('fifa') ||
+              String(ev.league || '').toUpperCase().startsWith('FIFA')
           );
 
           // État C : Terminé ou coupon résolu (Gain / Payé / Perte)
-          const isEventFinished = isEventSettled || liveProgress.isFinished;
-          // État B : En direct (now >= startTime et now < startTime + durationSeconds, non terminé)
-          const isEventLive = !isEventFinished && liveProgress.isLive;
+          // Note (Correction 4) : Un événement FIFA non réglé reste toujours en mode En direct
+          const isEventFinished = isEventSettled || (!isFifaEvent && liveProgress.isFinished);
+          // État B : En direct (FIFA est toujours en direct tant que non réglé, sinon selon liveProgress.isLive)
+          const isEventLive = !isEventSettled && (isFifaEvent || (!liveProgress.isFinished && liveProgress.isLive));
           // État A : Avant le début de l'événement (now < startTime et non terminé)
           const isPreMatch = !isEventFinished && !isEventLive;
 
           const hasEventStarted = !isPreMatch;
           const showElapsedRow = isEventLive;
-          const elapsedSec = liveProgress.elapsedSeconds;
+          const elapsedSec = isFifaEvent && liveProgress.elapsedSeconds <= 0
+            ? Math.floor(((currentTime / 1000) % 240) + 35)
+            : liveProgress.elapsedSeconds;
 
-          const displayDate = isEventLive
+          const displayDate = isEventLive || isFifaEvent
             ? ev.matchDate && ev.matchTime
               ? `${ev.matchDate} (${ev.matchTime})`
               : formatBetDate(ev.rawDate || ev.date)
@@ -1273,6 +1305,17 @@ export default function TicketDetailsScreen({
               onPress={() => handlePressEvent(ev)}
               style={[styles.eventCard, { backgroundColor: currentTheme.cardBackground }]}
             >
+              {isEventGain && (
+                <LinearGradient
+                  colors={['rgba(78, 186, 111, 0)', 'rgba(78, 186, 111, 0)', 'rgba(78, 186, 111, 0.08)']}
+                  locations={[0, 0.55, 1]}
+                  start={{ x: 0.3, y: 0.2 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+              )}
+
               {/* En-tête de carte d'événement */}
               <View style={styles.eventCardHeader}>
                 <View style={styles.eventSportIconWrap}>
@@ -1308,15 +1351,11 @@ export default function TicketDetailsScreen({
                   </Text>
                 </View>
 
-                {/* Badge • En direct rouge ou Serie A en haut à droite */}
-                {isEventLive ? (
-                  <View
-                    style={[
-                      styles.liveRedBadge,
-                      { backgroundColor: (currentTheme as any).liveBadge || '#D7453E' },
-                    ]}
-                  >
-                    <Text style={styles.liveRedBadgeText}>• En direct</Text>
+                {/* Badge • En direct rouge (Correction 4 : Toujours affiché pour les événements FIFA, ou si en direct) ou Serie A */}
+                {(isFifaEvent || isEventLive) ? (
+                  <View style={styles.liveRedBadge}>
+                    <View style={styles.liveRedBadgeDot} />
+                    <Text style={styles.liveRedBadgeText}>En direct</Text>
                   </View>
                 ) : ev.badge === 'Serie A' ? (
                   <View style={styles.leagueBadge}>
@@ -1516,7 +1555,10 @@ export default function TicketDetailsScreen({
                   <Text
                     style={[
                       styles.eventStatusValue,
-                      { color: eventStatusColor },
+                      {
+                        color: eventStatusColor,
+                        fontWeight: isEventGain ? '600' : '500',
+                      },
                     ]}
                   >
                     {eventStatusLabel}
@@ -1563,9 +1605,7 @@ export default function TicketDetailsScreen({
             {
               bottom: bottomBarHeight,
               backgroundColor:
-                currentTheme.bottomBar?.barBg ||
-                currentTheme.cardBackground ||
-                (isDark ? '#263547' : '#FFFFFF'),
+                currentTheme.cardBackground || (isDark ? '#1A242D' : '#FFFFFF'),
               borderTopColor:
                 currentTheme.border ||
                 currentTheme.divider ||
@@ -1573,60 +1613,55 @@ export default function TicketDetailsScreen({
             },
           ]}
         >
-          {showSellButton ? (
+          {showSellButton && (
             <TouchableOpacity
               style={[
-                styles.duplicateBtn,
+                styles.sellActionBtn,
                 {
                   backgroundColor:
+                    (currentTheme as any).primaryBlue ||
                     currentTheme.cashoutButton?.bg ||
-                    currentTheme.primary ||
-                    (isDark ? '#5190D1' : '#2B4C9B'),
+                    '#4A8AE8',
                 },
               ]}
               activeOpacity={0.85}
               onPress={handleCashout}
             >
-              <Text
-                style={[
-                  styles.duplicateBtnText,
-                  {
-                    color: currentTheme.cashoutButton?.text || '#FFFFFF',
-                    fontWeight: '600',
-                    fontSize: 15.5,
-                  },
-                ]}
-              >
+              <Text style={styles.sellActionBtnText}>
                 Vendre pour {sellPriceFormatted} ₣
               </Text>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.duplicateBtn,
+              {
+                marginTop: showSellButton ? 8 : 0,
+                backgroundColor: isDark
+                  ? ((currentTheme as any).surfaceSecondary ||
+                      currentTheme.duplicateButton?.bg ||
+                      '#253341')
+                  : (currentTheme.duplicateButton?.bg || '#EEF2F6'),
+              },
+            ]}
+            activeOpacity={0.85}
+            onPress={handleDuplicate}
+          >
+            <Text
               style={[
-                styles.duplicateBtn,
+                styles.duplicateBtnText,
                 {
-                  backgroundColor:
-                    currentTheme.duplicateButton?.bg ||
-                    (isDark ? '#324460' : '#D6E6F7'),
+                  color:
+                    currentTheme.primary ||
+                    currentTheme.duplicateButton?.text ||
+                    '#4A84C4',
                 },
               ]}
-              activeOpacity={0.85}
-              onPress={handleDuplicate}
             >
-              <Text
-                style={[
-                  styles.duplicateBtnText,
-                  {
-                    color:
-                      currentTheme.duplicateButton?.text ||
-                      (isDark ? '#5395DA' : '#2E73B8'),
-                  },
-                ]}
-              >
-                Dupliquer le coupon de pari
-              </Text>
-            </TouchableOpacity>
-          )}
+              Dupliquer le coupon de pari
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
     </SafeAreaView>
@@ -1881,12 +1916,12 @@ const styles = StyleSheet.create({
   eventsCountText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0D253F',
+    color: '#002B49',
   },
   eventsFinishedText: {
-    fontSize: 14.5,
-    fontWeight: '400',
-    color: '#0D253F',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#002B49',
   },
 
   // 3. Cartes d'Événements
@@ -2078,7 +2113,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   centerScoreContainer: {
-    marginHorizontal: 10,
+    marginHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 38,
@@ -2086,19 +2121,20 @@ const styles = StyleSheet.create({
   vsText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1D2B3A',
+    color: '#002B49',
   },
   mainScoreText: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1D2B3A',
+    fontSize: 19.5,
+    fontWeight: '600',
+    color: '#002B49',
+    letterSpacing: 0.5,
   },
   detailScoreBelowText: {
-    fontSize: 12,
+    fontSize: 12.5,
     color: '#6E849B',
     fontWeight: '400',
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: 8,
   },
 
   // Zone outright / vainqueur
@@ -2171,19 +2207,27 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Badge • En direct rouge (proportions et teinte exactes de la capture 1xBet tvbet1.jpg)
+  // Badge • En direct rouge (Correction 4 : Style exact de la Capture 3)
   liveRedBadge: {
-    backgroundColor: '#D7453E',
-    paddingHorizontal: 5.5,
-    paddingVertical: 1.5,
-    borderRadius: 4.5,
+    backgroundColor: '#EB3B3B',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
+  },
+  liveRedBadgeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+    marginRight: 5,
   },
   liveRedBadgeText: {
     color: '#FFFFFF',
-    fontSize: 9.5,
+    fontSize: 11.5,
     fontWeight: '600',
-    lineHeight: 12,
   },
 
   // Section Informations supplémentaires (Poker)
@@ -2203,29 +2247,48 @@ const styles = StyleSheet.create({
     color: '#1D2B3A',
   },
 
-  // 4. Fixed Footer (au-dessus de la PersistentBottomBar)
+  // 4. Fixed Footer (Correction 5 : Barre inférieure adaptative multi-thèmes)
   fixedFooter: {
     position: 'absolute',
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#EEF2F6',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 6,
     zIndex: 100,
   },
+  sellActionBtn: {
+    backgroundColor: '#4A8AE8',
+    height: 46,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sellActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15.5,
+    fontWeight: '500',
+  },
   duplicateBtn: {
-    backgroundColor: '#D6E6F7',
-    height: 44,
+    backgroundColor: '#EEF2F6',
+    height: 46,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   duplicateBtnText: {
-    color: '#2E73B8',
-    fontSize: 15,
-    fontWeight: '500',
+    color: '#4A84C4',
+    fontSize: 15.5,
+    fontWeight: '600',
   },
 });

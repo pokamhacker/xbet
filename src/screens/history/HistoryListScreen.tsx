@@ -193,7 +193,7 @@ export const HistoryAvatarBadge: React.FC<{
 
   // Couleurs adaptées dynamiquement à tous les thèmes
   const badgeBg = isPaid
-    ? (currentTheme.status?.paye || currentTheme.status?.gagne || '#52B76E')
+    ? '#52B76E'
     : isLost
     ? (currentTheme.status?.perdu || '#E74C3C')
     : (currentTheme.status?.accepte || currentTheme.primary || '#4A89DC');
@@ -323,7 +323,7 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
   );
   const statusLabel = isAccepted ? 'Accepté' : isPaid ? 'Payé' : 'Perdu';
   const statusColor = isPaid
-    ? (currentTheme.status?.paye || currentTheme.status?.gagne || '#4EBA6F')
+    ? '#4EBA6F'
     : isLost
     ? (currentTheme.status?.perdu || '#E74C3C')
     : (currentTheme.status?.accepte || currentTheme.primary || '#4A83C4');
@@ -589,7 +589,7 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
             <Text
               style={[
                 styles.cardDataValueBold,
-                { color: currentTheme.status?.paye || currentTheme.status?.gagne || '#4EBA6F' },
+                { color: '#4EBA6F', fontWeight: '600' },
               ]}
             >
               {actualGainStr}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { useThemeStore } from '../../stores/themeStore';
 import { Typography } from '../../theme/theme';
 
@@ -21,66 +21,54 @@ export const HistoryTabIcon: React.FC<HistoryTabIconProps> = ({
 }) => {
   const { currentTheme, isDark } = useThemeStore();
 
-  // 1. Couleurs adaptées au thème actif (1xBet, Melbet, Melbet Light, Paripesa, WinWin, BetWinner, MegaPari)
+  // 1. Couleurs adaptées au thème actif (Capture 1 & 3 : #4A84C4 actif, #6E849B inactif)
   const activeColor =
     (focused && color) ||
     currentTheme.bottomBar?.active ||
     currentTheme.primary ||
-    '#2563EB';
+    '#4A84C4';
 
   const inactiveColor =
     (!focused && color) ||
     currentTheme.bottomBar?.inactive ||
     currentTheme.textSecondary ||
-    (isDark ? '#7C8B99' : '#7E95AC');
+    (isDark ? '#7C8B99' : '#6E849B');
 
-  // Le fond de la pastille prend la couleur active si sélectionné, sinon la couleur inactive (identique au fond plein de l'icône Favoris)
+  // Disque plein de 22x22 en couleur active (#4A84C4) ou inactive (#6E849B)
   const discBgColor = focused ? activeColor : inactiveColor;
 
-  // Couleur des aiguilles au centre : blanc haute visibilité ou centerTint du thème
+  // Couleur des aiguilles au centre : blanc (#FFFFFF) ou centerTint du thème
   const rawCenterTint = currentTheme.bottomBar?.centerTint;
   const needleColor =
     rawCenterTint && rawCenterTint.length >= 4 && rawCenterTint !== '#FFFFF'
       ? rawCenterTint
       : '#FFFFFF';
 
-  // Dimensions
   const discSize = size;
-  const needleSvgSize = Math.round(discSize * 0.65); // ~14px pour size=22
 
   return (
     <View style={styles.container}>
-      {/* Pastille circulaire pleine à la couleur du thème (active ou inactive, calquée sur le fond de Favoris) */}
-      <View
-        style={[
-          styles.circleDisc,
-          {
-            width: discSize,
-            height: discSize,
-            borderRadius: discSize / 2,
-            backgroundColor: discBgColor,
-          },
-        ]}
-      >
-        <Svg width={needleSvgSize} height={needleSvgSize} viewBox="0 0 24 24" fill="none">
-          {/* Aiguille d'horloge en L à angle droit (12h - 15h) parfaitement nette et lisible */}
+      {/* Disque plein 22x22 (Circle cx="12" cy="12" r="9.5") + aiguilles blanches centrées formant un L net */}
+      <View style={styles.iconWrapper}>
+        <Svg width={discSize} height={discSize} viewBox="0 0 24 24" fill="none">
+          <Circle cx="12" cy="12" r="9.5" fill={discBgColor} />
           <Path
-            d="M12 6.5V12H16.5"
+            d="M12 7.5V12.5H15.5"
             stroke={needleColor}
-            strokeWidth="2.8"
+            strokeWidth={2.2}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         </Svg>
       </View>
 
-      {/* Libellé du texte dynamique selon l'état et le thème */}
+      {/* Libellé Historique en dessous : fontSize: 11, fontWeight: '500', couleur #4A84C4 lorsqu'il est actif */}
       {showLabel && (
         <Text
           style={[
             styles.label,
             { color: focused ? activeColor : inactiveColor },
-            focused && styles.activeLabel,
+            focused ? styles.activeLabel : styles.inactiveLabel,
           ]}
           numberOfLines={1}
         >
@@ -100,13 +88,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 2,
   },
-  circleDisc: {
+  iconWrapper: {
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
   },
   label: {
-    fontSize: 10.5,
+    fontSize: 11,
     textAlign: 'center',
     letterSpacing: -0.1,
     fontFamily: Typography.fontFamily,
@@ -114,7 +104,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   activeLabel: {
-    fontWeight: '700',
+    fontWeight: '500',
   },
   inactiveLabel: {
     fontWeight: '500',

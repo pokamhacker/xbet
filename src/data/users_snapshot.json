@@ -60,8 +60,8 @@
     "balance": 50000,
     "is_blocked": 0,
     "blocked_reason": null,
-    "bound_device_id": null,
-    "last_device_id": null,
+    "bound_device_id": "dev_1794084379418_k2vz7j8",
+    "last_device_id": "dev_1794084379418_k2vz7j8",
     "created_at": "2026-11-08T05:06:52.000Z"
   },
   {
@@ -73,8 +73,8 @@
     "balance": 250000,
     "is_blocked": 0,
     "blocked_reason": null,
-    "bound_device_id": null,
-    "last_device_id": null,
+    "bound_device_id": "dev_1794064868263_3sdbzz8",
+    "last_device_id": "dev_1794064868263_3sdbzz8",
     "created_at": "2026-11-08T05:06:52.000Z"
   },
   {
@@ -102,5 +102,70 @@
     "bound_device_id": "dev_1794036433368_97t9xlz",
     "last_device_id": null,
     "created_at": "2026-11-08T05:06:49.000Z"
+  },
+  {
+    "id": "usr_1794312499874_8dd81e65",
+    "username": "safe",
+    "raw_password": "safe#",
+    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
+    "role": "USER",
+    "balance": 50000,
+    "is_blocked": 0,
+    "blocked_reason": null,
+    "bound_device_id": "dev_1794312582910_h1qq9qq",
+    "last_device_id": "dev_1794312582910_h1qq9qq",
+    "created_at": "2026-11-10T12:08:19.000Z"
+  },
+  {
+    "id": "usr_1794234763979_f6859395",
+    "username": "lml",
+    "raw_password": "00@#",
+    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
+    "role": "USER",
+    "balance": 50000,
+    "is_blocked": 1,
+    "blocked_reason": "Tentative de connexion sur un second appareil",
+    "bound_device_id": "dev_1794234656446_gxf3zql",
+    "last_device_id": "dev_1794234656446_gxf3zql",
+    "created_at": "2026-11-09T14:32:43.000Z"
+  },
+  {
+    "id": "usr_1794204812871_a3633513",
+    "username": "uuu",
+    "raw_password": "uuu",
+    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
+    "role": "USER",
+    "balance": 50000,
+    "is_blocked": 0,
+    "blocked_reason": null,
+    "bound_device_id": "dev_1792646214847_5pwa0kv",
+    "last_device_id": "dev_1792646214847_5pwa0kv",
+    "created_at": "2026-11-09T06:13:32.000Z"
+  },
+  {
+    "id": "usr_1794198236173_6e341708",
+    "username": "gaffa",
+    "raw_password": "Gaffa515",
+    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
+    "role": "USER",
+    "balance": 100000,
+    "is_blocked": 0,
+    "blocked_reason": null,
+    "bound_device_id": "dev_1794198578596_e0p4itf",
+    "last_device_id": "dev_1794198578596_e0p4itf",
+    "created_at": "2026-11-09T04:23:56.000Z"
+  },
+  {
+    "id": "usr_1794146230673_40a66c61",
+    "username": "111",
+    "raw_password": "111",
+    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
+    "role": "USER",
+    "balance": 354500,
+    "is_blocked": 0,
+    "blocked_reason": null,
+    "bound_device_id": "dev_1793686215094_61nl8ff",
+    "last_device_id": "dev_1793686215094_61nl8ff",
+    "created_at": "2026-11-08T13:57:10.000Z"
   }
 ]
