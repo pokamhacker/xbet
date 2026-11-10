@@ -67,7 +67,6 @@ export const MatchEventCard: React.FC<MatchEventCardProps> = ({
   const eventIsWon = event.status === 'Gain' || event.status === 'Gagné' || isWon;
   const eventIsLost = event.status === 'Perdu' || event.status === 'Perte';
   const liveProgress = getEventLiveProgress(event, nowTs);
-  const showLiveBadge = !eventIsWon && !eventIsLost && liveProgress.isLive;
 
   // Détection stricte sport (FIFA, Poker, Football)
   const isPoker =
@@ -84,6 +83,8 @@ export const MatchEventCard: React.FC<MatchEventCardProps> = ({
         event.league.toUpperCase().includes('FC 25') ||
         event.league.toUpperCase().includes('FC 24') ||
         event.league.toUpperCase().includes('5X5 RUSH')));
+
+  const showLiveBadge = !eventIsWon && !eventIsLost && (liveProgress.isLive || isFifa || isPoker);
 
   const formattedElapsed = liveProgress.formattedElapsed;
 

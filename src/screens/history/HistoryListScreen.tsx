@@ -335,8 +335,23 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
   const isLive = Boolean(
     isAccepted &&
       (coupon.events && coupon.events.length > 0
-        ? coupon.events.some((ev: any) => getEventLiveProgress(ev).isLive)
-        : getEventLiveProgress(coupon).isLive)
+        ? coupon.events.some(
+            (ev: any) =>
+              getEventLiveProgress(ev).isLive ||
+              Boolean(ev.isFifa) ||
+              String(ev.sport || '').toUpperCase().includes('FIFA') ||
+              String(ev.league || '').toUpperCase().includes('FIFA') ||
+              Boolean(ev.isPoker) ||
+              String(ev.sport || '').toUpperCase().includes('POKER') ||
+              String(ev.sport || '').toUpperCase().includes('TVBET')
+          )
+        : (getEventLiveProgress(coupon).isLive ||
+            Boolean((coupon as any).isFifa) ||
+            String(coupon.sport || '').toUpperCase().includes('FIFA') ||
+            String(coupon.league || '').toUpperCase().includes('FIFA') ||
+            Boolean((coupon as any).isPoker) ||
+            String(coupon.sport || '').toUpperCase().includes('POKER') ||
+            String(coupon.sport || '').toUpperCase().includes('TVBET')))
   );
   const statusLabel = isAccepted ? 'Accepté' : isPaid ? 'Payé' : 'Perdu';
   const statusColor = isPaid
@@ -484,6 +499,13 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
               {Boolean(pillBadgeText) && (
                 <View style={styles.serieABadge}>
                   <Text style={styles.serieABadgeText}>{pillBadgeText}</Text>
+                </View>
+              )}
+
+              {isLive && !pillBadgeText && (
+                <View style={styles.liveHistoryBadge}>
+                  <View style={styles.liveHistoryDot} />
+                  <Text style={styles.liveHistoryText}>En direct</Text>
                 </View>
               )}
             </View>
@@ -1961,6 +1983,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
+  },
+  liveHistoryBadge: {
+    backgroundColor: '#D94343',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  liveHistoryDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+    marginRight: 4,
+  },
+  liveHistoryText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
   },
   cardRightActions: {
     flexDirection: 'row',

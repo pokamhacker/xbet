@@ -1099,7 +1099,7 @@ export default function TicketDetailsScreen({
               </Text>
             </View>
 
-            {/* Badge • En direct rouge (uniquement si un événement a commencé et est en direct, ou FIFA déjà démarré) */}
+            {/* Badge • En direct rouge (sur événements FIFA ou Poker quand Accepté/Live, ou tout événement en direct) */}
             {(events.some((e) => {
               if (e.isBonus) return false;
               const prog = getEventLiveProgress(e, currentTime);
@@ -1113,12 +1113,18 @@ export default function TicketDetailsScreen({
               const evFifa = Boolean(
                 e.isFifa ||
                   e.sport === 'FIFA' ||
-                  String(e.league || '').toUpperCase().startsWith('FIFA')
+                  String(e.league || '').toUpperCase().startsWith('FIFA') ||
+                  String(e.league || '').toUpperCase().includes('FIFA')
               );
-              const evStarted = evSettled || prog.hasStarted;
-              return (evFifa && evStarted) || (!evSettled && prog.isLive);
+              const evPoker = Boolean(
+                e.isPoker ||
+                  String(e.sport || '').toUpperCase().includes('POKER') ||
+                  String(e.sport || '').toUpperCase().includes('TVBET')
+              );
+              // Le badge live apparaît sur les événements FIFA et Poker quand le statut est accepté, ou sur tout événement live
+              return (!evSettled && (evFifa || evPoker || prog.isLive)) || prog.isLive;
             })) ? (
-              <View style={styles.liveRedBadge}>
+              <View style={[styles.liveRedBadge, { backgroundColor: (currentTheme as any).liveBadgeBg || '#D94343' }]}>
                 <View style={styles.liveRedBadgeDot} />
                 <Text style={styles.liveRedBadgeText}>En direct</Text>
               </View>
@@ -1371,9 +1377,9 @@ export default function TicketDetailsScreen({
                   </Text>
                 </View>
 
-                {/* Badge • En direct rouge (uniquement si l'événement a commencé : en direct ou FIFA démarré) ou Serie A */}
-                {((isFifaEvent && hasEventStarted) || isEventLive) ? (
-                  <View style={styles.liveRedBadge}>
+                {/* Badge • En direct rouge (sur les événements FIFA ou Poker quand statut Accepté/Live, ou tout événement en direct) ou Serie A */}
+                {((!isEventFinished && (isFifaEvent || ev.isPoker)) || (isFifaEvent && hasEventStarted) || isEventLive) ? (
+                  <View style={[styles.liveRedBadge, { backgroundColor: (currentTheme as any).liveBadgeBg || '#D94343' }]}>
                     <View style={styles.liveRedBadgeDot} />
                     <Text style={styles.liveRedBadgeText}>En direct</Text>
                   </View>
