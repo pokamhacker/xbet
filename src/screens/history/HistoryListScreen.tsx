@@ -162,7 +162,8 @@ export const HistoryAvatarBadge: React.FC<{
   league?: string;
   gameCategory?: string;
   size?: number;
-}> = ({ type, status, sport, league, gameCategory }) => {
+  events?: any[];
+}> = ({ type, status, sport, league, gameCategory, events }) => {
   const { currentTheme } = useThemeStore();
   const statusStr = String(status || '').toLowerCase();
   const isPaid =
@@ -180,14 +181,22 @@ export const HistoryAvatarBadge: React.FC<{
 
   const isCombine = typeStr.includes('combin') || typeStr.includes('multi');
   const isPoker =
-    !isCombine &&
-    (catStr === 'poker' ||
-      sportStr.includes('poker') ||
-      sportStr.includes('tvbet') ||
-      leagueStr.includes('poker') ||
-      typeStr.includes('poker'));
+    catStr === 'poker' ||
+    sportStr.includes('poker') ||
+    sportStr.includes('tvbet') ||
+    leagueStr.includes('poker') ||
+    typeStr.includes('poker') ||
+    Boolean(
+      events?.some(
+        (e: any) =>
+          e.isPoker ||
+          String(e.sport || '').toLowerCase().includes('poker') ||
+          String(e.sport || '').toLowerCase().includes('tvbet') ||
+          String(e.league || '').toLowerCase().includes('poker') ||
+          String(e.league || '').toLowerCase().includes('tvbet')
+      )
+    );
   const isFifa =
-    !isCombine &&
     !isPoker &&
     (typeStr.includes('fifa') ||
       sportStr.includes('fifa') ||
@@ -205,20 +214,22 @@ export const HistoryAvatarBadge: React.FC<{
     : (currentTheme.status?.accepte || currentTheme.primary || '#4A89DC');
 
   const badgeBorderColor = currentTheme.cardBackground || '#FFFFFF';
-  const iconTint = currentTheme.textSecondary || (currentTheme.isDark ? '#8A9DB0' : '#6E849B');
+  const iconTint = isPoker
+    ? (currentTheme as any).iconSlate || (currentTheme.isDark ? '#8A9DB0' : '#5C7690')
+    : currentTheme.textSecondary || (currentTheme.isDark ? '#8A9DB0' : '#6E849B');
 
   return (
     <View style={styles.avatarWrapNoBg}>
-      {isCombine ? (
-        <Image
-          source={ASSET_ICONS.combine}
-          style={[styles.avatarIconCombineDirect, { tintColor: iconTint }]}
-          resizeMode="contain"
-        />
-      ) : isPoker ? (
+      {isPoker ? (
         <Image
           source={ASSET_ICONS.poker}
           style={[styles.avatarIconPokerDirect, { tintColor: iconTint }]}
+          resizeMode="contain"
+        />
+      ) : isCombine ? (
+        <Image
+          source={ASSET_ICONS.combine}
+          style={[styles.avatarIconCombineDirect, { tintColor: iconTint }]}
           resizeMode="contain"
         />
       ) : isFifa ? (
@@ -425,6 +436,7 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
             sport={coupon.sport || coupon.events?.[0]?.sport}
             league={coupon.league || coupon.events?.[0]?.league}
             gameCategory={coupon.gameCategory}
+            events={coupon.events}
             size={40}
           />
 

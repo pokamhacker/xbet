@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { MatchEvent } from '../types/bet';
 import { Typography } from '../theme/theme';
 import { generateWinningPokerDraw, renderCardsWithSuits, getStableRandomHand } from '../utils/pokerGenerator';
+import { PokerFormattedLine } from './poker/PokerSuit3DIcon';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
 import { formatBetDate, combineDateAndTime, replaceMonthNamesWithNumbers } from '../utils/dateFormatter';
@@ -178,42 +179,33 @@ export const TvBetPokerCard: React.FC<TvBetPokerCardProps> = ({
 
         {isEventWon && (
           <View style={styles.pokerHandsBlock}>
-            <Text style={baseCardTextStyle}>
-              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 1 : </Text>
-              {renderCardsWithSuits(pokerDraw.hand1, baseCardTextStyle, redCardStyle)}
-            </Text>
-            <Text style={baseCardTextStyle}>
-              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 2 : </Text>
-              {renderCardsWithSuits(pokerDraw.hand2, baseCardTextStyle, redCardStyle)}
-            </Text>
-            <Text style={baseCardTextStyle}>
-              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 3 : </Text>
-              {renderCardsWithSuits(pokerDraw.hand3, baseCardTextStyle, redCardStyle)}
-            </Text>
-            <Text style={baseCardTextStyle}>
-              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 4 : </Text>
-              {renderCardsWithSuits(pokerDraw.hand4, baseCardTextStyle, redCardStyle)}
-            </Text>
-            <Text style={baseCardTextStyle}>
-              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 5 : </Text>
-              {renderCardsWithSuits(pokerDraw.hand5, baseCardTextStyle, redCardStyle)}
-            </Text>
-            <Text style={baseCardTextStyle}>
-              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Main 6 : </Text>
-              {renderCardsWithSuits(pokerDraw.hand6, baseCardTextStyle, redCardStyle)}
-            </Text>
+            {[
+              pokerDraw.hand1,
+              pokerDraw.hand2,
+              pokerDraw.hand3,
+              pokerDraw.hand4,
+              pokerDraw.hand5,
+              pokerDraw.hand6,
+            ].map((handCards, hIdx) => (
+              <PokerFormattedLine
+                key={`hand-${hIdx}`}
+                label={`Main ${hIdx + 1} : `}
+                text={handCards}
+                color={currentTheme.isDark ? '#93A7BC' : labelPrefixColor}
+              />
+            ))}
 
-            <Text style={[styles.pokerLine, styles.tableLine, { color: cardTextColor }]}>
-              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>Table : </Text>
-              {renderCardsWithSuits(pokerDraw.table, baseCardTextStyle, redCardStyle)}
-            </Text>
+            <PokerFormattedLine
+              label="Table : "
+              text={pokerDraw.table}
+              color={currentTheme.isDark ? '#93A7BC' : labelPrefixColor}
+            />
 
-            <Text style={[styles.pokerLine, styles.winnerLine, { color: labelPrefixColor }]}>
-              <Text style={[styles.labelPrefix, { color: labelPrefixColor }]}>
-                Gagnant :{' '}
-              </Text>
-              {pokerDraw.winnerHand} ({cleanCombinationName})
-            </Text>
+            <PokerFormattedLine
+              label="Gagnant : "
+              text={`${pokerDraw.winnerHand} (${cleanCombinationName})`}
+              color={currentTheme.isDark ? '#93A7BC' : labelPrefixColor}
+            />
           </View>
         )}
       </View>

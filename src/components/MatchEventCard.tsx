@@ -18,6 +18,7 @@ import {
 import { formatCleanOdds } from '../utils/oddsFormatter';
 import { LiveBadge } from './LiveBadge';
 import { getEffectiveEventScore } from '../utils/scoreAdapter';
+import { PokerFormattedLine } from './poker/PokerSuit3DIcon';
 
 interface MatchEventCardProps {
   event: MatchEvent;
@@ -236,16 +237,25 @@ export const MatchEventCard: React.FC<MatchEventCardProps> = ({
         <View style={[styles.pokerContainer, currentTheme.isDark && { backgroundColor: currentTheme.cardBackground, borderColor: currentTheme.border }]}>
           <Text style={[styles.pokerHeader, { color: currentTheme.primary }]}>POKER</Text>
           {event.pokerResult.hands.map((h) => (
-            <React.Fragment key={h.id}>
-              <Text style={[styles.pokerLine, { color: currentTheme.textSecondary }]}>
-                Main {h.id} : <Text style={[styles.boldText, { color: currentTheme.textPrimary }]}>{h.cards}</Text>
-              </Text>
-            </React.Fragment>
+            <PokerFormattedLine
+              key={h.id}
+              label={`Main ${h.id} : `}
+              text={h.cards}
+              color={currentTheme.isDark ? '#93A7BC' : currentTheme.textSecondary}
+            />
           ))}
-          <Text style={[styles.pokerLine, styles.pokerTableLine, { color: currentTheme.textSecondary, borderTopColor: currentTheme.border }]}>
-            Table : <Text style={[styles.boldText, { color: currentTheme.textPrimary }]}>{event.pokerResult.board}</Text>
-          </Text>
-          <Text style={[styles.pokerWinner, { color: '#9CA3AF' }]}>Gagnant : {event.pokerResult.winnerLabel}</Text>
+          <View style={[styles.pokerTableLine, { borderTopColor: currentTheme.border }]}>
+            <PokerFormattedLine
+              label="Table : "
+              text={event.pokerResult.board}
+              color={currentTheme.isDark ? '#93A7BC' : currentTheme.textSecondary}
+            />
+          </View>
+          <PokerFormattedLine
+            label="Gagnant : "
+            text={String(event.pokerResult.winnerLabel || '').replace(/^Main\s+/i, '')}
+            color={currentTheme.isDark ? '#93A7BC' : currentTheme.textSecondary}
+          />
         </View>
       )}
 

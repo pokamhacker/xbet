@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Text, TextStyle, StyleProp } from 'react-native';
+import { PokerSuit3DIcon, getSuitFromChar } from '../components/poker/PokerSuit3DIcon';
 
 export interface PokerDrawResult {
   hand1: string;
@@ -322,24 +323,21 @@ export const generateWinningPokerDraw = (
 export const renderCardsWithSuits = (
   cardsText: string,
   textStyle?: StyleProp<TextStyle>,
-  redStyle?: StyleProp<TextStyle>
+  _redStyle?: StyleProp<TextStyle>
 ): React.ReactNode => {
   if (!cardsText) return null;
 
-  // Découpage par caractères pour styliser les symboles rouges
-  const normalized = cardsText.replace(/\uFE0F/g, '');
-  const parts = normalized.split(/([♥♦])/g);
+  // Découpage par symboles d'enseignes pour insérer les icônes 3D glossy
+  const parts = cardsText.split(/([♥♡♦♢♠♤♣♧]\uFE0F?)/g);
 
   return parts.map((part, idx) => {
-    if (part === '♥' || part === '♦') {
-      return React.createElement(
-        Text,
-        {
-          key: `suit-${idx}`,
-          style: redStyle || { color: '#DC2626', fontWeight: '700' },
-        },
-        part
-      );
+    const suit = getSuitFromChar(part);
+    if (suit) {
+      return React.createElement(PokerSuit3DIcon, {
+        key: `suit-3d-${idx}`,
+        suit,
+        size: 18.5,
+      });
     }
     return React.createElement(
       Text,

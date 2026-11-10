@@ -53,6 +53,7 @@ import {
 } from '../utils/dateFormatter';
 import { formatCleanOdds } from '../utils/oddsFormatter';
 import { renderCardsWithSuits, generateWinningPokerDraw } from '../utils/pokerGenerator';
+import { PokerFormattedLine } from '../components/poker/PokerSuit3DIcon';
 
 // ============================================================================
 // Types
@@ -1026,23 +1027,27 @@ export default function TicketDetailsScreen({
               >
                 <Image
                   source={
-                    isCombine
-                      ? ASSET_ICONS.combine
-                      : isPokerCoupon
+                    isPokerCoupon
                       ? ASSET_ICONS.poker
+                      : isCombine
+                      ? ASSET_ICONS.combine
                       : isFifaCoupon
                       ? ASSET_ICONS.fifa
                       : ASSET_ICONS.football
                   }
                   style={[
-                    isCombine
-                      ? styles.avatarIconCombine
-                      : isPokerCoupon
+                    isPokerCoupon
                       ? styles.avatarIconPoker
+                      : isCombine
+                      ? styles.avatarIconCombine
                       : isFifaCoupon
                       ? styles.avatarIconFifa
                       : styles.avatarIcon,
-                    { tintColor: currentTheme.textSecondary || (isDark ? '#8A9DB0' : '#6E849B') },
+                    {
+                      tintColor: isPokerCoupon
+                        ? (currentTheme as any).iconSlate || (isDark ? '#8A9DB0' : '#5C7690')
+                        : currentTheme.textSecondary || (isDark ? '#8A9DB0' : '#6E849B'),
+                    },
                   ]}
                   resizeMode="contain"
                 />
@@ -1089,7 +1094,7 @@ export default function TicketDetailsScreen({
               <Text style={[styles.summaryTypeText, { color: currentTheme.textPrimary }]}>
                 {typeLabel}
               </Text>
-              <Text style={[styles.summaryNumberText, { color: currentTheme.textSecondary }]}>
+              <Text style={[styles.summaryNumberText, { color: currentTheme.textPrimary || '#002B49' }]}>
                 № {ticketNumber}
               </Text>
             </View>
@@ -1395,55 +1400,28 @@ export default function TicketDetailsScreen({
                       {Boolean(ev.pokerDraw) && (
                         <View style={styles.eventPokerHandsBox}>
                           {ev.pokerDraw?.hands?.map((h: any, hIdx: number) => (
-                            <Text key={h.id || hIdx} style={styles.eventPokerHandLine}>
-                              <Text
-                                style={[
-                                  styles.eventPokerHandLabel,
-                                  { color: isDark ? currentTheme.textSecondary : '#557089' },
-                                ]}
-                              >
-                                Main {h.id || hIdx + 1}:{' '}
-                              </Text>
-                              {renderCardsWithSuits(
-                                h.cards,
-                                [
-                                  styles.eventPokerCardText,
-                                  { color: isDark ? currentTheme.textPrimary : '#557089' },
-                                ],
-                                styles.eventPokerRedCardText
-                              )}
-                            </Text>
+                            <PokerFormattedLine
+                              key={h.id || hIdx}
+                              label={`Main ${h.id || hIdx + 1}: `}
+                              text={h.cards}
+                              color={isDark ? '#93A7BC' : currentTheme.textSecondary}
+                            />
                           ))}
-                          <Text style={styles.eventPokerTableLine}>
-                            <Text
-                              style={[
-                                styles.eventPokerHandLabel,
-                                { color: isDark ? currentTheme.textSecondary : '#557089' },
-                              ]}
-                            >
-                              Table :{' '}
-                            </Text>
-                            {renderCardsWithSuits(
-                              ev.pokerDraw?.board || '',
-                              [
-                                styles.eventPokerCardText,
-                                { color: isDark ? currentTheme.textPrimary : '#557089' },
-                              ],
-                              styles.eventPokerRedCardText
-                            )}
-                          </Text>
+                          <PokerFormattedLine
+                            label="Table : "
+                            text={ev.pokerDraw?.board || ''}
+                            color={isDark ? '#93A7BC' : currentTheme.textSecondary}
+                          />
                           {Boolean(ev.pokerDraw?.winnerLabel) && (
-                            <Text
-                              style={[
-                                styles.eventPokerWinnerLine,
-                                { color: isDark ? currentTheme.textSecondary : '#557089' },
-                              ]}
-                            >
-                              Gagnant :{' '}
-                              {ev.pokerDraw?.winnerLabel
-                                ? ev.pokerDraw.winnerLabel.replace(/^Main\s+/i, '')
-                                : ''}
-                            </Text>
+                            <PokerFormattedLine
+                              label="Gagnant : "
+                              text={
+                                ev.pokerDraw?.winnerLabel
+                                  ? ev.pokerDraw.winnerLabel.replace(/^Main\s+/i, '')
+                                  : ''
+                              }
+                              color={isDark ? '#93A7BC' : currentTheme.textSecondary}
+                            />
                           )}
                         </View>
                       )}
@@ -1854,10 +1832,10 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   summaryNumberText: {
-    fontSize: 12,
-    color: '#6E849B',
-    fontWeight: '400',
-    marginTop: 1,
+    fontSize: 14.5,
+    fontWeight: '500',
+    letterSpacing: 0.1,
+    marginTop: 2,
   },
 
   // Badge Ligue Bleu (Serie A uniquement)
@@ -2218,24 +2196,24 @@ const styles = StyleSheet.create({
 
   // Badge • En direct rouge (Correction 4 : Style exact de la Capture 3)
   liveRedBadge: {
-    backgroundColor: '#EB3B3B',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    backgroundColor: '#D94343',
+    borderRadius: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
   },
   liveRedBadgeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 4.5,
+    height: 4.5,
+    borderRadius: 2.25,
     backgroundColor: '#FFFFFF',
     marginRight: 5,
   },
   liveRedBadgeText: {
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '600',
   },
 
@@ -2245,15 +2223,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   extraInfoTitle: {
-    fontSize: 13.5,
-    fontWeight: '400',
-    color: '#6E849B',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#557089',
     marginBottom: 2,
   },
   extraInfoValue: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '500',
-    color: '#1D2B3A',
+    color: '#002B49',
   },
 
   // 4. Fixed Footer (Correction 5 : Barre inférieure adaptative multi-thèmes)
