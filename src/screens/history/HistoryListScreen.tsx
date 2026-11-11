@@ -1302,6 +1302,7 @@ export default function HistoryListScreen() {
       {/* ================================================================== */}
       {/* MODAL : FILTRES PAR STATUT                                         */}
       {/* ================================================================== */}
+      {isFilterModalVisible && (
       <Modal
         visible={isFilterModalVisible}
         transparent
@@ -1427,10 +1428,12 @@ export default function HistoryListScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+      )}
 
       {/* ================================================================== */}
       {/* MODAL : PÉRIODE                                                    */}
       {/* ================================================================== */}
+      {isPeriodModalVisible && (
       <Modal
         visible={isPeriodModalVisible}
         transparent
@@ -1478,10 +1481,12 @@ export default function HistoryListScreen() {
           </View>
         </View>
       </Modal>
+      )}
 
       {/* ================================================================== */}
       {/* MODAL : DÉPÔT RAPIDE                                               */}
       {/* ================================================================== */}
+      {isDepositModalVisible && (
       <Modal
         visible={isDepositModalVisible}
         transparent
@@ -1560,10 +1565,12 @@ export default function HistoryListScreen() {
           </View>
         </View>
       </Modal>
+      )}
 
       {/* ================================================================== */}
       {/* MODAL : OPTIONS DU COUPON (VALIDATION / ÉDITION)                   */}
       {/* ================================================================== */}
+      {isOptionsModalVisible && (
       <Modal
         visible={isOptionsModalVisible}
         transparent
@@ -1714,6 +1721,7 @@ export default function HistoryListScreen() {
           </View>
         </View>
       </Modal>
+      )}
 
       {/* Modale de saisie des scores des 2 mi-temps avant validation */}
       <ScoreEditorModal

@@ -108,6 +108,7 @@ export const BetOptionsBottomSheet: React.FC<BetOptionsBottomSheetProps> = ({
 
   return (
     <>
+      {visible && (
       <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
         <TouchableOpacity
           style={[
@@ -227,6 +228,7 @@ export const BetOptionsBottomSheet: React.FC<BetOptionsBottomSheetProps> = ({
           </View>
         </TouchableOpacity>
       </Modal>
+      )}
 
       {/* Score Editor Modal */}
       <ScoreEditorModal

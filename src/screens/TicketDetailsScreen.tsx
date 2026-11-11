@@ -1600,6 +1600,7 @@ export default function TicketDetailsScreen({
       )}
 
       {/* Menu d'options du coupon (Validation avec saisie des scores des 2 mi-temps) */}
+      {isMoreModalVisible && (
       <Modal
         visible={isMoreModalVisible}
         transparent
@@ -1784,6 +1785,7 @@ export default function TicketDetailsScreen({
           </View>
         </View>
       </Modal>
+      )}
 
       {/* Modale de saisie des scores des 2 mi-temps avant validation */}
       <ScoreEditorModal

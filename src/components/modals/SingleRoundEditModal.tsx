@@ -79,6 +79,8 @@ export const SingleRoundEditModal: React.FC<SingleRoundEditModalProps> = ({
     onClose();
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <SafeAreaView style={styles.modalOverlay}>

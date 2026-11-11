@@ -103,6 +103,7 @@ export const ActionBottomSheet: React.FC<ActionBottomSheetProps> = ({
 
   return (
     <>
+    {visible && (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity
         style={styles.modalOverlay}
@@ -197,6 +198,7 @@ export const ActionBottomSheet: React.FC<ActionBottomSheetProps> = ({
         </View>
       </TouchableOpacity>
     </Modal>
+    )}
     <ScoreEditorModal
       visible={isScoreModalVisible}
       coupon={coupon}

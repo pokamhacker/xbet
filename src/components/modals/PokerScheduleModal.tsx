@@ -149,6 +149,8 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
     { label: '10 min', value: 10, subtitle: 'Long' },
   ];
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <SafeAreaView style={styles.modalOverlay}>

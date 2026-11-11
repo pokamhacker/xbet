@@ -167,6 +167,8 @@ export const LiveMatchPickerModal: React.FC<LiveMatchPickerModalProps> = ({
     };
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <SafeAreaView style={styles.modalOverlay}>

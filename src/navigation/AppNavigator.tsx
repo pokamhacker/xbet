@@ -98,8 +98,7 @@ export default function AppNavigator() {
   useSocketSync();
   // Android portrait ratio (e.g., 1080×2400) or any portrait window occupies 100% width and height.
   // Desktop phone framing is only applied in desktop landscape mode (width > height and width >= 1024).
-  const isPortrait = windowHeight >= windowWidth;
-  const isDesktopLandscape = !isPortrait && windowWidth >= 1024;
+  const isDesktopLandscape = windowWidth >= 1024 && windowWidth > windowHeight;
 
   useEffect(() => {
     initAuth();
@@ -286,10 +285,12 @@ export default function AppNavigator() {
         {shouldShowBottomBar && <PersistentBottomBar currentRoute={currentRoute} />}
 
         {/* Theme Switcher Modal */}
-        <ThemeSwitcherModal
-          visible={isThemeModalVisible}
-          onClose={() => setThemeModalVisible(false)}
-        />
+        {isThemeModalVisible && (
+          <ThemeSwitcherModal
+            visible={isThemeModalVisible}
+            onClose={() => setThemeModalVisible(false)}
+          />
+        )}
       </View>
     </View>
   );

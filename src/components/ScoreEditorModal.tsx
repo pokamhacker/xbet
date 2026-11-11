@@ -9,7 +9,6 @@ import {
   ScrollView,
   Alert,
   Platform,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BetSlip, BetStatus, MatchEvent } from '../types/bet';
@@ -43,7 +42,8 @@ function buildInitialEventStates(
   const map: { [id: string]: EventHalfScoreState } = {};
   if (!coupon || !coupon.events) return map;
 
-  coupon.events.forEach((e: MatchEvent) => {
+  coupon.events.forEach((e: MatchEvent, idx: number) => {
+    const evKey = e.id || `ev-${idx}`;
     const isWin =
       e.status === 'Gain' ||
       e.status === 'Payé' ||
@@ -58,7 +58,7 @@ function buildInitialEventStates(
       isWin,
     });
 
-    map[e.id] = {
+    map[evKey] = {
       ht1Home: String(complete.ht1Home),
       ht1Away: String(complete.ht1Away),
       ht2Home: String(complete.ht2Home),
@@ -99,7 +99,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
     }
   }, [visible, coupon]);
 
-  if (!coupon) return null;
+  if (!visible || !coupon) return null;
 
   const isBonusOrPokerEvent = (e: MatchEvent): boolean => {
     const s = String(e.sport || '').toUpperCase();
@@ -192,7 +192,8 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
 
   const handleAutoAdaptScores = (isWin: boolean = true) => {
     const newStates: { [id: string]: EventHalfScoreState } = {};
-    coupon.events.forEach((e) => {
+    coupon.events.forEach((e, idx) => {
+      const evKey = e.id || `ev-${idx}`;
       const adapted = adaptEventResultToPrediction(e, isWin);
       const complete = ensureTwoHalvesScoreFormat({
         event: e,
@@ -200,7 +201,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
         rawScoreDetail: adapted.halftimeScore,
         isWin,
       });
-      newStates[e.id] = {
+      newStates[evKey] = {
         ht1Home: String(complete.ht1Home),
         ht1Away: String(complete.ht1Away),
         ht2Home: String(complete.ht2Home),
@@ -216,15 +217,18 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
       [eventId: string]: { scoreFinal: string; halftimeScore: string };
     } = {};
 
-    coupon.events.forEach((ev) => {
+    coupon.events.forEach((ev, idx) => {
       if (isBonusOrPokerEvent(ev)) return;
-      const st = eventStates[ev.id];
+      const evKey = ev.id || `ev-${idx}`;
+      const st = eventStates[evKey] || (ev.id ? eventStates[ev.id] : undefined);
       if (st) {
         const formatted = computeFormattedFromHalves(st);
-        customScores[ev.id] = {
+        const entry = {
           scoreFinal: formatted.scoreFinal,
           halftimeScore: formatted.scoreDetail,
         };
+        customScores[evKey] = entry;
+        if (ev.id) customScores[ev.id] = entry;
       } else {
         const adapted = adaptEventResultToPrediction(ev, isWin);
         const complete = ensureTwoHalvesScoreFormat({
@@ -233,10 +237,12 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
           rawScoreDetail: adapted.halftimeScore,
           isWin,
         });
-        customScores[ev.id] = {
+        const entry = {
           scoreFinal: complete.scoreFinal,
           halftimeScore: complete.scoreDetail,
         };
+        customScores[evKey] = entry;
+        if (ev.id) customScores[ev.id] = entry;
       }
     });
 
@@ -254,14 +260,15 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   };
 
   const handleApplyIndividualScores = () => {
-    coupon.events.forEach((ev) => {
+    coupon.events.forEach((ev, idx) => {
       if (isBonusOrPokerEvent(ev)) return;
-      const st = eventStates[ev.id];
+      const evKey = ev.id || `ev-${idx}`;
+      const st = eventStates[evKey] || (ev.id ? eventStates[ev.id] : undefined);
       if (st) {
         const formatted = computeFormattedFromHalves(st);
         updateEventScore(
           coupon.id,
-          ev.id,
+          ev.id || evKey,
           formatted.scoreFinal,
           st.status,
           formatted.scoreDetail
@@ -283,459 +290,497 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   const inputBg = currentTheme.cardBackground || (isDark ? '#0F172A' : '#FFFFFF');
   const payeGreen = '#4EBA6F';
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+  const modalContent = (
+    <View
+      style={[
+        Platform.OS === 'web' ? styles.webPortalOverlay : styles.overlay,
+        { paddingTop: Math.max(insets.top + 8, 12) },
+        (isTablet || isDesktop) && styles.overlayTablet,
+      ]}
+    >
+      <TouchableOpacity
+        style={StyleSheet.absoluteFill}
+        activeOpacity={1}
+        onPress={onClose}
+      />
+      <View
         style={[
-          styles.overlay,
-          (isTablet || isDesktop) && styles.overlayTablet,
+          styles.sheet,
+          {
+            backgroundColor: sheetBg,
+            borderColor: currentTheme.border,
+            paddingBottom: Math.max(18, insets.bottom + 10),
+            zIndex: 2,
+          },
+          (isTablet || isDesktop) && styles.sheetTablet,
         ]}
       >
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: sheetBg,
-              borderColor: currentTheme.border,
-              paddingBottom: Math.max(24, insets.bottom + 12),
-              zIndex: 2,
-            },
-            (isTablet || isDesktop) && styles.sheetTablet,
-          ]}
-        >
-          <View style={[styles.handle, { backgroundColor: currentTheme.border }]} />
+        <View style={[styles.handle, { backgroundColor: currentTheme.border }]} />
 
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text
-                style={[styles.title, { color: currentTheme.textPrimary, fontSize: font(16.5) }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-              >
-                Saisir les scores des 2 mi-temps
-              </Text>
-              <Text style={[styles.subtitle, { color: currentTheme.textSecondary, fontSize: font(12) }]}>
-                Coupon № {coupon.id} • Validation & Scores (1ère et 2ème mi-temps)
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={moderateScale(22)} color={currentTheme.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.adaptScoresBtn,
-              {
-                borderColor: currentTheme.border || '#CBD5E1',
-                backgroundColor: isDark ? currentTheme.surface || '#1E293B' : '#F1F5F9',
-              },
-            ]}
-            onPress={() => handleAutoAdaptScores(true)}
-          >
-            <Ionicons
-              name="sparkles"
-              size={moderateScale(14)}
-              color={currentTheme.primary}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.adaptScoresBtnText, { color: currentTheme.primary, fontSize: font(12) }]}>
-              Générer des scores de mi-temps adaptés aux pronostics
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text
+              style={[styles.title, { color: currentTheme.textPrimary, fontSize: font(16.5) }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              Saisir les scores des 2 mi-temps
             </Text>
+            <Text style={[styles.subtitle, { color: currentTheme.textSecondary, fontSize: font(12) }]}>
+              Coupon № {coupon.id} • Validation & Scores (1ère et 2ème mi-temps)
+            </Text>
+          </View>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <Ionicons name="close" size={moderateScale(22)} color={currentTheme.textSecondary} />
           </TouchableOpacity>
+        </View>
 
-          <ScrollView
-            style={styles.eventsScroll}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="always"
-            keyboardDismissMode="none"
-          >
-            {coupon.events.map((ev, index) => {
-              if (isBonusOrPokerEvent(ev)) {
-                return null;
-              }
-              const current = eventStates[ev.id] || {
-                ht1Home: '1',
-                ht1Away: '0',
-                ht2Home: '1',
-                ht2Away: '0',
-                status: 'Gain' as BetStatus,
-              };
-              const computed = computeFormattedFromHalves(current);
-              const homeName =
-                typeof ev.homeTeam === 'string' ? ev.homeTeam : ev.homeTeam?.name || 'Équipe 1';
-              const awayName =
-                typeof ev.awayTeam === 'string' ? ev.awayTeam : ev.awayTeam?.name || 'Équipe 2';
+        <TouchableOpacity
+          style={[
+            styles.adaptScoresBtn,
+            {
+              borderColor: currentTheme.border || '#CBD5E1',
+              backgroundColor: isDark ? currentTheme.surface || '#1E293B' : '#F1F5F9',
+            },
+          ]}
+          onPress={() => handleAutoAdaptScores(true)}
+        >
+          <Ionicons
+            name="sparkles"
+            size={moderateScale(14)}
+            color={currentTheme.primary}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.adaptScoresBtnText, { color: currentTheme.primary, fontSize: font(12) }]}>
+            Générer des scores de mi-temps adaptés aux pronostics
+          </Text>
+        </TouchableOpacity>
 
-              return (
-                <View
-                  key={ev.id || index}
-                  style={[
-                    styles.eventCard,
-                    {
-                      backgroundColor: cardSurfaceBg,
-                      borderColor: currentTheme.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.eventHeader}>
-                    <Text style={[styles.eventIndex, { color: currentTheme.primary }]}>
-                      Match {index + 1}
-                    </Text>
-                    <Text
-                      style={[styles.eventLeague, { color: currentTheme.textSecondary }]}
-                      numberOfLines={1}
-                    >
-                      {ev.league}
-                    </Text>
-                  </View>
+        <ScrollView
+          style={styles.eventsScroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
+        >
+          {coupon.events.map((ev, index) => {
+            if (isBonusOrPokerEvent(ev)) {
+              return null;
+            }
+            const evKey = ev.id || `ev-${index}`;
+            const current = eventStates[evKey] || {
+              ht1Home: '1',
+              ht1Away: '0',
+              ht2Home: '1',
+              ht2Away: '0',
+              status: 'Gain' as BetStatus,
+            };
+            const computed = computeFormattedFromHalves(current);
+            const homeName =
+              typeof ev.homeTeam === 'string' ? ev.homeTeam : ev.homeTeam?.name || 'Équipe 1';
+            const awayName =
+              typeof ev.awayTeam === 'string' ? ev.awayTeam : ev.awayTeam?.name || 'Équipe 2';
 
-                  <Text style={[styles.eventMatch, { color: currentTheme.textPrimary }]}>
-                    {homeName} vs {awayName}
+            return (
+              <View
+                key={evKey}
+                style={[
+                  styles.eventCard,
+                  {
+                    backgroundColor: cardSurfaceBg,
+                    borderColor: currentTheme.border,
+                  },
+                ]}
+              >
+                <View style={styles.eventHeader}>
+                  <Text style={[styles.eventIndex, { color: currentTheme.primary }]}>
+                    Match {index + 1}
                   </Text>
-                  <Text style={[styles.eventPrediction, { color: currentTheme.textSecondary }]}>
-                    Pronostic : {ev.prediction}
+                  <Text
+                    style={[styles.eventLeague, { color: currentTheme.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {ev.league}
                   </Text>
+                </View>
 
-                  {/* Saisie 1ère Mi-Temps et 2ème Mi-Temps */}
-                  <View style={styles.halvesContainer}>
-                    {/* 1ère Mi-Temps */}
-                    <View
-                      style={[
-                        styles.halfBox,
-                        {
-                          backgroundColor: inputBg,
-                          borderColor: currentTheme.border,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.halfTitle, { color: currentTheme.textSecondary }]}>
-                        1ère mi-temps
-                      </Text>
-                      <View style={styles.halfInputsRow}>
-                        <View style={styles.teamScoreCol}>
-                          <Text
-                            style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
-                            numberOfLines={1}
-                          >
-                            Dom.
-                          </Text>
-                          <TextInput
-                            style={[
-                              styles.halfDigitInput,
-                              {
-                                backgroundColor: cardSurfaceBg,
-                                color: currentTheme.textPrimary,
-                                borderColor: currentTheme.border,
-                              },
-                            ]}
-                            value={current.ht1Home}
-                            onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht1Home', t)}
-                            keyboardType="numeric"
-                            inputMode="numeric"
-                            maxLength={2}
-                          />
-                          <View style={styles.miniStepperRow}>
-                            <TouchableOpacity
-                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
-                              onPress={() => adjustHalfField(ev.id, 'ht1Home', -1)}
-                            >
-                              <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
-                              onPress={() => adjustHalfField(ev.id, 'ht1Home', 1)}
-                            >
-                              <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                        <Text style={[styles.scoreColon, { color: currentTheme.textPrimary }]}>:</Text>
-                        <View style={styles.teamScoreCol}>
-                          <Text
-                            style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
-                            numberOfLines={1}
-                          >
-                            Ext.
-                          </Text>
-                          <TextInput
-                            style={[
-                              styles.halfDigitInput,
-                              {
-                                backgroundColor: cardSurfaceBg,
-                                color: currentTheme.textPrimary,
-                                borderColor: currentTheme.border,
-                              },
-                            ]}
-                            value={current.ht1Away}
-                            onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht1Away', t)}
-                            keyboardType="numeric"
-                            inputMode="numeric"
-                            maxLength={2}
-                          />
-                          <View style={styles.miniStepperRow}>
-                            <TouchableOpacity
-                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
-                              onPress={() => adjustHalfField(ev.id, 'ht1Away', -1)}
-                            >
-                              <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
-                              onPress={() => adjustHalfField(ev.id, 'ht1Away', 1)}
-                            >
-                              <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
+                <Text style={[styles.eventMatch, { color: currentTheme.textPrimary }]}>
+                  {homeName} vs {awayName}
+                </Text>
+                <Text style={[styles.eventPrediction, { color: currentTheme.textSecondary }]}>
+                  Pronostic : {ev.prediction}
+                </Text>
 
-                    {/* 2ème Mi-Temps */}
-                    <View
-                      style={[
-                        styles.halfBox,
-                        {
-                          backgroundColor: inputBg,
-                          borderColor: currentTheme.border,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.halfTitle, { color: currentTheme.textSecondary }]}>
-                        2ème mi-temps
-                      </Text>
-                      <View style={styles.halfInputsRow}>
-                        <View style={styles.teamScoreCol}>
-                          <Text
-                            style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
-                            numberOfLines={1}
-                          >
-                            Dom.
-                          </Text>
-                          <TextInput
-                            style={[
-                              styles.halfDigitInput,
-                              {
-                                backgroundColor: cardSurfaceBg,
-                                color: currentTheme.textPrimary,
-                                borderColor: currentTheme.border,
-                              },
-                            ]}
-                            value={current.ht2Home}
-                            onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht2Home', t)}
-                            keyboardType="numeric"
-                            inputMode="numeric"
-                            maxLength={2}
-                          />
-                          <View style={styles.miniStepperRow}>
-                            <TouchableOpacity
-                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
-                              onPress={() => adjustHalfField(ev.id, 'ht2Home', -1)}
-                            >
-                              <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
-                              onPress={() => adjustHalfField(ev.id, 'ht2Home', 1)}
-                            >
-                              <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                        <Text style={[styles.scoreColon, { color: currentTheme.textPrimary }]}>:</Text>
-                        <View style={styles.teamScoreCol}>
-                          <Text
-                            style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
-                            numberOfLines={1}
-                          >
-                            Ext.
-                          </Text>
-                          <TextInput
-                            style={[
-                              styles.halfDigitInput,
-                              {
-                                backgroundColor: cardSurfaceBg,
-                                color: currentTheme.textPrimary,
-                                borderColor: currentTheme.border,
-                              },
-                            ]}
-                            value={current.ht2Away}
-                            onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht2Away', t)}
-                            keyboardType="numeric"
-                            inputMode="numeric"
-                            maxLength={2}
-                          />
-                          <View style={styles.miniStepperRow}>
-                            <TouchableOpacity
-                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
-                              onPress={() => adjustHalfField(ev.id, 'ht2Away', -1)}
-                            >
-                              <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
-                              onPress={() => adjustHalfField(ev.id, 'ht2Away', 1)}
-                            >
-                              <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Aperçu en direct du score final et détail */}
+                {/* Saisie 1ère Mi-Temps et 2ème Mi-Temps */}
+                <View style={styles.halvesContainer}>
+                  {/* 1ère Mi-Temps */}
                   <View
                     style={[
-                      styles.previewScoreBar,
+                      styles.halfBox,
                       {
-                        backgroundColor: isDark ? 'rgba(78, 186, 111, 0.14)' : '#ECFDF5',
-                        borderColor: isDark ? 'rgba(78, 186, 111, 0.35)' : '#A7F3D0',
+                        backgroundColor: inputBg,
+                        borderColor: currentTheme.border,
                       },
                     ]}
                   >
-                    <Text style={[styles.previewScoreLabel, { color: currentTheme.textSecondary }]}>
-                      Score affiché sur le coupon :
+                    <Text style={[styles.halfTitle, { color: currentTheme.textSecondary }]}>
+                      1ère mi-temps
                     </Text>
-                    <Text style={[styles.previewScoreValue, { color: payeGreen }]}>
-                      {computed.scoreDetail}
-                    </Text>
-                  </View>
-
-                  {/* Statut de l'événement */}
-                  <View style={styles.statusPillsBox}>
-                    <Text style={[styles.inputLabel, { color: currentTheme.textSecondary }]}>
-                      Statut de l'événement :
-                    </Text>
-                    <View style={styles.pillsRow}>
-                      <TouchableOpacity
-                        style={[
-                          styles.statusPill,
-                          { borderColor: currentTheme.border, backgroundColor: inputBg },
-                          current.status === 'Gain' && {
-                            backgroundColor: payeGreen,
-                            borderColor: payeGreen,
-                          },
-                        ]}
-                        onPress={() => handleStatusChange(ev.id, 'Gain')}
-                      >
+                    <View style={styles.halfInputsRow}>
+                      <View style={styles.teamScoreCol}>
                         <Text
-                          style={[
-                            styles.statusPillText,
-                            { color: currentTheme.textSecondary },
-                            current.status === 'Gain' && styles.statusPillTextActive,
-                          ]}
+                          style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
+                          numberOfLines={1}
                         >
-                          Gain
+                          Dom.
                         </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.statusPill,
-                          { borderColor: currentTheme.border, backgroundColor: inputBg },
-                          current.status === 'Perdu' && styles.statusPillLoss,
-                        ]}
-                        onPress={() => handleStatusChange(ev.id, 'Perdu')}
-                      >
-                        <Text
+                        <TextInput
                           style={[
-                            styles.statusPillText,
-                            { color: currentTheme.textSecondary },
-                            current.status === 'Perdu' && styles.statusPillTextActive,
-                          ]}
-                        >
-                          Perdu
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[
-                          styles.statusPill,
-                          { borderColor: currentTheme.border, backgroundColor: inputBg },
-                          current.status === 'Accepté' && {
-                            backgroundColor: currentTheme.primary,
-                            borderColor: currentTheme.primary,
-                          },
-                        ]}
-                        onPress={() => handleStatusChange(ev.id, 'Accepté')}
-                      >
-                        <Text
-                          style={[
-                            styles.statusPillText,
-                            { color: currentTheme.textSecondary },
-                            current.status === 'Accepté' && {
-                              color: currentTheme.colors?.primaryText || '#FFFFFF',
-                              fontWeight: '700',
+                            styles.halfDigitInput,
+                            {
+                              backgroundColor: cardSurfaceBg,
+                              color: currentTheme.textPrimary,
+                              borderColor: currentTheme.border,
                             },
                           ]}
+                          value={current.ht1Home}
+                          onChangeText={(t) => handleHalfFieldChange(evKey, 'ht1Home', t)}
+                          keyboardType="numeric"
+                          inputMode="numeric"
+                          maxLength={2}
+                          selectTextOnFocus
+                        />
+                        <View style={styles.miniStepperRow}>
+                          <TouchableOpacity
+                            style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                            onPress={() => adjustHalfField(evKey, 'ht1Home', -1)}
+                          >
+                            <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                            onPress={() => adjustHalfField(evKey, 'ht1Home', 1)}
+                          >
+                            <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      <Text style={[styles.scoreColon, { color: currentTheme.textPrimary }]}>:</Text>
+                      <View style={styles.teamScoreCol}>
+                        <Text
+                          style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
+                          numberOfLines={1}
                         >
-                          En cours
+                          Ext.
                         </Text>
-                      </TouchableOpacity>
+                        <TextInput
+                          style={[
+                            styles.halfDigitInput,
+                            {
+                              backgroundColor: cardSurfaceBg,
+                              color: currentTheme.textPrimary,
+                              borderColor: currentTheme.border,
+                            },
+                          ]}
+                          value={current.ht1Away}
+                          onChangeText={(t) => handleHalfFieldChange(evKey, 'ht1Away', t)}
+                          keyboardType="numeric"
+                          inputMode="numeric"
+                          maxLength={2}
+                          selectTextOnFocus
+                        />
+                        <View style={styles.miniStepperRow}>
+                          <TouchableOpacity
+                            style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                            onPress={() => adjustHalfField(evKey, 'ht1Away', -1)}
+                          >
+                            <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                            onPress={() => adjustHalfField(evKey, 'ht1Away', 1)}
+                          >
+                            <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* 2ème Mi-Temps */}
+                  <View
+                    style={[
+                      styles.halfBox,
+                      {
+                        backgroundColor: inputBg,
+                        borderColor: currentTheme.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.halfTitle, { color: currentTheme.textSecondary }]}>
+                      2ème mi-temps
+                    </Text>
+                    <View style={styles.halfInputsRow}>
+                      <View style={styles.teamScoreCol}>
+                        <Text
+                          style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
+                          numberOfLines={1}
+                        >
+                          Dom.
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.halfDigitInput,
+                            {
+                              backgroundColor: cardSurfaceBg,
+                              color: currentTheme.textPrimary,
+                              borderColor: currentTheme.border,
+                            },
+                          ]}
+                          value={current.ht2Home}
+                          onChangeText={(t) => handleHalfFieldChange(evKey, 'ht2Home', t)}
+                          keyboardType="numeric"
+                          inputMode="numeric"
+                          maxLength={2}
+                          selectTextOnFocus
+                        />
+                        <View style={styles.miniStepperRow}>
+                          <TouchableOpacity
+                            style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                            onPress={() => adjustHalfField(evKey, 'ht2Home', -1)}
+                          >
+                            <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                            onPress={() => adjustHalfField(evKey, 'ht2Home', 1)}
+                          >
+                            <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      <Text style={[styles.scoreColon, { color: currentTheme.textPrimary }]}>:</Text>
+                      <View style={styles.teamScoreCol}>
+                        <Text
+                          style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
+                          numberOfLines={1}
+                        >
+                          Ext.
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.halfDigitInput,
+                            {
+                              backgroundColor: cardSurfaceBg,
+                              color: currentTheme.textPrimary,
+                              borderColor: currentTheme.border,
+                            },
+                          ]}
+                          value={current.ht2Away}
+                          onChangeText={(t) => handleHalfFieldChange(evKey, 'ht2Away', t)}
+                          keyboardType="numeric"
+                          inputMode="numeric"
+                          maxLength={2}
+                          selectTextOnFocus
+                        />
+                        <View style={styles.miniStepperRow}>
+                          <TouchableOpacity
+                            style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                            onPress={() => adjustHalfField(evKey, 'ht2Away', -1)}
+                          >
+                            <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                            onPress={() => adjustHalfField(evKey, 'ht2Away', 1)}
+                          >
+                            <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                     </View>
                   </View>
                 </View>
-              );
-            })}
-          </ScrollView>
 
-          {/* Boutons de validation finale avec les scores des 2 mi-temps saisis */}
+                {/* Aperçu en direct du score final et détail */}
+                <View
+                  style={[
+                    styles.previewScoreBar,
+                    {
+                      backgroundColor: isDark ? 'rgba(78, 186, 111, 0.14)' : '#ECFDF5',
+                      borderColor: isDark ? 'rgba(78, 186, 111, 0.35)' : '#A7F3D0',
+                    },
+                  ]}
+                >
+                  <Text style={[styles.previewScoreLabel, { color: currentTheme.textSecondary }]}>
+                    Score affiché sur le coupon :
+                  </Text>
+                  <Text style={[styles.previewScoreValue, { color: payeGreen }]}>
+                    {computed.scoreDetail}
+                  </Text>
+                </View>
+
+                {/* Statut de l'événement */}
+                <View style={styles.statusPillsBox}>
+                  <Text style={[styles.inputLabel, { color: currentTheme.textSecondary }]}>
+                    Statut de l'événement :
+                  </Text>
+                  <View style={styles.pillsRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.statusPill,
+                        { borderColor: currentTheme.border, backgroundColor: inputBg },
+                        current.status === 'Gain' && {
+                          backgroundColor: payeGreen,
+                          borderColor: payeGreen,
+                        },
+                      ]}
+                      onPress={() => handleStatusChange(evKey, 'Gain')}
+                    >
+                      <Text
+                        style={[
+                          styles.statusPillText,
+                          { color: currentTheme.textSecondary },
+                          current.status === 'Gain' && styles.statusPillTextActive,
+                        ]}
+                      >
+                        Gain
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.statusPill,
+                        { borderColor: currentTheme.border, backgroundColor: inputBg },
+                        current.status === 'Perdu' && styles.statusPillLoss,
+                      ]}
+                      onPress={() => handleStatusChange(evKey, 'Perdu')}
+                    >
+                      <Text
+                        style={[
+                          styles.statusPillText,
+                          { color: currentTheme.textSecondary },
+                          current.status === 'Perdu' && styles.statusPillTextActive,
+                        ]}
+                      >
+                        Perdu
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.statusPill,
+                        { borderColor: currentTheme.border, backgroundColor: inputBg },
+                        current.status === 'Accepté' && {
+                          backgroundColor: currentTheme.primary,
+                          borderColor: currentTheme.primary,
+                        },
+                      ]}
+                      onPress={() => handleStatusChange(evKey, 'Accepté')}
+                    >
+                      <Text
+                        style={[
+                          styles.statusPillText,
+                          { color: currentTheme.textSecondary },
+                          current.status === 'Accepté' && {
+                            color: currentTheme.colors?.primaryText || '#FFFFFF',
+                            fontWeight: '700',
+                          },
+                        ]}
+                      >
+                        En cours
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        {/* Boutons de validation finale avec les scores des 2 mi-temps saisis */}
+        <TouchableOpacity
+          style={[styles.validateMainBtn, { backgroundColor: payeGreen }]}
+          activeOpacity={0.85}
+          onPress={() => handleValidateCouponWithEnteredHalves(true)}
+        >
+          <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+          <Text style={styles.validateMainBtnText}>
+            Valider le coupon (Gain / Payé)
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.bottomSecondaryRow}>
           <TouchableOpacity
-            style={[styles.validateMainBtn, { backgroundColor: payeGreen }]}
+            style={[
+              styles.secondaryActionBtn,
+              {
+                backgroundColor: currentTheme.primary || '#3B82F6',
+              },
+            ]}
             activeOpacity={0.85}
-            onPress={() => handleValidateCouponWithEnteredHalves(true)}
+            onPress={handleApplyIndividualScores}
           >
-            <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.validateMainBtnText}>
-              Valider le coupon (Gain / Payé)
-            </Text>
+            <Text style={styles.secondaryActionBtnText}>Enregistrer les scores</Text>
           </TouchableOpacity>
 
-          <View style={styles.bottomSecondaryRow}>
-            <TouchableOpacity
-              style={[
-                styles.secondaryActionBtn,
-                {
-                  backgroundColor: currentTheme.primary || '#3B82F6',
-                },
-              ]}
-              activeOpacity={0.85}
-              onPress={handleApplyIndividualScores}
-            >
-              <Text style={styles.secondaryActionBtnText}>Enregistrer les scores</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.secondaryActionBtn,
-                {
-                  backgroundColor: currentTheme.status?.perdu || '#EF4444',
-                },
-              ]}
-              activeOpacity={0.85}
-              onPress={() => handleValidateCouponWithEnteredHalves(false)}
-            >
-              <Text style={styles.secondaryActionBtnText}>Valider en Perdu</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[
+              styles.secondaryActionBtn,
+              {
+                backgroundColor: currentTheme.status?.perdu || '#EF4444',
+              },
+            ]}
+            activeOpacity={0.85}
+            onPress={() => handleValidateCouponWithEnteredHalves(false)}
+          >
+            <Text style={styles.secondaryActionBtnText}>Valider en Perdu</Text>
+          </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </View>
+    </View>
+  );
+
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    try {
+      // Rendu direct dans document.body sans ModalFocusTrap de react-native-web
+      // pour empêcher toute perte de focus ou fermeture du clavier virtuel sur mobile.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const ReactDOM = require('react-dom');
+      if (ReactDOM && typeof ReactDOM.createPortal === 'function') {
+        return ReactDOM.createPortal(modalContent, document.body);
+      }
+    } catch {
+      // fallback
+    }
+    return modalContent;
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      {modalContent}
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  webPortalOverlay: {
+    position: 'fixed' as any,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 99999,
+    backgroundColor: Colors.darkOverlay,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
   overlay: {
     flex: 1,
     backgroundColor: Colors.darkOverlay,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingHorizontal: 10,
   },
   overlayTablet: {
     justifyContent: 'center',
@@ -744,13 +789,13 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 18,
+    borderRadius: 20,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 28,
-    maxHeight: '90%',
+    paddingBottom: 20,
+    maxHeight: '92%',
     width: '100%',
+    maxWidth: 480,
   },
   sheetTablet: {
     maxWidth: 560,
@@ -876,11 +921,11 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   halfDigitInput: {
-    width: 44,
-    height: 36,
+    width: 46,
+    height: 38,
     borderWidth: 1,
     borderRadius: 7,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     textAlign: 'center',
     paddingVertical: 0,

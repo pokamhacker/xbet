@@ -129,9 +129,33 @@ export default function App() {
           input, textarea {
             -webkit-user-select: text !important;
             user-select: text !important;
+            touch-action: manipulation;
           }
         `;
         document.head.appendChild(style);
+      }
+
+      // Protection globale contre le vol de focus (ex: ModalFocusTrap de react-native-web)
+      // qui faisait disparaître le clavier virtuel dès l'ouverture d'un TextInput de score.
+      const w = window as any;
+      if (!w.__inputFocusGuardInstalled && typeof HTMLElement !== 'undefined') {
+        w.__inputFocusGuardInstalled = true;
+        const origFocus = HTMLElement.prototype.focus;
+        HTMLElement.prototype.focus = function (options?: FocusOptions) {
+          const active = document.activeElement as HTMLElement | null;
+          if (
+            active &&
+            (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+            this !== active &&
+            this.tagName !== 'INPUT' &&
+            this.tagName !== 'TEXTAREA' &&
+            !this.isContentEditable
+          ) {
+            // Ignorer tout appel programmatique .focus() vers un div/bracket pendant qu'un champ de saisie est actif
+            return;
+          }
+          return origFocus.call(this, options);
+        };
       }
     }
   }, []);

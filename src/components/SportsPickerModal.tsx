@@ -472,6 +472,8 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
     return deduplicated;
   }, [mode, activeTab, searchQuery, useLeagueConstraint, filterCompetitionId, dynamicTeams, constrainedCompetition]);
 
+  if (!visible) return null;
+
   return (
     <Modal
       visible={visible}

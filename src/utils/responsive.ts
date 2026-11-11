@@ -17,8 +17,8 @@ export const getWindowDimensions = () => Dimensions.get('window');
  * Mise à l'échelle horizontale (Largeur, paddings/margins horizontaux)
  */
 export const scale = (size: number): number => {
-  const { width } = getWindowDimensions();
-  const shortDimension = Math.min(width, Dimensions.get('window').height);
+  const { width, height } = getWindowDimensions();
+  const shortDimension = width < 540 ? width : Math.min(width, height);
   return (shortDimension / BASE_WIDTH) * size;
 };
 
@@ -133,14 +133,15 @@ export const useResponsive = (): ResponsiveContext => {
     insets = { top: 0, bottom: 0, left: 0, right: 0 };
   }
 
+  // Sur mobile (width < 600), stabiliser la hauteur pour que l'ouverture/fermeture du clavier virtuel
+  // ne déclenche aucun recalcul ni re-rendu en cascade des écrans et modales.
+  const isLandscape = width > height && width >= 540;
+  const stableHeight = width < 600 ? BASE_HEIGHT : height;
+
   return useMemo(() => {
-    // Sur mobile en portrait, l'ouverture du clavier virtuel réduit `height` sous `width`.
-    // On n'active le mode paysage que si la largeur dépasse 540px pour éviter un faux basculement
-    // portrait -> paysage qui provoquerait un recalcul des tailles et une perte de focus du TextInput.
-    const isLandscape = width > height && width >= 540;
     const isPortrait = !isLandscape;
-    const minDim = isLandscape ? Math.min(width, height) : width;
-    const maxDim = Math.max(width, height);
+    const minDim = isLandscape ? Math.min(width, stableHeight) : width;
+    const maxDim = Math.max(width, stableHeight);
 
     const isSmallDevice = minDim < 360;
     const isStandardPhone = minDim >= 360 && minDim < 430;
@@ -154,7 +155,7 @@ export const useResponsive = (): ResponsiveContext => {
     };
 
     const dynamicVerticalScale = (size: number) => {
-      const base = isLandscape ? maxDim : Math.max(height, BASE_HEIGHT);
+      const base = isLandscape ? maxDim : Math.max(stableHeight, BASE_HEIGHT);
       return (base / BASE_HEIGHT) * size;
     };
 
@@ -180,7 +181,7 @@ export const useResponsive = (): ResponsiveContext => {
 
     return {
       width,
-      height,
+      height: stableHeight,
       isPortrait,
       isLandscape,
       isSmallDevice,
@@ -195,7 +196,7 @@ export const useResponsive = (): ResponsiveContext => {
       insets,
       contentContainerStyle,
     };
-  }, [width, height, insets]);
+  }, [width, stableHeight, isLandscape, insets.top, insets.bottom, insets.left, insets.right]);
 };
 
 export default {

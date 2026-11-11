@@ -2099,25 +2099,27 @@ export default function StudioCreationScreen({ navigation }: any) {
                     <TextInput
                       style={[
                         styles.input,
-                        { width: 44, height: 36, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
+                        { width: 46, height: 38, fontSize: 16, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
                       ]}
                       value={studioHt1Home}
                       onChangeText={(t) => setStudioHt1Home(t.replace(/[^0-9]/g, ''))}
                       keyboardType="numeric"
                       inputMode="numeric"
                       maxLength={2}
+                      selectTextOnFocus
                     />
                     <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>:</Text>
                     <TextInput
                       style={[
                         styles.input,
-                        { width: 44, height: 36, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
+                        { width: 46, height: 38, fontSize: 16, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
                       ]}
                       value={studioHt1Away}
                       onChangeText={(t) => setStudioHt1Away(t.replace(/[^0-9]/g, ''))}
                       keyboardType="numeric"
                       inputMode="numeric"
                       maxLength={2}
+                      selectTextOnFocus
                     />
                   </View>
                 </View>
@@ -2141,25 +2143,27 @@ export default function StudioCreationScreen({ navigation }: any) {
                     <TextInput
                       style={[
                         styles.input,
-                        { width: 44, height: 36, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
+                        { width: 46, height: 38, fontSize: 16, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
                       ]}
                       value={studioHt2Home}
                       onChangeText={(t) => setStudioHt2Home(t.replace(/[^0-9]/g, ''))}
                       keyboardType="numeric"
                       inputMode="numeric"
                       maxLength={2}
+                      selectTextOnFocus
                     />
                     <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>:</Text>
                     <TextInput
                       style={[
                         styles.input,
-                        { width: 44, height: 36, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
+                        { width: 46, height: 38, fontSize: 16, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
                       ]}
                       value={studioHt2Away}
                       onChangeText={(t) => setStudioHt2Away(t.replace(/[^0-9]/g, ''))}
                       keyboardType="numeric"
                       inputMode="numeric"
                       maxLength={2}
+                      selectTextOnFocus
                     />
                   </View>
                 </View>
@@ -2342,6 +2346,7 @@ export default function StudioCreationScreen({ navigation }: any) {
       />
 
       {/* Modale : Créer un Championnat Personnalisé */}
+      {createLeagueModalVisible && (
       <Modal
         visible={createLeagueModalVisible}
         transparent
@@ -2394,8 +2399,10 @@ export default function StudioCreationScreen({ navigation }: any) {
           </View>
         </SafeAreaView>
       </Modal>
+      )}
 
       {/* Modale : Créer une Équipe Personnalisée */}
+      {createTeamModalVisible && (
       <Modal
         visible={createTeamModalVisible}
         transparent
@@ -2448,6 +2455,7 @@ export default function StudioCreationScreen({ navigation }: any) {
           </View>
         </SafeAreaView>
       </Modal>
+      )}
     </View>
   );
 }

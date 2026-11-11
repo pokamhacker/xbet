@@ -2371,9 +2371,11 @@ export const useBetStore = create<BetState>()(
           const updatedCoupons = state.coupons.map((coupon) => {
             if (coupon.id !== couponId) return coupon;
 
-            const updatedEvents = coupon.events.map((event) => {
+            const updatedEvents = coupon.events.map((event, idx) => {
+              const evKey = event.id || `ev-${idx}`;
               const adapted = adaptEventResultToPrediction(event, isWon);
-              const customEntry = customScores?.[event.id];
+              const customEntry =
+                (event.id ? customScores?.[event.id] : undefined) ?? customScores?.[evKey];
               const customFinal =
                 typeof customEntry === 'string'
                   ? customEntry.includes('(')
@@ -2450,8 +2452,9 @@ export const useBetStore = create<BetState>()(
           const nextCoupons = state.coupons.map((c) => {
             if (c.id !== couponId) return c;
             const wasPaid = c.status === 'Payé';
-            const newEvents = c.events.map((e) => {
-              if (e.id !== eventId) return e;
+            const newEvents = c.events.map((e, idx) => {
+              const evKey = e.id || `ev-${idx}`;
+              if (e.id !== eventId && evKey !== eventId) return e;
               const isWin = status === 'Gain' || status === 'Payé' || status === 'Gagné';
               const rawFinal = score.includes('(') ? score.split('(')[0].trim() : score;
               const rawDetail = halftimeScore || (score.includes('(') ? score : e.halftimeScore);
