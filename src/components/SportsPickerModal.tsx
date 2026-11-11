@@ -236,16 +236,17 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
     const list: Array<Competition | SportsLeague> = [];
     const seenNames = new Set<string>();
 
-    // 1. Ajouter les ligues de l'API TheSportsDB
-    for (const al of apiLeagues) {
-      seenNames.add(al.name.toLowerCase());
-      list.push(al);
+    // 1. Ajouter d'abord le catalogue local riche (avec toutes les équipes et logos officiels actuels)
+    for (const sc of SPORTS_CATALOG) {
+      seenNames.add(sc.name.toLowerCase());
+      list.push(sc);
     }
 
-    // 2. Compléter avec les ligues locales (FIFA, Cyber, etc.) si non présentes
-    for (const sc of SPORTS_CATALOG) {
-      if (!seenNames.has(sc.name.toLowerCase())) {
-        list.push(sc);
+    // 2. Compléter avec les ligues de l'API si non présentes
+    for (const al of apiLeagues) {
+      if (!seenNames.has(al.name.toLowerCase())) {
+        seenNames.add(al.name.toLowerCase());
+        list.push(al);
       }
     }
 
@@ -746,19 +747,11 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
                       }}
                     >
                       <View style={styles.itemLogoWrap}>
-                        {teamBadgeUri ? (
-                          <Image
-                            source={{ uri: teamBadgeUri }}
-                            style={styles.teamLogoImage}
-                            resizeMode="contain"
-                          />
-                        ) : (
-                          <TeamLogo
-                            teamName={item.team.name}
-                            logoUrl={item.team.logo}
-                            size={32}
-                          />
-                        )}
+                        <TeamLogo
+                          teamName={item.team.name}
+                          logoUrl={teamBadgeUri}
+                          size={34}
+                        />
                       </View>
                       <View style={styles.itemInfoWrap}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -941,13 +934,11 @@ const styles = StyleSheet.create({
   itemLogoWrap: {
     width: 42,
     height: 42,
-    borderRadius: 21,
-    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   fifaMiniBadge: {
     position: 'absolute',

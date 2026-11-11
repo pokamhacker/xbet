@@ -245,7 +245,7 @@ const KNOWN_TEAM_LOGOS: Record<string, string> = {
   arsenal: 'https://media.api-sports.io/football/teams/42.png',
   liverpool: 'https://media.api-sports.io/football/teams/40.png',
   ajax: 'https://media.api-sports.io/football/teams/194.png',
-  'az alkmaar': 'https://media.api-sports.io/football/teams/197.png',
+  'az alkmaar': 'https://media.api-sports.io/football/teams/201.png',
   'bayer 04 leverkusen': 'https://media.api-sports.io/football/teams/168.png',
   'bayer leverkusen': 'https://media.api-sports.io/football/teams/168.png',
   'vfb stuttgart': 'https://media.api-sports.io/football/teams/172.png',
@@ -255,8 +255,8 @@ const KNOWN_TEAM_LOGOS: Record<string, string> = {
   'le havre': 'https://media.api-sports.io/football/teams/111.png',
   'sc telstar': 'https://media.api-sports.io/football/teams/425.png',
   telstar: 'https://media.api-sports.io/football/teams/425.png',
-  utrecht: 'https://media.api-sports.io/football/teams/207.png',
-  'fc utrecht': 'https://media.api-sports.io/football/teams/207.png',
+  utrecht: 'https://media.api-sports.io/football/teams/200.png',
+  'fc utrecht': 'https://media.api-sports.io/football/teams/200.png',
   'estudiantes de la plata': 'https://media.api-sports.io/football/teams/450.png',
   estudiantes: 'https://media.api-sports.io/football/teams/450.png',
   'instituto atlético central córdoba': 'https://media.api-sports.io/football/teams/478.png',
@@ -265,14 +265,17 @@ const KNOWN_TEAM_LOGOS: Record<string, string> = {
 };
 
 export function resolveMatchTeamLogo(name: string, existingLogo?: string): string {
-  if (existingLogo && !existingLogo.includes('ui-avatars')) {
-    return existingLogo;
-  }
   const cleanKey = (name || '').trim().toLowerCase();
   if (KNOWN_TEAM_LOGOS[cleanKey]) {
     return KNOWN_TEAM_LOGOS[cleanKey];
   }
   const catalogTeam = getTeamById(name || '');
+  if (catalogTeam?.logo && !catalogTeam.logo.includes('ui-avatars')) {
+    return catalogTeam.logo;
+  }
+  if (existingLogo && !existingLogo.includes('ui-avatars')) {
+    return existingLogo;
+  }
   if (catalogTeam?.logo) {
     return catalogTeam.logo;
   }

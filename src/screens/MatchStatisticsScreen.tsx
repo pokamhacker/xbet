@@ -15,6 +15,7 @@ import {
 import Svg, { Rect, Circle } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
+import { TeamLogo } from '../components/common/TeamLogo';
 import * as Haptics from 'expo-haptics';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
@@ -56,38 +57,13 @@ const MatchStatsBarIcon: React.FC<{ color: string; size?: number }> = React.memo
 
 interface TeamCrestProps {
   uri: string;
+  teamName?: string;
   size: number;
 }
 
-const TeamCrest: React.FC<TeamCrestProps> = ({ uri, size }) => {
-  const [imgError, setImgError] = useState(false);
-
-  if (!imgError && uri) {
-    return (
-      <Image
-        source={{ uri }}
-        style={{ width: size, height: size }}
-        resizeMode="contain"
-        onError={() => setImgError(true)}
-      />
-    );
-  }
-
-  return (
-    <View
-      style={[
-        styles.fallbackCrestCircle,
-        { width: size, height: size, borderRadius: size / 2 },
-      ]}
-    >
-      <Ionicons
-        name="shield"
-        size={Math.round(size * 0.62)}
-        color="rgba(255,255,255,0.85)"
-      />
-    </View>
-  );
-};
+const TeamCrest: React.FC<TeamCrestProps> = ({ uri, teamName, size }) => (
+  <TeamLogo teamName={teamName || 'Équipe'} logoUrl={uri} size={size} />
+);
 
 interface StatRowProps {
   item: StatMetricItem;
@@ -276,7 +252,7 @@ export const MatchStatisticsScreen: React.FC<{ route?: any; navigation?: any }> 
           {/* Zone d'affrontement : Logo au-dessus du nom de chaque équipe + Score final au centre */}
           <View style={styles.teamsScoreRow}>
             <View style={styles.teamColumn}>
-              <TeamCrest uri={statsData.homeTeam.logo} size={crestSize} />
+              <TeamCrest uri={statsData.homeTeam.logo} teamName={statsData.homeTeam.name} size={crestSize} />
               <Text
                 style={[styles.teamNameText, { fontSize: font(13.5) }]}
                 numberOfLines={2}
@@ -292,7 +268,7 @@ export const MatchStatisticsScreen: React.FC<{ route?: any; navigation?: any }> 
             </View>
 
             <View style={styles.teamColumn}>
-              <TeamCrest uri={statsData.awayTeam.logo} size={crestSize} />
+              <TeamCrest uri={statsData.awayTeam.logo} teamName={statsData.awayTeam.name} size={crestSize} />
               <Text
                 style={[styles.teamNameText, { fontSize: font(13.5) }]}
                 numberOfLines={2}

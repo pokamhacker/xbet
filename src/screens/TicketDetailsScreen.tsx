@@ -354,20 +354,20 @@ export default function TicketDetailsScreen({
       const rawAwayLogo =
         typeof ev.awayTeam === 'object' ? (ev.awayTeam as any)?.logo : undefined;
       const homeLogo =
+        resolveTeamLogo(homeName) ||
         (rawHomeLogo &&
         (rawHomeLogo.startsWith('http://') || rawHomeLogo.startsWith('https://')) &&
         !rawHomeLogo.includes('ui-avatars.com')
           ? rawHomeLogo
           : undefined) ||
-        resolveTeamLogo(homeName) ||
         rawHomeLogo;
       const awayLogo =
+        resolveTeamLogo(awayName) ||
         (rawAwayLogo &&
         (rawAwayLogo.startsWith('http://') || rawAwayLogo.startsWith('https://')) &&
         !rawAwayLogo.includes('ui-avatars.com')
           ? rawAwayLogo
           : undefined) ||
-        resolveTeamLogo(awayName) ||
         rawAwayLogo;
 
       const evStatusRaw = String(ev.status || currentCoupon?.status || 'Accepté');

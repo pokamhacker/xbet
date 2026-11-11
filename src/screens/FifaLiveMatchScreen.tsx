@@ -181,9 +181,8 @@ const CLUB_CREST_MAP: Record<string, string> = {
 
 const resolveClubLogoUrl = (teamName: string, rawLogo?: string): string | null => {
   const lowerName = (teamName || '').trim().toLowerCase();
-  // Comme sur la capture officielle : Borussia Monchengladbach utilise le maillot blanc avec drapeau allemand
   if (lowerName.includes('monchengladbach') || lowerName.includes('mönchengladbach') || lowerName.includes('gladbach')) {
-    return null;
+    return 'https://media.api-sports.io/football/teams/163.png';
   }
   if (
     rawLogo &&

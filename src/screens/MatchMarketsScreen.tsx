@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
+import { TeamLogo } from '../components/common/TeamLogo';
 import * as Haptics from 'expo-haptics';
 import { useThemeStore } from '../stores/themeStore';
 import { useCouponStore } from '../store/couponStore';
@@ -625,10 +626,10 @@ export const MatchMarketsScreen: React.FC<{ route?: any; navigation?: any }> = (
             {/* Équipe Domicile */}
             <View style={styles.teamColumn}>
               <View style={[styles.crestWrap, { width: crestSize + 8, height: crestSize + 4 }]}>
-                <Image
-                  source={{ uri: marketsData.homeTeam.logo }}
-                  style={{ width: crestSize, height: crestSize }}
-                  resizeMode="contain"
+                <TeamLogo
+                  teamName={marketsData.homeTeam.name}
+                  logoUrl={marketsData.homeTeam.logo}
+                  size={crestSize}
                 />
                 <TouchableOpacity
                   activeOpacity={0.8}
@@ -668,10 +669,10 @@ export const MatchMarketsScreen: React.FC<{ route?: any; navigation?: any }> = (
             {/* Équipe Extérieur */}
             <View style={styles.teamColumn}>
               <View style={[styles.crestWrap, { width: crestSize + 8, height: crestSize + 4 }]}>
-                <Image
-                  source={{ uri: marketsData.awayTeam.logo }}
-                  style={{ width: crestSize, height: crestSize }}
-                  resizeMode="contain"
+                <TeamLogo
+                  teamName={marketsData.awayTeam.name}
+                  logoUrl={marketsData.awayTeam.logo}
+                  size={crestSize}
                 />
                 <TouchableOpacity
                   activeOpacity={0.8}

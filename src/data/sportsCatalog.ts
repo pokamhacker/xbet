@@ -120,11 +120,11 @@ const BASE_SPORTS_CATALOG: Competition[] = [
       { id: 'uwcl-paris-fc', name: 'Paris FC (F)', shortName: 'PFC', logo: 'https://media.api-sports.io/football/teams/114.png', country: 'France', leagueId: 'uefa-womens-champions-league' },
       { id: 'uwcl-benfica', name: 'SL Benfica (F)', shortName: 'BEN', logo: 'https://media.api-sports.io/football/teams/211.png', country: 'Portugal', leagueId: 'uefa-womens-champions-league' },
       { id: 'uwcl-ajax', name: 'Ajax Amsterdam (F)', shortName: 'AJA', logo: 'https://media.api-sports.io/football/teams/194.png', country: 'Pays-Bas', leagueId: 'uefa-womens-champions-league' },
-      { id: 'uwcl-twente', name: 'FC Twente (F)', shortName: 'TWE', logo: 'https://media.api-sports.io/football/teams/415.png', country: 'Pays-Bas', leagueId: 'uefa-womens-champions-league' },
-      { id: 'uwcl-hacken', name: 'BK Häcken (F)', shortName: 'HAC', logo: 'https://media.api-sports.io/football/teams/367.png', country: 'Suède', leagueId: 'uefa-womens-champions-league' },
-      { id: 'uwcl-hammarby', name: 'Hammarby IF (F)', shortName: 'HAM', logo: 'https://media.api-sports.io/football/teams/363.png', country: 'Suède', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-twente', name: 'FC Twente (F)', shortName: 'TWE', logo: 'https://media.api-sports.io/football/teams/195.png', country: 'Pays-Bas', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-hacken', name: 'BK Häcken (F)', shortName: 'HAC', logo: 'https://media.api-sports.io/football/teams/365.png', country: 'Suède', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-hammarby', name: 'Hammarby IF (F)', shortName: 'HAM', logo: 'https://media.api-sports.io/football/teams/368.png', country: 'Suède', leagueId: 'uefa-womens-champions-league' },
       { id: 'uwcl-rosengard', name: 'FC Rosengård (F)', shortName: 'ROS', logo: 'https://media.api-sports.io/football/teams/10899.png', country: 'Suède', leagueId: 'uefa-womens-champions-league' },
-      { id: 'uwcl-st-polten', name: 'SKN St. Pölten (F)', shortName: 'STP', logo: 'https://media.api-sports.io/football/teams/1025.png', country: 'Autriche', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-st-polten', name: 'SKN St. Pölten (F)', shortName: 'STP', logo: 'https://media.api-sports.io/football/teams/638.png', country: 'Autriche', leagueId: 'uefa-womens-champions-league' },
       { id: 'uwcl-valerenga', name: 'Vålerenga (F)', shortName: 'VAL', logo: 'https://media.api-sports.io/football/teams/332.png', country: 'Norvège', leagueId: 'uefa-womens-champions-league' },
       { id: 'uwcl-brann', name: 'SK Brann (F)', shortName: 'BRA', logo: 'https://media.api-sports.io/football/teams/319.png', country: 'Norvège', leagueId: 'uefa-womens-champions-league' },
       { id: 'uwcl-celtic', name: 'Celtic (F)', shortName: 'CEL', logo: 'https://media.api-sports.io/football/teams/247.png', country: 'Écosse', leagueId: 'uefa-womens-champions-league' },
@@ -139,6 +139,16 @@ const BASE_SPORTS_CATALOG: Competition[] = [
       { id: 'uwcl-fiorentina', name: 'Fiorentina (F)', shortName: 'FIO', logo: 'https://media.api-sports.io/football/teams/502.png', country: 'Italie', leagueId: 'uefa-womens-champions-league' },
       { id: 'uwcl-anderlecht', name: 'Anderlecht (F)', shortName: 'AND', logo: 'https://media.api-sports.io/football/teams/554.png', country: 'Belgique', leagueId: 'uefa-womens-champions-league' },
       { id: 'uwcl-servette', name: 'Servette FC Chênois (F)', shortName: 'SER', logo: 'https://media.api-sports.io/football/teams/2184.png', country: 'Suisse', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-real-sociedad', name: 'Real Sociedad (F)', shortName: 'RSO', logo: 'https://media.api-sports.io/football/teams/548.png', country: 'Espagne', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-psv', name: 'PSV Eindhoven (F)', shortName: 'PSV', logo: 'https://media.api-sports.io/football/teams/197.png', country: 'Pays-Bas', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-inter', name: 'Inter Milan (F)', shortName: 'INT', logo: 'https://media.api-sports.io/football/teams/505.png', country: 'Italie', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-ac-milan', name: 'AC Milan (F)', shortName: 'MIL', logo: 'https://media.api-sports.io/football/teams/489.png', country: 'Italie', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-leverkusen', name: 'Bayer Leverkusen (F)', shortName: 'B04', logo: 'https://media.api-sports.io/football/teams/168.png', country: 'Allemagne', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-rb-leipzig', name: 'RB Leipzig (F)', shortName: 'RBL', logo: 'https://media.api-sports.io/football/teams/173.png', country: 'Allemagne', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-liverpool', name: 'Liverpool (F)', shortName: 'LIV', logo: 'https://media.api-sports.io/football/teams/40.png', country: 'Angleterre', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-tottenham', name: 'Tottenham Hotspur (F)', shortName: 'TOT', logo: 'https://media.api-sports.io/football/teams/47.png', country: 'Angleterre', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-aston-villa', name: 'Aston Villa (F)', shortName: 'AVL', logo: 'https://media.api-sports.io/football/teams/66.png', country: 'Angleterre', leagueId: 'uefa-womens-champions-league' },
+      { id: 'uwcl-montpellier', name: 'Montpellier HSC (F)', shortName: 'MHS', logo: 'https://media.api-sports.io/football/teams/82.png', country: 'France', leagueId: 'uefa-womens-champions-league' },
     ],
   },
   {
@@ -360,7 +370,7 @@ const BASE_SPORTS_CATALOG: Competition[] = [
         id: 'team-zaragoza',
         name: 'Real Zaragoza',
         shortName: 'ZAR',
-        logo: 'https://media.api-sports.io/football/teams/733.png',
+        logo: 'https://media.api-sports.io/football/teams/732.png',
         country: 'Espagne',
         leagueId: 'esp-laliga-2',
       },
@@ -538,7 +548,7 @@ const BASE_SPORTS_CATALOG: Competition[] = [
         id: 'team-aberdeen-fc',
         name: 'Aberdeen Fc',
         shortName: 'ABE',
-        logo: 'https://media.api-sports.io/football/teams/257.png',
+        logo: 'https://media.api-sports.io/football/teams/252.png',
         country: 'Vietnam',
         leagueId: 'vietnam-vleague',
       },
@@ -1284,7 +1294,9 @@ function normalizeName(str: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\b(fc|cf|ac|sc|as|cd|us|rb|ssc|fsv|rc|ud|ca)\b/gi, '')
+    .replace(/\(f\)/gi, '')
+    .replace(/\bu(17|19|20|21|23)\b/gi, '')
+    .replace(/\b(fc|cf|ac|sc|as|cd|us|rb|ssc|fsv|rc|ud|ca|rcd|sk|fk|bsc|vfl|vfb|kv|krc|kvc|sv|tsv|scr)\b/gi, '')
     .replace(/[^a-z0-9]/g, '')
     .trim();
 }
@@ -1358,44 +1370,57 @@ export function getCompetitionById(id: string): Competition | undefined {
 }
 
 /**
- * Récupère une équipe par son identifiant unique ou son nom avec tolérance orthographique
+ * Récupère une équipe par son identifiant unique ou son nom avec tolérance orthographique,
+ * en priorisant les compétitions majeures, UEFA et FIFA officielles.
  */
 export function getTeamById(idOrName: string): Team | undefined {
   if (!idOrName) return undefined;
   const query = idOrName.trim().toLowerCase();
+  const priorityCatalog = [... BASE_SPORTS_CATALOG, ...FC_FIFA_COMPETITIONS, ...SPORTS_CATALOG];
 
-  // 1. Recherche exacte (ID, Nom exact, Code court)
-  for (const comp of SPORTS_CATALOG) {
+  // 1. Recherche exacte (ID ou Nom exact)
+  for (const comp of priorityCatalog) {
     const found = comp.teams.find(
       (t) =>
         t.id.toLowerCase() === query ||
-        t.name.toLowerCase() === query ||
-        (t.shortName && t.shortName.toLowerCase() === query)
+        t.name.toLowerCase() === query
     );
     if (found) return found;
   }
 
-  // 2. Recherche normalisée (sans "FC", "CF", accents, tirets)
-  const normQuery = normalizeName(query);
-  if (normQuery.length >= 3) {
-    for (const comp of SPORTS_CATALOG) {
+  // 2. Recherche par code court exact (ex: "RMA", "PSG", "BAR") uniquement si <= 4 caractères
+  if (query.length <= 4) {
+    for (const comp of priorityCatalog) {
       const found = comp.teams.find(
-        (t) =>
-          normalizeName(t.name) === normQuery ||
-          (t.shortName && normalizeName(t.shortName) === normQuery)
+        (t) => t.shortName && t.shortName.toLowerCase() === query
       );
       if (found) return found;
     }
   }
 
-  // 3. Recherche par inclusion de nom (ex: "Liverpool" dans "Liverpool FC")
-  for (const comp of SPORTS_CATALOG) {
-    const found = comp.teams.find(
-      (t) =>
-        t.name.toLowerCase().includes(query) ||
-        query.includes(t.name.toLowerCase())
-    );
-    if (found) return found;
+  // 3. Recherche normalisée (sans "(F)", "U19", "FC", "CF", accents, tirets)
+  const normQuery = normalizeName(query);
+  if (normQuery.length >= 3) {
+    for (const comp of priorityCatalog) {
+      const found = comp.teams.find(
+        (t) => normalizeName(t.name) === normQuery
+      );
+      if (found) return found;
+    }
+  }
+
+  // 4. Recherche par inclusion de nom (ex: "Liverpool" dans "Liverpool FC", min 4 caractères)
+  if (normQuery.length >= 4) {
+    for (const comp of priorityCatalog) {
+      const found = comp.teams.find((t) => {
+        const normTeam = normalizeName(t.name);
+        return (
+          normTeam.length >= 4 &&
+          (normTeam.includes(normQuery) || normQuery.includes(normTeam))
+        );
+      });
+      if (found) return found;
+    }
   }
 
   return undefined;
