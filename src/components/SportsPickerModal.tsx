@@ -129,80 +129,83 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
     }
   }, [visible, mode, apiLeagues.length]);
 
-  // Synchronise league constraint & charge les équipes dynamiquement de la ligue sélectionnée
+  // Réinitialiser la recherche uniquement à l'ouverture de la modale
   useEffect(() => {
     if (visible) {
       setSearchQuery('');
       setUseLeagueConstraint(!!filterCompetitionId);
       setActiveTab(initialCategoryTab || 'Tous');
+    }
+  }, [visible, filterCompetitionId, initialCategoryTab]);
 
-      if (mode === 'team') {
-        const targetLeague =
-          filterCompetitionId ||
-          (selectedId && !selectedId.startsWith('team-') ? selectedId : undefined);
+  // Charge les équipes dynamiquement de la ligue sélectionnée
+  useEffect(() => {
+    if (visible && mode === 'team') {
+      const targetLeague =
+        filterCompetitionId ||
+        (selectedId && !selectedId.startsWith('team-') ? selectedId : undefined);
 
-        // Trouver la ligue correspondante (nom ou ID)
-        let leagueName = targetLeague;
-        let leagueNumericId: number | undefined;
+      // Trouver la ligue correspondante (nom ou ID)
+      let leagueName = targetLeague;
+      let leagueNumericId: number | undefined;
 
-        if (targetLeague) {
-          const matchedCatalog = SPORTS_CATALOG.find((c) => c.id === targetLeague || c.name === targetLeague);
-          const matchedApi = apiLeagues.find((l) => l.id === targetLeague || l.name === targetLeague);
+      if (targetLeague) {
+        const matchedCatalog = SPORTS_CATALOG.find((c) => c.id === targetLeague || c.name === targetLeague);
+        const matchedApi = apiLeagues.find((l) => l.id === targetLeague || l.name === targetLeague);
 
-          if (matchedCatalog) {
-            leagueName = matchedCatalog.name;
-          } else if (matchedApi) {
-            leagueName = matchedApi.name;
-          }
-
-          // Extraire l'ID numérique pour API-Football
-          if (!isNaN(Number(targetLeague))) {
-            leagueNumericId = Number(targetLeague);
-          } else if (matchedApi && !isNaN(Number(matchedApi.id))) {
-            leagueNumericId = Number(matchedApi.id);
-          }
+        if (matchedCatalog) {
+          leagueName = matchedCatalog.name;
+        } else if (matchedApi) {
+          leagueName = matchedApi.name;
         }
 
-        if (targetLeague) {
-          setLoadingTeams(true);
-
-          // 1. Tenter via API-Football
-          const promise = leagueNumericId
-            ? apiFootballService.getTeams(leagueNumericId)
-            : apiFootballService.getTeams(targetLeague);
-
-          promise
-            .then((fbTeams) => {
-              if (fbTeams && fbTeams.length > 0) {
-                const mapped: SportsTeam[] = fbTeams.map((item) => ({
-                  id: `team-${item.team.id}`,
-                  name: item.team.name,
-                  shortName: item.team.code || undefined,
-                  badge: item.team.logo,
-                  logo: item.team.logo,
-                  country: item.team.country,
-                  leagueId: String(leagueNumericId || targetLeague),
-                  leagueName: leagueName,
-                }));
-                setDynamicTeams(mapped);
-              } else if (leagueName) {
-                return fetchTeamsByLeague(leagueName).then((teams) => setDynamicTeams(teams));
-              }
-            })
-            .catch(() => {
-              if (leagueName) {
-                fetchTeamsByLeague(leagueName)
-                  .then((teams) => setDynamicTeams(teams))
-                  .catch(() => {});
-              }
-            })
-            .finally(() => {
-              setLoadingTeams(false);
-            });
+        // Extraire l'ID numérique pour API-Football
+        if (!isNaN(Number(targetLeague))) {
+          leagueNumericId = Number(targetLeague);
+        } else if (matchedApi && !isNaN(Number(matchedApi.id))) {
+          leagueNumericId = Number(matchedApi.id);
         }
       }
+
+      if (targetLeague) {
+        setLoadingTeams(true);
+
+        // 1. Tenter via API-Football
+        const promise = leagueNumericId
+          ? apiFootballService.getTeams(leagueNumericId)
+          : apiFootballService.getTeams(targetLeague);
+
+        promise
+          .then((fbTeams) => {
+            if (fbTeams && fbTeams.length > 0) {
+              const mapped: SportsTeam[] = fbTeams.map((item) => ({
+                id: `team-${item.team.id}`,
+                name: item.team.name,
+                shortName: item.team.code || undefined,
+                badge: item.team.logo,
+                logo: item.team.logo,
+                country: item.team.country,
+                leagueId: String(leagueNumericId || targetLeague),
+                leagueName: leagueName,
+              }));
+              setDynamicTeams(mapped);
+            } else if (leagueName) {
+              return fetchTeamsByLeague(leagueName).then((teams) => setDynamicTeams(teams));
+            }
+          })
+          .catch(() => {
+            if (leagueName) {
+              fetchTeamsByLeague(leagueName)
+                .then((teams) => setDynamicTeams(teams))
+                .catch(() => {});
+            }
+          })
+          .finally(() => {
+            setLoadingTeams(false);
+          });
+      }
     }
-  }, [visible, filterCompetitionId, mode, selectedId, apiLeagues]);
+  }, [visible, filterCompetitionId, mode, selectedId]);
 
   // Catégories disponibles
   const tabs: PickerCategoryTab[] = [
@@ -569,6 +572,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
               data={tabs}
               keyExtractor={(item) => item}
               showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="always"
               contentContainerStyle={styles.tabsContainer}
               renderItem={({ item }) => {
                 const isActive = activeTab === item;
@@ -621,6 +625,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
                 data={filteredCompetitions}
                 keyExtractor={(item) => item.id}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="always"
                 contentContainerStyle={styles.listContent}
                 renderItem={({ item }) => {
                   const isSelected = selectedId === item.id || selectedId === item.name;
@@ -714,6 +719,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
                 data={filteredTeams}
                 keyExtractor={(item) => `${item.comp.id}-${item.team.id}`}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="always"
                 contentContainerStyle={styles.listContent}
                 renderItem={({ item }) => {
                   const isSelected = selectedId === item.team.name || selectedId === item.team.id;

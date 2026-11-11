@@ -179,23 +179,33 @@ export default function AppNavigator() {
 
   const screenBg = getScreenBgColor(currentTheme);
   const headerBg = getHeaderBgColor(currentTheme);
-  const navTheme = {
-    dark: Boolean(currentTheme?.isDark),
-    colors: {
-      primary: currentTheme?.primary || '#4A84C4',
-      background: screenBg,
-      card: headerBg,
-      text: currentTheme?.textPrimary || '#002B49',
-      border: currentTheme?.border || '#E2E8F0',
-      notification: currentTheme?.primary || '#4A84C4',
-    },
-    fonts: {
-      regular: { fontFamily: 'System', fontWeight: '400' as const },
-      medium: { fontFamily: 'System', fontWeight: '500' as const },
-      bold: { fontFamily: 'System', fontWeight: '700' as const },
-      heavy: { fontFamily: 'System', fontWeight: '900' as const },
-    },
-  };
+  const navTheme = React.useMemo(
+    () => ({
+      dark: Boolean(currentTheme?.isDark),
+      colors: {
+        primary: currentTheme?.primary || '#4A84C4',
+        background: screenBg,
+        card: headerBg,
+        text: currentTheme?.textPrimary || '#002B49',
+        border: currentTheme?.border || '#E2E8F0',
+        notification: currentTheme?.primary || '#4A84C4',
+      },
+      fonts: {
+        regular: { fontFamily: 'System', fontWeight: '400' as const },
+        medium: { fontFamily: 'System', fontWeight: '500' as const },
+        bold: { fontFamily: 'System', fontWeight: '700' as const },
+        heavy: { fontFamily: 'System', fontWeight: '900' as const },
+      },
+    }),
+    [
+      currentTheme?.isDark,
+      currentTheme?.primary,
+      currentTheme?.textPrimary,
+      currentTheme?.border,
+      screenBg,
+      headerBg,
+    ]
+  );
 
   return (
     <View style={[styles.desktopOuterContainer, !isDesktopLandscape && { backgroundColor: screenBg }]}>

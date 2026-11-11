@@ -1192,7 +1192,12 @@ export default function StudioCreationScreen({ navigation }: any) {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollArea} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollArea}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
+      >
         {/* Banner : Création guidée */}
         <View style={styles.bannerBox}>
           <View style={styles.bannerIconBox}>
@@ -2099,6 +2104,7 @@ export default function StudioCreationScreen({ navigation }: any) {
                       value={studioHt1Home}
                       onChangeText={(t) => setStudioHt1Home(t.replace(/[^0-9]/g, ''))}
                       keyboardType="numeric"
+                      inputMode="numeric"
                       maxLength={2}
                     />
                     <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>:</Text>
@@ -2110,6 +2116,7 @@ export default function StudioCreationScreen({ navigation }: any) {
                       value={studioHt1Away}
                       onChangeText={(t) => setStudioHt1Away(t.replace(/[^0-9]/g, ''))}
                       keyboardType="numeric"
+                      inputMode="numeric"
                       maxLength={2}
                     />
                   </View>
@@ -2139,6 +2146,7 @@ export default function StudioCreationScreen({ navigation }: any) {
                       value={studioHt2Home}
                       onChangeText={(t) => setStudioHt2Home(t.replace(/[^0-9]/g, ''))}
                       keyboardType="numeric"
+                      inputMode="numeric"
                       maxLength={2}
                     />
                     <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>:</Text>
@@ -2150,6 +2158,7 @@ export default function StudioCreationScreen({ navigation }: any) {
                       value={studioHt2Away}
                       onChangeText={(t) => setStudioHt2Away(t.replace(/[^0-9]/g, ''))}
                       keyboardType="numeric"
+                      inputMode="numeric"
                       maxLength={2}
                     />
                   </View>

@@ -134,9 +134,12 @@ export const useResponsive = (): ResponsiveContext => {
   }
 
   return useMemo(() => {
-    const isPortrait = height >= width;
-    const isLandscape = width > height;
-    const minDim = Math.min(width, height);
+    // Sur mobile en portrait, l'ouverture du clavier virtuel réduit `height` sous `width`.
+    // On n'active le mode paysage que si la largeur dépasse 540px pour éviter un faux basculement
+    // portrait -> paysage qui provoquerait un recalcul des tailles et une perte de focus du TextInput.
+    const isLandscape = width > height && width >= 540;
+    const isPortrait = !isLandscape;
+    const minDim = isLandscape ? Math.min(width, height) : width;
     const maxDim = Math.max(width, height);
 
     const isSmallDevice = minDim < 360;
@@ -151,7 +154,7 @@ export const useResponsive = (): ResponsiveContext => {
     };
 
     const dynamicVerticalScale = (size: number) => {
-      const base = isLandscape ? maxDim : height;
+      const base = isLandscape ? maxDim : Math.max(height, BASE_HEIGHT);
       return (base / BASE_HEIGHT) * size;
     };
 

@@ -206,20 +206,21 @@ export default function TicketDetailsScreen({
   // Scroll tracking pour le repli fluide de l'en-tête
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Horloge temps réel pour la progression dynamique des événements EN DIRECT
-  const [currentTime, setCurrentTime] = useState(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   // 1. Résolution dynamique du coupon (priorité au store réactif pour refléter immédiatement la validation/saisie de scores)
   const couponId = route?.params?.couponId || route?.params?.ticketId || route?.params?.id;
   const passedCoupon = route?.params?.coupon || route?.params?.ticket || propTicket;
   const [isScoreModalVisible, setIsScoreModalVisible] = useState(false);
   const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
+
+  // Horloge temps réel pour la progression dynamique des événements EN DIRECT (suspendue quand une modale est ouverte pour ne pas perturber la saisie)
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  useEffect(() => {
+    if (isScoreModalVisible || isMoreModalVisible) return;
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isScoreModalVisible, isMoreModalVisible]);
 
   const currentCoupon: BetSlip = useMemo(() => {
     const targetId = couponId || passedCoupon?.id || (passedCoupon as any)?.ticketNumber;
@@ -1602,18 +1603,21 @@ export default function TicketDetailsScreen({
       <Modal
         visible={isMoreModalVisible}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setIsMoreModalVisible(false)}
       >
-        <TouchableOpacity
+        <View
           style={{
             flex: 1,
             backgroundColor: 'rgba(0,0,0,0.52)',
             justifyContent: 'flex-end',
           }}
-          activeOpacity={1}
-          onPress={() => setIsMoreModalVisible(false)}
         >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setIsMoreModalVisible(false)}
+          />
           <View
             style={{
               backgroundColor: currentTheme.cardBackground || (isDark ? '#1E2A36' : '#FFFFFF'),
@@ -1622,8 +1626,8 @@ export default function TicketDetailsScreen({
               paddingHorizontal: 18,
               paddingTop: 14,
               paddingBottom: Math.max(24, insets.bottom + 14),
+              zIndex: 2,
             }}
-            onStartShouldSetResponder={() => true}
           >
             <View
               style={{
@@ -1778,7 +1782,7 @@ export default function TicketDetailsScreen({
               </Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Modale de saisie des scores des 2 mi-temps avant validation */}

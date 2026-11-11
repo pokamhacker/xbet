@@ -1437,15 +1437,16 @@ export default function HistoryListScreen() {
         animationType="fade"
         onRequestClose={() => setIsPeriodModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsPeriodModalVisible(false)}
-        >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setIsPeriodModalVisible(false)}
+          />
           <View
             style={[
               styles.modalSheetContainer,
-              { backgroundColor: currentTheme.cardBackground || '#FFFFFF' },
+              { backgroundColor: currentTheme.cardBackground || '#FFFFFF', zIndex: 2 },
             ]}
           >
             <Text style={[styles.modalTitle, { color: currentTheme.textPrimary }]}>
@@ -1475,7 +1476,7 @@ export default function HistoryListScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ================================================================== */}
@@ -1487,15 +1488,16 @@ export default function HistoryListScreen() {
         animationType="fade"
         onRequestClose={() => setIsDepositModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsDepositModalVisible(false)}
-        >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setIsDepositModalVisible(false)}
+          />
           <View
             style={[
               styles.modalSheetContainer,
-              { backgroundColor: currentTheme.cardBackground || '#FFFFFF' },
+              { backgroundColor: currentTheme.cardBackground || '#FFFFFF', zIndex: 2 },
             ]}
           >
             <Text style={[styles.modalTitle, { color: currentTheme.textPrimary }]}>
@@ -1516,6 +1518,7 @@ export default function HistoryListScreen() {
               value={depositInputAmount}
               onChangeText={setDepositInputAmount}
               keyboardType="numeric"
+              inputMode="numeric"
               placeholder="Ex: 50 000"
               placeholderTextColor={currentTheme.textSecondary}
             />
@@ -1555,7 +1558,7 @@ export default function HistoryListScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* ================================================================== */}
@@ -1564,18 +1567,19 @@ export default function HistoryListScreen() {
       <Modal
         visible={isOptionsModalVisible}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setIsOptionsModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setIsOptionsModalVisible(false)}
-        >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setIsOptionsModalVisible(false)}
+          />
           <View
             style={[
               styles.modalSheetContainer,
-              { backgroundColor: currentTheme.cardBackground || '#FFFFFF' },
+              { backgroundColor: currentTheme.cardBackground || '#FFFFFF', zIndex: 2 },
             ]}
           >
             <Text style={[styles.modalTitle, { color: currentTheme.textPrimary }]}>
@@ -1708,7 +1712,7 @@ export default function HistoryListScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Modale de saisie des scores des 2 mi-temps avant validation */}

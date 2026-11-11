@@ -148,8 +148,8 @@ if (fs.existsSync(indexHtmlPath)) {
         -webkit-tap-highlight-color: transparent;
       }
       input, textarea {
-        -webkit-user-select: auto;
-        user-select: auto;
+        -webkit-user-select: text !important;
+        user-select: text !important;
       }
     </style>
   `;

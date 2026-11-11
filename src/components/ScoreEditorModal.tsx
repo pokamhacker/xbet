@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BetSlip, BetStatus, MatchEvent } from '../types/bet';
@@ -82,9 +83,19 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
     [id: string]: EventHalfScoreState;
   }>(() => buildInitialEventStates(coupon, true));
 
+  const wasVisibleRef = useRef(false);
+  const lastCouponIdRef = useRef<string | null>(null);
+
   useEffect(() => {
+    const currentId = coupon?.id ? String(coupon.id) : null;
     if (visible && coupon) {
-      setEventStates(buildInitialEventStates(coupon, true));
+      if (!wasVisibleRef.current || lastCouponIdRef.current !== currentId) {
+        setEventStates(buildInitialEventStates(coupon, true));
+        lastCouponIdRef.current = currentId;
+      }
+      wasVisibleRef.current = true;
+    } else if (!visible) {
+      wasVisibleRef.current = false;
     }
   }, [visible, coupon]);
 
@@ -142,6 +153,31 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
         [eventId]: {
           ...current,
           [field]: clean,
+        },
+      };
+    });
+  };
+
+  const adjustHalfField = (
+    eventId: string,
+    field: 'ht1Home' | 'ht1Away' | 'ht2Home' | 'ht2Away',
+    delta: number
+  ) => {
+    setEventStates((prev) => {
+      const current = prev[eventId] || {
+        ht1Home: '1',
+        ht1Away: '0',
+        ht2Home: '1',
+        ht2Away: '0',
+        status: 'Gain' as BetStatus,
+      };
+      const curNum = parseInt(current[field], 10) || 0;
+      const nextNum = Math.max(0, Math.min(99, curNum + delta));
+      return {
+        ...prev,
+        [eventId]: {
+          ...current,
+          [field]: String(nextNum),
         },
       };
     });
@@ -248,15 +284,19 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   const payeGreen = '#4EBA6F';
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[
           styles.overlay,
           (isTablet || isDesktop) && styles.overlayTablet,
         ]}
-        activeOpacity={1}
-        onPress={onClose}
       >
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={onClose}
+        />
         <View
           style={[
             styles.sheet,
@@ -264,10 +304,10 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
               backgroundColor: sheetBg,
               borderColor: currentTheme.border,
               paddingBottom: Math.max(24, insets.bottom + 12),
+              zIndex: 2,
             },
             (isTablet || isDesktop) && styles.sheetTablet,
           ]}
-          onStartShouldSetResponder={() => true}
         >
           <View style={[styles.handle, { backgroundColor: currentTheme.border }]} />
 
@@ -310,7 +350,12 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
             </Text>
           </TouchableOpacity>
 
-          <ScrollView style={styles.eventsScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.eventsScroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+          >
             {coupon.events.map((ev, index) => {
               if (isBonusOrPokerEvent(ev)) {
                 return null;
@@ -393,9 +438,23 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                             value={current.ht1Home}
                             onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht1Home', t)}
                             keyboardType="numeric"
+                            inputMode="numeric"
                             maxLength={2}
-                            selectTextOnFocus
                           />
+                          <View style={styles.miniStepperRow}>
+                            <TouchableOpacity
+                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                              onPress={() => adjustHalfField(ev.id, 'ht1Home', -1)}
+                            >
+                              <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                              onPress={() => adjustHalfField(ev.id, 'ht1Home', 1)}
+                            >
+                              <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                         <Text style={[styles.scoreColon, { color: currentTheme.textPrimary }]}>:</Text>
                         <View style={styles.teamScoreCol}>
@@ -417,9 +476,23 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                             value={current.ht1Away}
                             onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht1Away', t)}
                             keyboardType="numeric"
+                            inputMode="numeric"
                             maxLength={2}
-                            selectTextOnFocus
                           />
+                          <View style={styles.miniStepperRow}>
+                            <TouchableOpacity
+                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                              onPress={() => adjustHalfField(ev.id, 'ht1Away', -1)}
+                            >
+                              <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                              onPress={() => adjustHalfField(ev.id, 'ht1Away', 1)}
+                            >
+                              <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
                     </View>
@@ -457,9 +530,23 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                             value={current.ht2Home}
                             onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht2Home', t)}
                             keyboardType="numeric"
+                            inputMode="numeric"
                             maxLength={2}
-                            selectTextOnFocus
                           />
+                          <View style={styles.miniStepperRow}>
+                            <TouchableOpacity
+                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                              onPress={() => adjustHalfField(ev.id, 'ht2Home', -1)}
+                            >
+                              <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                              onPress={() => adjustHalfField(ev.id, 'ht2Home', 1)}
+                            >
+                              <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                         <Text style={[styles.scoreColon, { color: currentTheme.textPrimary }]}>:</Text>
                         <View style={styles.teamScoreCol}>
@@ -481,9 +568,23 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                             value={current.ht2Away}
                             onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht2Away', t)}
                             keyboardType="numeric"
+                            inputMode="numeric"
                             maxLength={2}
-                            selectTextOnFocus
                           />
+                          <View style={styles.miniStepperRow}>
+                            <TouchableOpacity
+                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                              onPress={() => adjustHalfField(ev.id, 'ht2Away', -1)}
+                            >
+                              <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
+                              onPress={() => adjustHalfField(ev.id, 'ht2Away', 1)}
+                            >
+                              <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
                     </View>
@@ -625,7 +726,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </TouchableOpacity>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -783,6 +884,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     paddingVertical: 0,
+  },
+  miniStepperRow: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 4,
+  },
+  miniStepBtn: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniStepTxt: {
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 14,
   },
   scoreColon: {
     fontSize: 16,

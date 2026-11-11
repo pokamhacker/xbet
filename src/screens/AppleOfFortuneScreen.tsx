@@ -657,12 +657,13 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
           animationType="fade"
           onRequestClose={() => setSettingsVisible(false)}
         >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setSettingsVisible(false)}
-          >
-            <View style={styles.modalCard} onStartShouldSetResponder={() => true}>
+          <View style={styles.modalBackdrop}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setSettingsVisible(false)}
+            />
+            <View style={[styles.modalCard, { zIndex: 2 }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Paramètres du jeu</Text>
                 <TouchableOpacity onPress={() => setSettingsVisible(false)}>
@@ -736,7 +737,7 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
                 <Text style={[styles.modalConfirmBtnText, { color: brandTextColor }]}>CONFIRMER</Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </View>
         </Modal>
 
         {/* ----------------------------------------------------------------- */}
@@ -748,12 +749,13 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
           animationType="fade"
           onRequestClose={() => setRulesVisible(false)}
         >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setRulesVisible(false)}
-          >
-            <View style={styles.modalCard} onStartShouldSetResponder={() => true}>
+          <View style={styles.modalBackdrop}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setRulesVisible(false)}
+            />
+            <View style={[styles.modalCard, { zIndex: 2 }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Règles du jeu</Text>
                 <TouchableOpacity onPress={() => setRulesVisible(false)}>
@@ -784,7 +786,7 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
                 <Text style={[styles.modalConfirmBtnText, { color: brandTextColor }]}>J'AI COMPRIS</Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </View>
         </Modal>
 
         {/* ----------------------------------------------------------------- */}
@@ -796,12 +798,13 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
           animationType="fade"
           onRequestClose={() => setDepositModalVisible(false)}
         >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setDepositModalVisible(false)}
-          >
-            <View style={styles.modalCard} onStartShouldSetResponder={() => true}>
+          <View style={styles.modalBackdrop}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setDepositModalVisible(false)}
+            />
+            <View style={[styles.modalCard, { zIndex: 2 }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Effectuer un dépôt</Text>
                 <TouchableOpacity onPress={() => setDepositModalVisible(false)}>
@@ -851,7 +854,7 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
                 <Text style={[styles.modalConfirmBtnText, { color: brandTextColor }]}>CRÉDITER MON COMPTE</Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          </View>
         </Modal>
       </ImageBackground>
     </SafeAreaView>

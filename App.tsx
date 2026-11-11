@@ -126,6 +126,10 @@ export default function App() {
             padding: 0 !important;
             overflow: hidden !important;
           }
+          input, textarea {
+            -webkit-user-select: text !important;
+            user-select: text !important;
+          }
         `;
         document.head.appendChild(style);
       }

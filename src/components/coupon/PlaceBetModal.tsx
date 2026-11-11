@@ -95,18 +95,19 @@ export const PlaceBetModal: React.FC<PlaceBetModalProps> = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <TouchableOpacity
-        style={styles.sheetBackdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      >
+      <View style={styles.sheetBackdrop}>
         <TouchableOpacity
+          style={StyleSheet.absoluteFill}
           activeOpacity={1}
+          onPress={onClose}
+        />
+        <View
           style={[
             styles.modalContainer,
             {
               backgroundColor: currentTheme.colors.cardBackground, // #212830 pour Melbet
               borderTopColor: currentTheme.colors.cardBorder,
+              zIndex: 2,
             },
           ]}
         >
@@ -368,8 +369,8 @@ export const PlaceBetModal: React.FC<PlaceBetModalProps> = ({
               })}
             </View>
           )}
-        </TouchableOpacity>
-      </TouchableOpacity>
+        </View>
+      </View>
     </Modal>
   );
 };

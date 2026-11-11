@@ -134,7 +134,6 @@ export const LoadCouponModal: React.FC<LoadCouponModalProps> = ({
                 borderTopWidth: isDark ? 1 : 0,
               },
             ]}
-            onStartShouldSetResponder={() => true}
           >
             {/* Poignée de glissement */}
             <View style={[styles.handle, { backgroundColor: handleColor }]} />
