@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { BetSlip } from '../types/bet';
 import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
 import { useThemeStore } from '../stores/themeStore';
+import { ScoreEditorModal } from './ScoreEditorModal';
 
 interface ActionBottomSheetProps {
   visible: boolean;
@@ -28,7 +29,8 @@ export const ActionBottomSheet: React.FC<ActionBottomSheetProps> = ({
   onViewDetail,
 }) => {
   const { currentTheme } = useThemeStore();
-  const { validateCouponWithResult, toggleCashout, deleteCoupon } = useBetStore();
+  const { updateCouponStatus, toggleCashout, deleteCoupon } = useBetStore();
+  const [isScoreModalVisible, setIsScoreModalVisible] = useState(false);
 
   if (!coupon) return null;
 
@@ -42,8 +44,13 @@ export const ActionBottomSheet: React.FC<ActionBottomSheetProps> = ({
   const primarySoft = currentTheme.primarySoft || (isDark ? '#1E293B' : '#EFF6FF');
 
   const handleToggleStatus = () => {
-    validateCouponWithResult(coupon.id, !isWon);
-    onClose();
+    if (isWon) {
+      updateCouponStatus(coupon.id, 'Accepté');
+      onClose();
+    } else {
+      onClose();
+      setIsScoreModalVisible(true);
+    }
   };
 
   const handleToggleSale = () => {
@@ -95,6 +102,7 @@ export const ActionBottomSheet: React.FC<ActionBottomSheetProps> = ({
   };
 
   return (
+    <>
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity
         style={styles.modalOverlay}
@@ -189,6 +197,12 @@ export const ActionBottomSheet: React.FC<ActionBottomSheetProps> = ({
         </View>
       </TouchableOpacity>
     </Modal>
+    <ScoreEditorModal
+      visible={isScoreModalVisible}
+      coupon={coupon}
+      onClose={() => setIsScoreModalVisible(false)}
+    />
+    </>
   );
 };
 

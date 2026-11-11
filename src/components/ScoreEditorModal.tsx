@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,19 +8,65 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BetSlip, BetStatus } from '../types/bet';
+import { BetSlip, BetStatus, MatchEvent } from '../types/bet';
 import { Colors } from '../theme/theme';
 import { useBetStore } from '../store/useBetStore';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
-import { adaptEventResultToPrediction } from '../utils/scoreAdapter';
+import {
+  adaptEventResultToPrediction,
+  ensureTwoHalvesScoreFormat,
+} from '../utils/scoreAdapter';
 
 interface ScoreEditorModalProps {
   visible: boolean;
   coupon: BetSlip | null;
   onClose: () => void;
+}
+
+interface EventHalfScoreState {
+  ht1Home: string;
+  ht1Away: string;
+  ht2Home: string;
+  ht2Away: string;
+  status: BetStatus;
+}
+
+function buildInitialEventStates(
+  coupon: BetSlip | null,
+  forceWinDefault: boolean = true
+): { [id: string]: EventHalfScoreState } {
+  const map: { [id: string]: EventHalfScoreState } = {};
+  if (!coupon || !coupon.events) return map;
+
+  coupon.events.forEach((e: MatchEvent) => {
+    const isWin =
+      e.status === 'Gain' ||
+      e.status === 'Payé' ||
+      e.status === 'Gagné' ||
+      coupon.status === 'Payé' ||
+      (forceWinDefault && e.status !== 'Perdu');
+
+    const complete = ensureTwoHalvesScoreFormat({
+      event: e,
+      rawScoreFinal: (e as any).scoreFinal || e.actualScore,
+      rawScoreDetail: (e as any).scoreDetail || e.halftimeScore,
+      isWin,
+    });
+
+    map[e.id] = {
+      ht1Home: String(complete.ht1Home),
+      ht1Away: String(complete.ht1Away),
+      ht2Home: String(complete.ht2Home),
+      ht2Away: String(complete.ht2Away),
+      status: e.status === 'Perdu' ? 'Perdu' : 'Gain',
+    };
+  });
+
+  return map;
 }
 
 export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
@@ -32,28 +78,73 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   const { updateEventScore, validateCouponWithResult } = useBetStore();
   const { isTablet, isDesktop, font, moderateScale, insets } = useResponsive();
 
+  const [eventStates, setEventStates] = useState<{
+    [id: string]: EventHalfScoreState;
+  }>(() => buildInitialEventStates(coupon, true));
+
+  useEffect(() => {
+    if (visible && coupon) {
+      setEventStates(buildInitialEventStates(coupon, true));
+    }
+  }, [visible, coupon]);
+
   if (!coupon) return null;
 
-  // Local state for event scores and statuses
-  const [eventStates, setEventStates] = useState<{
-    [id: string]: { score: string; status: BetStatus };
-  }>(() => {
-    const map: { [id: string]: { score: string; status: BetStatus } } = {};
-    coupon.events.forEach((e) => {
-      const adapted = adaptEventResultToPrediction(e, e.status === 'Gain' || e.status === 'Payé' || coupon.status === 'Payé');
-      map[e.id] = {
-        score: e.actualScore || adapted.actualScore,
-        status: e.status,
+  const isBonusOrPokerEvent = (e: MatchEvent): boolean => {
+    const s = String(e.sport || '').toUpperCase();
+    const l = String(e.league || '').toUpperCase();
+    const h = typeof e.homeTeam === 'string' ? e.homeTeam : e.homeTeam?.name || '';
+    return (
+      s === 'BONUS' ||
+      l === 'BONUS' ||
+      h.toUpperCase() === 'BONUS' ||
+      e.gameCategory === 'poker' ||
+      s.includes('POKER') ||
+      l.includes('POKER')
+    );
+  };
+
+  const computeFormattedFromHalves = (st: EventHalfScoreState) => {
+    const h1 = Math.max(0, parseInt(st.ht1Home, 10) || 0);
+    const a1 = Math.max(0, parseInt(st.ht1Away, 10) || 0);
+    const h2 = Math.max(0, parseInt(st.ht2Home, 10) || 0);
+    const a2 = Math.max(0, parseInt(st.ht2Away, 10) || 0);
+    const totalH = h1 + h2;
+    const totalA = a1 + a2;
+    return {
+      h1,
+      a1,
+      h2,
+      a2,
+      totalH,
+      totalA,
+      scoreFinal: `${totalH}:${totalA}`,
+      scoreDetail: `${totalH}:${totalA} (${h1}:${a1},${h2}:${a2})`,
+    };
+  };
+
+  const handleHalfFieldChange = (
+    eventId: string,
+    field: 'ht1Home' | 'ht1Away' | 'ht2Home' | 'ht2Away',
+    text: string
+  ) => {
+    const clean = text.replace(/[^0-9]/g, '');
+    setEventStates((prev) => {
+      const current = prev[eventId] || {
+        ht1Home: '1',
+        ht1Away: '0',
+        ht2Home: '1',
+        ht2Away: '0',
+        status: 'Gain' as BetStatus,
+      };
+      return {
+        ...prev,
+        [eventId]: {
+          ...current,
+          [field]: clean,
+        },
       };
     });
-    return map;
-  });
-
-  const handleScoreChange = (eventId: string, text: string) => {
-    setEventStates((prev) => ({
-      ...prev,
-      [eventId]: { ...prev[eventId], score: text },
-    }));
   };
 
   const handleStatusChange = (eventId: string, newStatus: BetStatus) => {
@@ -64,52 +155,97 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   };
 
   const handleAutoAdaptScores = (isWin: boolean = true) => {
-    const newStates: { [id: string]: { score: string; status: BetStatus } } = {};
+    const newStates: { [id: string]: EventHalfScoreState } = {};
     coupon.events.forEach((e) => {
       const adapted = adaptEventResultToPrediction(e, isWin);
+      const complete = ensureTwoHalvesScoreFormat({
+        event: e,
+        rawScoreFinal: adapted.actualScore,
+        rawScoreDetail: adapted.halftimeScore,
+        isWin,
+      });
       newStates[e.id] = {
-        score: adapted.actualScore,
-        status: adapted.status,
+        ht1Home: String(complete.ht1Home),
+        ht1Away: String(complete.ht1Away),
+        ht2Home: String(complete.ht2Home),
+        ht2Away: String(complete.ht2Away),
+        status: isWin ? 'Gain' : 'Perdu',
       };
     });
     setEventStates(newStates);
   };
 
-  const handleQuickValidateAll = (isWin: boolean) => {
-    // 1. Adapter tous les scores locaux selon les pronostics choisis au départ
-    const adaptedScores: { [id: string]: string } = {};
-    const newStates: { [id: string]: { score: string; status: BetStatus } } = {};
-    coupon.events.forEach((e) => {
-      const adapted = adaptEventResultToPrediction(e, isWin);
-      adaptedScores[e.id] = adapted.actualScore;
-      newStates[e.id] = {
-        score: adapted.actualScore,
-        status: adapted.status,
-      };
-    });
-    setEventStates(newStates);
+  const handleValidateCouponWithEnteredHalves = (isWin: boolean) => {
+    const customScores: {
+      [eventId: string]: { scoreFinal: string; halftimeScore: string };
+    } = {};
 
-    // 2. Mettre à jour le coupon dans le store avec les scores et statuts synchronisés
-    validateCouponWithResult(coupon.id, isWin, adaptedScores);
-    onClose();
-    Alert.alert(
-      isWin ? 'Coupon validé en Gain !' : 'Coupon marqué comme Perdu',
-      isWin
-        ? `Les résultats des matchs ont été adaptés à vos pronostics. Le statut est passé à Payé et ${coupon.potentialPayout.toLocaleString('fr-FR')} ₣ ont été crédités.`
-        : 'Le statut est passé à Perdu avec les résultats adaptés.'
-    );
-  };
-
-  const handleApply = () => {
     coupon.events.forEach((ev) => {
+      if (isBonusOrPokerEvent(ev)) return;
       const st = eventStates[ev.id];
       if (st) {
-        updateEventScore(coupon.id, ev.id, st.score, st.status);
+        const formatted = computeFormattedFromHalves(st);
+        customScores[ev.id] = {
+          scoreFinal: formatted.scoreFinal,
+          halftimeScore: formatted.scoreDetail,
+        };
+      } else {
+        const adapted = adaptEventResultToPrediction(ev, isWin);
+        const complete = ensureTwoHalvesScoreFormat({
+          event: ev,
+          rawScoreFinal: adapted.actualScore,
+          rawScoreDetail: adapted.halftimeScore,
+          isWin,
+        });
+        customScores[ev.id] = {
+          scoreFinal: complete.scoreFinal,
+          halftimeScore: complete.scoreDetail,
+        };
+      }
+    });
+
+    validateCouponWithResult(coupon.id, isWin, customScores);
+    onClose();
+
+    if (Platform.OS !== 'web') {
+      Alert.alert(
+        isWin ? 'Coupon validé (Gain / Payé)' : 'Coupon marqué comme Perdu',
+        isWin
+          ? `Les scores des 2 mi-temps ont été enregistrés. Le coupon est maintenant Payé (${coupon.potentialPayout.toLocaleString('fr-FR')} ₣).`
+          : 'Le coupon a été marqué comme Perdu avec les scores saisis.'
+      );
+    }
+  };
+
+  const handleApplyIndividualScores = () => {
+    coupon.events.forEach((ev) => {
+      if (isBonusOrPokerEvent(ev)) return;
+      const st = eventStates[ev.id];
+      if (st) {
+        const formatted = computeFormattedFromHalves(st);
+        updateEventScore(
+          coupon.id,
+          ev.id,
+          formatted.scoreFinal,
+          st.status,
+          formatted.scoreDetail
+        );
       }
     });
     onClose();
-    Alert.alert('Scores enregistrés', 'Les résultats du coupon ont été mis à jour.');
+    if (Platform.OS !== 'web') {
+      Alert.alert(
+        'Scores des 2 mi-temps enregistrés',
+        'Les résultats et le détail des deux mi-temps ont été mis à jour.'
+      );
+    }
   };
+
+  const isDark = Boolean(currentTheme?.isDark);
+  const sheetBg = currentTheme.modalBackground || currentTheme.cardBackground || '#FFFFFF';
+  const cardSurfaceBg = isDark ? currentTheme.surface || '#1E293B' : '#F8FAFC';
+  const inputBg = currentTheme.cardBackground || (isDark ? '#0F172A' : '#FFFFFF');
+  const payeGreen = '#4EBA6F';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -125,7 +261,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
           style={[
             styles.sheet,
             {
-              backgroundColor: currentTheme.modalBackground || currentTheme.cardBackground,
+              backgroundColor: sheetBg,
               borderColor: currentTheme.border,
               paddingBottom: Math.max(24, insets.bottom + 12),
             },
@@ -137,30 +273,19 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
 
           <View style={styles.headerRow}>
             <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text style={[styles.title, { color: currentTheme.textPrimary, fontSize: font(17) }]} numberOfLines={1} adjustsFontSizeToFit>Saisie des scores</Text>
-              <Text style={[styles.subtitle, { color: currentTheme.textSecondary, fontSize: font(12) }]}>Coupon № {coupon.id}</Text>
+              <Text
+                style={[styles.title, { color: currentTheme.textPrimary, fontSize: font(16.5) }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                Saisir les scores des 2 mi-temps
+              </Text>
+              <Text style={[styles.subtitle, { color: currentTheme.textSecondary, fontSize: font(12) }]}>
+                Coupon № {coupon.id} • Validation & Scores (1ère et 2ème mi-temps)
+              </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Ionicons name="close" size={moderateScale(22)} color={currentTheme.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Quick 1-Tap actions */}
-          <View style={styles.quickActionsRow}>
-            <TouchableOpacity
-              style={[styles.quickBtn, styles.quickWinBtn, { backgroundColor: currentTheme.status.paye || '#16A34A' }]}
-              onPress={() => handleQuickValidateAll(true)}
-            >
-              <Ionicons name="checkmark-circle" size={moderateScale(16)} color="#fff" style={{ marginRight: 4 }} />
-              <Text style={[styles.quickBtnText, { fontSize: font(12) }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Tout Valider (Gain)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickBtn, styles.quickLossBtn, { backgroundColor: currentTheme.status.perdu || '#EF4444' }]}
-              onPress={() => handleQuickValidateAll(false)}
-            >
-              <Ionicons name="close-circle" size={moderateScale(16)} color="#fff" style={{ marginRight: 4 }} />
-              <Text style={[styles.quickBtnText, { fontSize: font(12) }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Tout Marquer (Perdu)</Text>
             </TouchableOpacity>
           </View>
 
@@ -169,140 +294,336 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
               styles.adaptScoresBtn,
               {
                 borderColor: currentTheme.border || '#CBD5E1',
-                backgroundColor: currentTheme.isDark ? (currentTheme.surface || '#1E293B') : '#F1F5F9',
+                backgroundColor: isDark ? currentTheme.surface || '#1E293B' : '#F1F5F9',
               },
             ]}
             onPress={() => handleAutoAdaptScores(true)}
           >
-            <Ionicons name="sparkles" size={moderateScale(14)} color={currentTheme.primary} style={{ marginRight: 6 }} />
+            <Ionicons
+              name="sparkles"
+              size={moderateScale(14)}
+              color={currentTheme.primary}
+              style={{ marginRight: 6 }}
+            />
             <Text style={[styles.adaptScoresBtnText, { color: currentTheme.primary, fontSize: font(12) }]}>
-              Adapter les scores aux pronostics
+              Générer des scores de mi-temps adaptés aux pronostics
             </Text>
           </TouchableOpacity>
 
           <ScrollView style={styles.eventsScroll} showsVerticalScrollIndicator={false}>
             {coupon.events.map((ev, index) => {
-              const current = eventStates[ev.id] || { score: '1-0', status: ev.status };
+              if (isBonusOrPokerEvent(ev)) {
+                return null;
+              }
+              const current = eventStates[ev.id] || {
+                ht1Home: '1',
+                ht1Away: '0',
+                ht2Home: '1',
+                ht2Away: '0',
+                status: 'Gain' as BetStatus,
+              };
+              const computed = computeFormattedFromHalves(current);
+              const homeName =
+                typeof ev.homeTeam === 'string' ? ev.homeTeam : ev.homeTeam?.name || 'Équipe 1';
+              const awayName =
+                typeof ev.awayTeam === 'string' ? ev.awayTeam : ev.awayTeam?.name || 'Équipe 2';
+
               return (
-                <React.Fragment key={ev.id}>
-                  <View
-                    style={[
-                      styles.eventCard,
-                      {
-                        backgroundColor: currentTheme.isDark ? currentTheme.surface : '#F8FAFC',
-                        borderColor: currentTheme.border,
-                      },
-                    ]}
-                  >
+                <View
+                  key={ev.id || index}
+                  style={[
+                    styles.eventCard,
+                    {
+                      backgroundColor: cardSurfaceBg,
+                      borderColor: currentTheme.border,
+                    },
+                  ]}
+                >
                   <View style={styles.eventHeader}>
-                    <Text style={[styles.eventIndex, { color: currentTheme.primary }]}>Match {index + 1}</Text>
-                    <Text style={[styles.eventLeague, { color: currentTheme.textSecondary }]}>{ev.league}</Text>
+                    <Text style={[styles.eventIndex, { color: currentTheme.primary }]}>
+                      Match {index + 1}
+                    </Text>
+                    <Text
+                      style={[styles.eventLeague, { color: currentTheme.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      {ev.league}
+                    </Text>
                   </View>
 
                   <Text style={[styles.eventMatch, { color: currentTheme.textPrimary }]}>
-                    {ev.homeTeam.name} vs {ev.awayTeam.name}
+                    {homeName} vs {awayName}
                   </Text>
-                  <Text style={[styles.eventPrediction, { color: currentTheme.textSecondary }]}>Pronostic : {ev.prediction}</Text>
+                  <Text style={[styles.eventPrediction, { color: currentTheme.textSecondary }]}>
+                    Pronostic : {ev.prediction}
+                  </Text>
 
-                  <View style={styles.inputsRow}>
-                    <View style={styles.scoreInputBox}>
-                      <Text style={[styles.inputLabel, { color: currentTheme.textSecondary }]}>Score final :</Text>
-                      <TextInput
-                        style={[
-                          styles.scoreInput,
-                          {
-                            backgroundColor: currentTheme.cardBackground,
-                            color: currentTheme.textPrimary,
-                            borderColor: currentTheme.border,
-                          },
-                        ]}
-                        value={current.score}
-                        onChangeText={(txt) => handleScoreChange(ev.id, txt)}
-                        placeholder="Ex: 5-4"
-                        placeholderTextColor={currentTheme.textMuted}
-                      />
-                    </View>
-
-                    <View style={styles.statusPillsBox}>
-                      <Text style={[styles.inputLabel, { color: currentTheme.textSecondary }]}>Résultat :</Text>
-                      <View style={styles.pillsRow}>
-                        <TouchableOpacity
-                          style={[
-                            styles.statusPill,
-                            { borderColor: currentTheme.border },
-                            current.status === 'Gain' && styles.statusPillWin,
-                          ]}
-                          onPress={() => handleStatusChange(ev.id, 'Gain')}
-                        >
+                  {/* Saisie 1ère Mi-Temps et 2ème Mi-Temps */}
+                  <View style={styles.halvesContainer}>
+                    {/* 1ère Mi-Temps */}
+                    <View
+                      style={[
+                        styles.halfBox,
+                        {
+                          backgroundColor: inputBg,
+                          borderColor: currentTheme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.halfTitle, { color: currentTheme.textSecondary }]}>
+                        1ère mi-temps
+                      </Text>
+                      <View style={styles.halfInputsRow}>
+                        <View style={styles.teamScoreCol}>
                           <Text
-                            style={[
-                              styles.statusPillText,
-                              { color: currentTheme.textSecondary },
-                              current.status === 'Gain' && styles.statusPillTextActive,
-                            ]}
+                            style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
+                            numberOfLines={1}
                           >
-                            Gain
+                            Dom.
                           </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.statusPill,
-                            { borderColor: currentTheme.border },
-                            current.status === 'Perdu' && styles.statusPillLoss,
-                          ]}
-                          onPress={() => handleStatusChange(ev.id, 'Perdu')}
-                        >
-                          <Text
+                          <TextInput
                             style={[
-                              styles.statusPillText,
-                              { color: currentTheme.textSecondary },
-                              current.status === 'Perdu' && styles.statusPillTextActive,
-                            ]}
-                          >
-                            Perdu
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.statusPill,
-                            { borderColor: currentTheme.border },
-                            current.status === 'Accepté' && {
-                              backgroundColor: currentTheme.primary,
-                              borderColor: currentTheme.primary,
-                            },
-                          ]}
-                          onPress={() => handleStatusChange(ev.id, 'Accepté')}
-                        >
-                          <Text
-                            style={[
-                              styles.statusPillText,
-                              { color: currentTheme.textSecondary },
-                              current.status === 'Accepté' && {
-                                color: currentTheme.colors?.primaryText || '#FFFFFF',
-                                fontWeight: '700',
+                              styles.halfDigitInput,
+                              {
+                                backgroundColor: cardSurfaceBg,
+                                color: currentTheme.textPrimary,
+                                borderColor: currentTheme.border,
                               },
                             ]}
+                            value={current.ht1Home}
+                            onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht1Home', t)}
+                            keyboardType="numeric"
+                            maxLength={2}
+                            selectTextOnFocus
+                          />
+                        </View>
+                        <Text style={[styles.scoreColon, { color: currentTheme.textPrimary }]}>:</Text>
+                        <View style={styles.teamScoreCol}>
+                          <Text
+                            style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
+                            numberOfLines={1}
                           >
-                            En cours
+                            Ext.
                           </Text>
-                        </TouchableOpacity>
+                          <TextInput
+                            style={[
+                              styles.halfDigitInput,
+                              {
+                                backgroundColor: cardSurfaceBg,
+                                color: currentTheme.textPrimary,
+                                borderColor: currentTheme.border,
+                              },
+                            ]}
+                            value={current.ht1Away}
+                            onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht1Away', t)}
+                            keyboardType="numeric"
+                            maxLength={2}
+                            selectTextOnFocus
+                          />
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* 2ème Mi-Temps */}
+                    <View
+                      style={[
+                        styles.halfBox,
+                        {
+                          backgroundColor: inputBg,
+                          borderColor: currentTheme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.halfTitle, { color: currentTheme.textSecondary }]}>
+                        2ème mi-temps
+                      </Text>
+                      <View style={styles.halfInputsRow}>
+                        <View style={styles.teamScoreCol}>
+                          <Text
+                            style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
+                            numberOfLines={1}
+                          >
+                            Dom.
+                          </Text>
+                          <TextInput
+                            style={[
+                              styles.halfDigitInput,
+                              {
+                                backgroundColor: cardSurfaceBg,
+                                color: currentTheme.textPrimary,
+                                borderColor: currentTheme.border,
+                              },
+                            ]}
+                            value={current.ht2Home}
+                            onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht2Home', t)}
+                            keyboardType="numeric"
+                            maxLength={2}
+                            selectTextOnFocus
+                          />
+                        </View>
+                        <Text style={[styles.scoreColon, { color: currentTheme.textPrimary }]}>:</Text>
+                        <View style={styles.teamScoreCol}>
+                          <Text
+                            style={[styles.teamMiniLabel, { color: currentTheme.textSecondary }]}
+                            numberOfLines={1}
+                          >
+                            Ext.
+                          </Text>
+                          <TextInput
+                            style={[
+                              styles.halfDigitInput,
+                              {
+                                backgroundColor: cardSurfaceBg,
+                                color: currentTheme.textPrimary,
+                                borderColor: currentTheme.border,
+                              },
+                            ]}
+                            value={current.ht2Away}
+                            onChangeText={(t) => handleHalfFieldChange(ev.id, 'ht2Away', t)}
+                            keyboardType="numeric"
+                            maxLength={2}
+                            selectTextOnFocus
+                          />
+                        </View>
                       </View>
                     </View>
                   </View>
+
+                  {/* Aperçu en direct du score final et détail */}
+                  <View
+                    style={[
+                      styles.previewScoreBar,
+                      {
+                        backgroundColor: isDark ? 'rgba(78, 186, 111, 0.14)' : '#ECFDF5',
+                        borderColor: isDark ? 'rgba(78, 186, 111, 0.35)' : '#A7F3D0',
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.previewScoreLabel, { color: currentTheme.textSecondary }]}>
+                      Score affiché sur le coupon :
+                    </Text>
+                    <Text style={[styles.previewScoreValue, { color: payeGreen }]}>
+                      {computed.scoreDetail}
+                    </Text>
+                  </View>
+
+                  {/* Statut de l'événement */}
+                  <View style={styles.statusPillsBox}>
+                    <Text style={[styles.inputLabel, { color: currentTheme.textSecondary }]}>
+                      Statut de l'événement :
+                    </Text>
+                    <View style={styles.pillsRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.statusPill,
+                          { borderColor: currentTheme.border, backgroundColor: inputBg },
+                          current.status === 'Gain' && {
+                            backgroundColor: payeGreen,
+                            borderColor: payeGreen,
+                          },
+                        ]}
+                        onPress={() => handleStatusChange(ev.id, 'Gain')}
+                      >
+                        <Text
+                          style={[
+                            styles.statusPillText,
+                            { color: currentTheme.textSecondary },
+                            current.status === 'Gain' && styles.statusPillTextActive,
+                          ]}
+                        >
+                          Gain
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.statusPill,
+                          { borderColor: currentTheme.border, backgroundColor: inputBg },
+                          current.status === 'Perdu' && styles.statusPillLoss,
+                        ]}
+                        onPress={() => handleStatusChange(ev.id, 'Perdu')}
+                      >
+                        <Text
+                          style={[
+                            styles.statusPillText,
+                            { color: currentTheme.textSecondary },
+                            current.status === 'Perdu' && styles.statusPillTextActive,
+                          ]}
+                        >
+                          Perdu
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.statusPill,
+                          { borderColor: currentTheme.border, backgroundColor: inputBg },
+                          current.status === 'Accepté' && {
+                            backgroundColor: currentTheme.primary,
+                            borderColor: currentTheme.primary,
+                          },
+                        ]}
+                        onPress={() => handleStatusChange(ev.id, 'Accepté')}
+                      >
+                        <Text
+                          style={[
+                            styles.statusPillText,
+                            { color: currentTheme.textSecondary },
+                            current.status === 'Accepté' && {
+                              color: currentTheme.colors?.primaryText || '#FFFFFF',
+                              fontWeight: '700',
+                            },
+                          ]}
+                        >
+                          En cours
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
-              </React.Fragment>
               );
             })}
           </ScrollView>
 
+          {/* Boutons de validation finale avec les scores des 2 mi-temps saisis */}
           <TouchableOpacity
-            style={[styles.applyBtn, { backgroundColor: currentTheme.primary }]}
-            onPress={handleApply}
+            style={[styles.validateMainBtn, { backgroundColor: payeGreen }]}
+            activeOpacity={0.85}
+            onPress={() => handleValidateCouponWithEnteredHalves(true)}
           >
-            <Text style={[styles.applyBtnText, { color: currentTheme.colors?.primaryText || '#FFFFFF' }]}>Enregistrer et Recalculer</Text>
+            <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.validateMainBtnText}>
+              Valider le coupon (Gain / Payé)
+            </Text>
           </TouchableOpacity>
+
+          <View style={styles.bottomSecondaryRow}>
+            <TouchableOpacity
+              style={[
+                styles.secondaryActionBtn,
+                {
+                  backgroundColor: currentTheme.primary || '#3B82F6',
+                },
+              ]}
+              activeOpacity={0.85}
+              onPress={handleApplyIndividualScores}
+            >
+              <Text style={styles.secondaryActionBtnText}>Enregistrer les scores</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.secondaryActionBtn,
+                {
+                  backgroundColor: currentTheme.status?.perdu || '#EF4444',
+                },
+              ]}
+              activeOpacity={0.85}
+              onPress={() => handleValidateCouponWithEnteredHalves(false)}
+            >
+              <Text style={styles.secondaryActionBtnText}>Valider en Perdu</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     </Modal>
@@ -324,10 +645,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingTop: 12,
-    paddingBottom: 30,
-    maxHeight: '85%',
+    paddingBottom: 28,
+    maxHeight: '90%',
     width: '100%',
   },
   sheetTablet: {
@@ -335,7 +656,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    maxHeight: '80%',
+    maxHeight: '85%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
@@ -348,16 +669,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.borderDark,
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   title: {
-    fontSize: 17,
+    fontSize: 16.5,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
@@ -369,35 +690,12 @@ const styles = StyleSheet.create({
   closeBtn: {
     padding: 4,
   },
-  quickActionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-  },
-  quickBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 9,
-    borderRadius: 8,
-  },
-  quickWinBtn: {
-    backgroundColor: Colors.success,
-  },
-  quickLossBtn: {
-    backgroundColor: Colors.danger,
-  },
-  quickBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
   adaptScoresBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 7,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: 12,
@@ -406,8 +704,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   eventsScroll: {
-    maxHeight: 340,
-    marginBottom: 14,
+    maxHeight: 380,
+    marginBottom: 12,
   },
   eventCard: {
     backgroundColor: Colors.surfaceSecondary,
@@ -431,50 +729,96 @@ const styles = StyleSheet.create({
   eventLeague: {
     fontSize: 11,
     color: Colors.textMuted,
+    maxWidth: '75%',
   },
   eventMatch: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '700',
     color: Colors.textPrimary,
     marginBottom: 2,
   },
   eventPrediction: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: Colors.textSecondary,
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  inputsRow: {
+  halvesContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  halfBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  halfTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  halfInputsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 6,
   },
-  scoreInputBox: {
-    width: 90,
+  teamScoreCol: {
+    alignItems: 'center',
   },
-  inputLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.textMuted,
-    marginBottom: 4,
+  teamMiniLabel: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    marginBottom: 3,
   },
-  scoreInput: {
-    backgroundColor: '#fff',
+  halfDigitInput: {
+    width: 44,
+    height: 36,
     borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: 13,
+    borderRadius: 7,
+    fontSize: 15,
     fontWeight: '800',
-    color: Colors.textPrimary,
     textAlign: 'center',
+    paddingVertical: 0,
+  },
+  scoreColon: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 14,
+  },
+  previewScoreBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  previewScoreLabel: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  previewScoreValue: {
+    fontSize: 13.5,
+    fontWeight: '800',
   },
   statusPillsBox: {
-    flex: 1,
+    marginTop: 2,
+  },
+  inputLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    marginBottom: 5,
   },
   pillsRow: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
   },
   statusPill: {
     flex: 1,
@@ -485,36 +829,46 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: 'center',
   },
-  statusPillWin: {
-    backgroundColor: Colors.success,
-    borderColor: Colors.success,
-  },
   statusPillLoss: {
     backgroundColor: Colors.danger,
     borderColor: Colors.danger,
   },
-  statusPillPending: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
   statusPillText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     color: Colors.textSecondary,
   },
   statusPillTextActive: {
     color: '#fff',
   },
-  applyBtn: {
-    backgroundColor: Colors.primary,
+  validateMainBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 10,
     paddingVertical: 13,
-    alignItems: 'center',
+    marginBottom: 8,
   },
-  applyBtnText: {
-    color: '#fff',
-    fontSize: 14,
+  validateMainBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
     fontWeight: '800',
+  },
+  bottomSecondaryRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  secondaryActionBtn: {
+    flex: 1,
+    borderRadius: 9,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
 });
 

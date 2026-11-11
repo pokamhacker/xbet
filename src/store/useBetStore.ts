@@ -23,8 +23,25 @@ interface BetState {
   addCoupon: (coupon: BetSlip, userId?: string) => void;
   addMatchToBetCoupon: (matchPayload: any) => void;
   updateCouponStatus: (couponId: string, status: BetStatus) => void;
-  validateCouponWithResult: (couponId: string, isWon: boolean, customScores?: { [eventId: string]: string }) => void;
-  updateEventScore: (couponId: string, eventId: string, score: string, status: BetStatus) => void;
+  validateCouponWithResult: (
+    couponId: string,
+    isWon: boolean,
+    customScores?: {
+      [eventId: string]:
+        | string
+        | {
+            scoreFinal?: string;
+            halftimeScore?: string;
+          };
+    }
+  ) => void;
+  updateEventScore: (
+    couponId: string,
+    eventId: string,
+    score: string,
+    status: BetStatus,
+    halftimeScore?: string
+  ) => void;
   toggleCashout: (couponId: string, amount?: number) => void;
   executeCashout: (couponId: string) => void;
   duplicateCoupon: (couponId: string) => MatchEvent[];
@@ -2335,7 +2352,18 @@ export const useBetStore = create<BetState>()(
         betApiService.updateBetStatusOnBackend(couponId, status, actualPayout);
       },
 
-      validateCouponWithResult: (couponId: string, isWon: boolean, customScores?: { [eventId: string]: string }) => {
+      validateCouponWithResult: (
+        couponId: string,
+        isWon: boolean,
+        customScores?: {
+          [eventId: string]:
+            | string
+            | {
+                scoreFinal?: string;
+                halftimeScore?: string;
+              };
+        }
+      ) => {
         let finalStatus: BetStatus = isWon ? 'Payé' : 'Perdu';
         let payout = 0;
         set((state) => {
@@ -2345,29 +2373,48 @@ export const useBetStore = create<BetState>()(
 
             const updatedEvents = coupon.events.map((event) => {
               const adapted = adaptEventResultToPrediction(event, isWon);
-              const customScore = customScores?.[event.id];
+              const customEntry = customScores?.[event.id];
+              const customFinal =
+                typeof customEntry === 'string'
+                  ? customEntry.includes('(')
+                    ? customEntry.split('(')[0].trim()
+                    : customEntry
+                  : customEntry?.scoreFinal;
+              const customDetail =
+                typeof customEntry === 'string'
+                  ? customEntry.includes('(')
+                    ? customEntry
+                    : undefined
+                  : customEntry?.halftimeScore;
+
               const completeScore = ensureTwoHalvesScoreFormat({
                 event,
-                rawScoreFinal: customScore || event.actualScore || adapted.actualScore,
-                rawScoreDetail: event.halftimeScore || adapted.halftimeScore,
+                rawScoreFinal: customFinal || event.actualScore || adapted.actualScore,
+                rawScoreDetail: customDetail || event.halftimeScore || adapted.halftimeScore,
                 isWin: isWon,
               });
 
-              return {
+              const nextEv: MatchEvent = {
                 ...event,
                 status: (isWon ? 'Gain' : 'Perdu') as BetStatus,
                 isLive: false,
                 actualScore: completeScore.scoreFinal,
+                finalScore: completeScore.scoreFinal,
                 halftimeScore: completeScore.scoreDetail,
                 pokerResult: adapted.pokerResult || event.pokerResult,
                 mkResult: adapted.mkResult || event.mkResult,
               };
+              (nextEv as any).scoreFinal = completeScore.scoreFinal;
+              (nextEv as any).scoreDetail = completeScore.scoreDetail;
+              return nextEv;
             });
 
             const newStatus: BetStatus = isWon ? 'Payé' : 'Perdu';
             finalStatus = newStatus;
-            if (isWon) {
+            if (isWon && coupon.status !== 'Payé') {
               balanceChange += coupon.potentialPayout;
+              payout = coupon.potentialPayout;
+            } else if (isWon) {
               payout = coupon.potentialPayout;
             }
 
@@ -2390,26 +2437,41 @@ export const useBetStore = create<BetState>()(
         betApiService.updateBetStatusOnBackend(couponId, finalStatus, payout);
       },
 
-      updateEventScore: (couponId: string, eventId: string, score: string, status: BetStatus) => {
+      updateEventScore: (
+        couponId: string,
+        eventId: string,
+        score: string,
+        status: BetStatus,
+        halftimeScore?: string
+      ) => {
         let updatedCouponStatus: BetStatus | undefined;
-        set((state) => ({
-          coupons: state.coupons.map((c) => {
+        set((state) => {
+          let balanceDelta = 0;
+          const nextCoupons = state.coupons.map((c) => {
             if (c.id !== couponId) return c;
+            const wasPaid = c.status === 'Payé';
             const newEvents = c.events.map((e) => {
               if (e.id !== eventId) return e;
               const isWin = status === 'Gain' || status === 'Payé' || status === 'Gagné';
+              const rawFinal = score.includes('(') ? score.split('(')[0].trim() : score;
+              const rawDetail = halftimeScore || (score.includes('(') ? score : e.halftimeScore);
               const completeScore = ensureTwoHalvesScoreFormat({
                 event: e,
-                rawScoreFinal: score,
-                rawScoreDetail: e.halftimeScore,
+                rawScoreFinal: rawFinal,
+                rawScoreDetail: rawDetail,
                 isWin,
               });
-              return {
+              const updatedEv: MatchEvent = {
                 ...e,
                 actualScore: completeScore.scoreFinal,
+                finalScore: completeScore.scoreFinal,
                 status,
+                isLive: status === 'Accepté' ? e.isLive : false,
                 halftimeScore: completeScore.scoreDetail,
               };
+              (updatedEv as any).scoreFinal = completeScore.scoreFinal;
+              (updatedEv as any).scoreDetail = completeScore.scoreDetail;
+              return updatedEv;
             });
             const allCompleted = newEvents.every((e) => e.status !== 'Accepté' && e.status !== 'En cours');
             const allWon = newEvents.every((e) => e.status === 'Gain' || e.status === 'Payé');
@@ -2420,15 +2482,25 @@ export const useBetStore = create<BetState>()(
             else if (anyLost) newCouponStatus = 'Perdu';
             updatedCouponStatus = newCouponStatus;
 
+            if (newCouponStatus === 'Payé' && !wasPaid) {
+              balanceDelta += c.potentialPayout;
+            }
+
             return {
               ...c,
               events: newEvents,
               status: newCouponStatus,
+              isLive: allCompleted ? false : c.isLive,
               completedCount: allCompleted ? c.eventsCount : c.completedCount,
               actualPayout: allWon ? c.potentialPayout : (anyLost ? 0 : c.actualPayout),
             };
-          }),
-        }));
+          });
+
+          return {
+            coupons: nextCoupons,
+            balance: state.balance + balanceDelta,
+          };
+        });
 
         betApiService.updateBetScoreOnBackend(couponId, eventId, score, status, updatedCouponStatus);
       },

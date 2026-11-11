@@ -655,11 +655,15 @@ export function ensureTwoHalvesScoreFormat(params: {
   const isExplicit11 = /(?:1\s*[-:–]\s*1|match\s*nul|nul|^x$|^n$|1x2\.\s*x)/i.test(pred);
 
   const cleanRawFinal = (rawScoreFinal || '').trim();
+  const hasExplicitTwoHalves = Boolean(
+    rawScoreDetail && /\(\s*\d+\s*[:\-]\s*\d+\s*,\s*\d+\s*[:\-]\s*\d+\s*\)/.test(rawScoreDetail)
+  );
   const isDefault11 =
-    cleanRawFinal === '1-1' ||
-    cleanRawFinal === '1:1' ||
-    cleanRawFinal === '1 - 1' ||
-    cleanRawFinal === '1 : 1';
+    !hasExplicitTwoHalves &&
+    (cleanRawFinal === '1-1' ||
+      cleanRawFinal === '1:1' ||
+      cleanRawFinal === '1 - 1' ||
+      cleanRawFinal === '1 : 1');
 
   const adapted = adaptEventResultToPrediction(
     {

@@ -456,9 +456,12 @@ export const formatFootballHeader = (
       cleanLeague = `Allemagne. ${cleanLeague}`;
     } else if (lower.includes('ligue 1')) {
       cleanLeague = `France. ${cleanLeague}`;
-    } else if (lower.includes('champions league') || lower.includes('ligue des champions')) {
+    } else if (
+      (lower.includes('champions league') || lower.includes('ligue des champions')) &&
+      !lower.includes("de l'uefa")
+    ) {
       cleanLeague = `Europe. ${cleanLeague}`;
-    } else if (lower.includes('europa league')) {
+    } else if (lower.includes('europa league') && !lower.includes("de l'uefa")) {
       cleanLeague = `Europe. ${cleanLeague}`;
     }
   }

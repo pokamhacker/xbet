@@ -48,9 +48,21 @@ import { normalizeBetSelectionLabel } from '../utils/scoreAdapter';
 const TOP_REAL_LEAGUES = [
   {
     id: 'uefa-champions-league',
-    name: 'UEFA Champions League',
+    name: "Ligue des champions de l'UEFA",
     country: 'Europe',
     logo: 'https://media.api-sports.io/football/leagues/2.png',
+  },
+  {
+    id: 'uefa-womens-champions-league',
+    name: "Ligue des champions de l'UEFA. Femmes",
+    country: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/525.png',
+  },
+  {
+    id: 'uefa-nations-league',
+    name: "Ligue des nations de l'UEFA",
+    country: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/5.png',
   },
   {
     id: 'premier-league',
@@ -98,6 +110,18 @@ const TOP_REAL_LEAGUES = [
 
 // Championnats Afrique & Sélections Internationales
 const AFRICA_AND_REGIONS_LEAGUES = [
+  {
+    id: 'uefa-nations-league',
+    name: "Ligue des nations de l'UEFA",
+    country: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/5.png',
+  },
+  {
+    id: 'uefa-womens-champions-league',
+    name: "Ligue des champions de l'UEFA. Femmes",
+    country: 'Europe',
+    logo: 'https://media.api-sports.io/football/leagues/525.png',
+  },
   {
     id: 'can-coupe-dafrique-des-nations',
     name: "Coupe d'Afrique des Nations (CAN)",
@@ -284,6 +308,10 @@ export default function StudioCreationScreen({ navigation }: any) {
   const [selectedOptionLabel, setSelectedOptionLabel] = useState('');
   const [odd, setOdd] = useState('');
   const [finalScoreSwitch, setFinalScoreSwitch] = useState(false);
+  const [studioHt1Home, setStudioHt1Home] = useState('1');
+  const [studioHt1Away, setStudioHt1Away] = useState('0');
+  const [studioHt2Home, setStudioHt2Home] = useState('1');
+  const [studioHt2Away, setStudioHt2Away] = useState('0');
   // Clé du pronostic rapide actif ('1', 'X', '2', etc. ou 'custom') pour adapter dynamiquement l'intitulé
   const [selectedPredKey, setSelectedPredKey] = useState<string>('1');
   const [predictionPeriod, setPredictionPeriod] = useState<'regular' | 'first_half' | 'second_half'>('regular');
@@ -901,6 +929,17 @@ export default function StudioCreationScreen({ navigation }: any) {
     const evIsLive = isFifa ? true : isLiveBadge;
 
     const customElapsedSec = parseElapsedMMSS(liveElapsedInput);
+    const h1 = Math.max(0, parseInt(studioHt1Home, 10) || 0);
+    const a1 = Math.max(0, parseInt(studioHt1Away, 10) || 0);
+    const h2 = Math.max(0, parseInt(studioHt2Home, 10) || 0);
+    const a2 = Math.max(0, parseInt(studioHt2Away, 10) || 0);
+    const studioTotalH = h1 + h2;
+    const studioTotalA = a1 + a2;
+    const studioScoreFinal = finalScoreSwitch ? `${studioTotalH}:${studioTotalA}` : undefined;
+    const studioScoreDetail = finalScoreSwitch
+      ? `${studioTotalH}:${studioTotalA} (${h1}:${a1},${h2}:${a2})`
+      : undefined;
+
     const newEv: MatchEvent = {
       id: String(Date.now()),
       sport: isFifa ? 'FIFA' : 'Football',
@@ -913,13 +952,19 @@ export default function StudioCreationScreen({ navigation }: any) {
       awayTeam: { name: awayTeam, logo: awayTeamLogo },
       prediction: normalizedPred,
       odd: numericOdd,
-      actualScore: undefined,
+      actualScore: studioScoreFinal,
+      finalScore: studioScoreFinal,
+      halftimeScore: studioScoreDetail,
       status: 'Accepté',
       isLive: evIsLive,
       isFifa,
       elapsedSeconds: customElapsedSec,
       gameCategory: 'sports',
     };
+    if (studioScoreFinal) {
+      (newEv as any).scoreFinal = studioScoreFinal;
+      (newEv as any).scoreDetail = studioScoreDetail;
+    }
     (newEv as any).hasCustomElapsed = typeof customElapsedSec === 'number';
     (newEv as any).liveStartedAt = Date.now();
     setAddedEvents([...addedEvents, newEv]);
@@ -959,6 +1004,16 @@ export default function StudioCreationScreen({ navigation }: any) {
       );
       const evIsLive = isFifa ? true : isLiveBadge;
       const customElapsedSec = parseElapsedMMSS(liveElapsedInput);
+      const h1 = Math.max(0, parseInt(studioHt1Home, 10) || 0);
+      const a1 = Math.max(0, parseInt(studioHt1Away, 10) || 0);
+      const h2 = Math.max(0, parseInt(studioHt2Home, 10) || 0);
+      const a2 = Math.max(0, parseInt(studioHt2Away, 10) || 0);
+      const studioTotalH = h1 + h2;
+      const studioTotalA = a1 + a2;
+      const studioScoreFinal = finalScoreSwitch ? `${studioTotalH}:${studioTotalA}` : undefined;
+      const studioScoreDetail = finalScoreSwitch
+        ? `${studioTotalH}:${studioTotalA} (${h1}:${a1},${h2}:${a2})`
+        : undefined;
       const autoEv: MatchEvent = {
         id: String(Date.now()),
         sport: isFifa ? 'FIFA' : 'Football',
@@ -971,13 +1026,19 @@ export default function StudioCreationScreen({ navigation }: any) {
         awayTeam: { name: awayTeam, logo: awayTeamLogo },
         prediction: normalizedPred,
         odd: numericOdd,
-        actualScore: undefined,
+        actualScore: studioScoreFinal,
+        finalScore: studioScoreFinal,
+        halftimeScore: studioScoreDetail,
         status: 'Accepté',
         isLive: evIsLive,
         isFifa,
         elapsedSeconds: customElapsedSec,
         gameCategory: 'sports',
       };
+      if (studioScoreFinal) {
+        (autoEv as any).scoreFinal = studioScoreFinal;
+        (autoEv as any).scoreDetail = studioScoreDetail;
+      }
       (autoEv as any).hasCustomElapsed = typeof customElapsedSec === 'number';
       (autoEv as any).liveStartedAt = Date.now();
       eventsToSave = [autoEv];
@@ -1989,7 +2050,7 @@ export default function StudioCreationScreen({ navigation }: any) {
               />
             </View>
             <View style={styles.switchCol}>
-              <Text style={styles.fieldLabel}>Score final</Text>
+              <Text style={styles.fieldLabel}>Score 2 mi-temps</Text>
               <Switch
                 value={finalScoreSwitch}
                 onValueChange={setFinalScoreSwitch}
@@ -1998,6 +2059,110 @@ export default function StudioCreationScreen({ navigation }: any) {
               />
             </View>
           </View>
+
+          {finalScoreSwitch && (
+            <View
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 10,
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+              }}
+            >
+              <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>
+                Saisie du score des 2 mi-temps (avant validation)
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {/* 1ère mi-temps */}
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 8,
+                    padding: 8,
+                    borderWidth: 1,
+                    borderColor: '#CBD5E1',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
+                    1ère mi-temps
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { width: 44, height: 36, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
+                      ]}
+                      value={studioHt1Home}
+                      onChangeText={(t) => setStudioHt1Home(t.replace(/[^0-9]/g, ''))}
+                      keyboardType="numeric"
+                      maxLength={2}
+                    />
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>:</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { width: 44, height: 36, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
+                      ]}
+                      value={studioHt1Away}
+                      onChangeText={(t) => setStudioHt1Away(t.replace(/[^0-9]/g, ''))}
+                      keyboardType="numeric"
+                      maxLength={2}
+                    />
+                  </View>
+                </View>
+
+                {/* 2ème mi-temps */}
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 8,
+                    padding: 8,
+                    borderWidth: 1,
+                    borderColor: '#CBD5E1',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
+                    2ème mi-temps
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { width: 44, height: 36, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
+                      ]}
+                      value={studioHt2Home}
+                      onChangeText={(t) => setStudioHt2Home(t.replace(/[^0-9]/g, ''))}
+                      keyboardType="numeric"
+                      maxLength={2}
+                    />
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>:</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { width: 44, height: 36, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
+                      ]}
+                      value={studioHt2Away}
+                      onChangeText={(t) => setStudioHt2Away(t.replace(/[^0-9]/g, ''))}
+                      keyboardType="numeric"
+                      maxLength={2}
+                    />
+                  </View>
+                </View>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#16A34A', marginTop: 8, textAlign: 'center' }}>
+                Score calculé : {(parseInt(studioHt1Home, 10) || 0) + (parseInt(studioHt2Home, 10) || 0)}:
+                {(parseInt(studioHt1Away, 10) || 0) + (parseInt(studioHt2Away, 10) || 0)} (
+                {parseInt(studioHt1Home, 10) || 0}:{parseInt(studioHt1Away, 10) || 0},
+                {parseInt(studioHt2Home, 10) || 0}:{parseInt(studioHt2Away, 10) || 0})
+              </Text>
+            </View>
+          )}
 
           {/* Bouton Ajouter l'Événement */}
           <TouchableOpacity style={styles.addBtn} onPress={handleAddEvent}>

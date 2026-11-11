@@ -28,6 +28,7 @@ import {
   getScreenBgColor,
   getStatusBarStyleForTheme,
 } from '../../theme/themes';
+import { ScoreEditorModal } from '../../components/ScoreEditorModal';
 
 // ============================================================================
 // ICÔNES LOCALES DEPUIS LE DOSSIER ASSETS
@@ -690,6 +691,7 @@ export default function HistoryListScreen() {
   const [isDepositModalVisible, setIsDepositModalVisible] = useState(false);
   const [depositInputAmount, setDepositInputAmount] = useState('50000');
   const [isOptionsModalVisible, setIsOptionsModalVisible] = useState(false);
+  const [isScoreEditorVisible, setIsScoreEditorVisible] = useState(false);
   const [selectedCouponForOptions, setSelectedCouponForOptions] = useState<BetSlip | null>(null);
   const [isSaleActive, setIsSaleActive] = useState(false);
   const [isHeaderExpanded, setIsHeaderExpanded] = useState(true);
@@ -1599,24 +1601,23 @@ export default function HistoryListScreen() {
               style={styles.modalOptionItem}
               onPress={() => {
                 if (selectedCouponForOptions) {
-                  validateCouponWithResult(selectedCouponForOptions.id, true);
                   setIsOptionsModalVisible(false);
-                  Alert.alert('Succès', 'Le coupon a été validé comme Gagné (Payé) !');
+                  setIsScoreEditorVisible(true);
                 }
               }}
             >
               <Text
                 style={[
                   styles.modalOptionText,
-                  { color: currentTheme.status?.paye || '#2ECC71', fontWeight: '600' },
+                  { color: currentTheme.status?.paye || '#4EBA6F', fontWeight: '600' },
                 ]}
               >
-                Valider le coupon (Gain / Payé)
+                Valider le coupon (Saisir les scores des 2 mi-temps)
               </Text>
               <Ionicons
                 name="checkmark-circle-outline"
                 size={20}
-                color={currentTheme.status?.paye || '#2ECC71'}
+                color={currentTheme.status?.paye || '#4EBA6F'}
               />
             </TouchableOpacity>
 
@@ -1709,6 +1710,13 @@ export default function HistoryListScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Modale de saisie des scores des 2 mi-temps avant validation */}
+      <ScoreEditorModal
+        visible={isScoreEditorVisible}
+        coupon={selectedCouponForOptions}
+        onClose={() => setIsScoreEditorVisible(false)}
+      />
     </View>
   );
 }

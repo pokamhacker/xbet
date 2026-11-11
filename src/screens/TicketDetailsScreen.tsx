@@ -9,6 +9,7 @@ import {
   Alert,
   Image,
   Animated,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -53,6 +54,7 @@ import {
 import { formatCleanOdds } from '../utils/oddsFormatter';
 import { renderCardsWithSuits, generateWinningPokerDraw } from '../utils/pokerGenerator';
 import { PokerFormattedLine } from '../components/poker/PokerSuit3DIcon';
+import { ScoreEditorModal } from '../components/ScoreEditorModal';
 
 // ============================================================================
 // Types
@@ -213,21 +215,24 @@ export default function TicketDetailsScreen({
     return () => clearInterval(timer);
   }, []);
 
-  // 1. Résolution dynamique du coupon
+  // 1. Résolution dynamique du coupon (priorité au store réactif pour refléter immédiatement la validation/saisie de scores)
   const couponId = route?.params?.couponId || route?.params?.ticketId || route?.params?.id;
   const passedCoupon = route?.params?.coupon || route?.params?.ticket || propTicket;
+  const [isScoreModalVisible, setIsScoreModalVisible] = useState(false);
+  const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
 
   const currentCoupon: BetSlip = useMemo(() => {
-    if (passedCoupon && (passedCoupon.id || passedCoupon.ticketNumber)) {
-      return passedCoupon;
-    }
-    if (couponId) {
+    const targetId = couponId || passedCoupon?.id || (passedCoupon as any)?.ticketNumber;
+    if (targetId) {
       const found = coupons.find(
         (c) =>
-          String(c.id) === String(couponId) ||
-          String((c as any).ticketNumber) === String(couponId)
+          String(c.id) === String(targetId) ||
+          String((c as any).ticketNumber) === String(targetId)
       );
       if (found) return found;
+    }
+    if (passedCoupon && (passedCoupon.id || (passedCoupon as any).ticketNumber)) {
+      return passedCoupon;
     }
     return coupons[0] || ({} as BetSlip);
   }, [coupons, couponId, passedCoupon]);
@@ -640,56 +645,7 @@ export default function TicketDetailsScreen({
       onMore();
       return;
     }
-    Alert.alert(
-      `Pari № ${ticketNumber}`,
-      'Que souhaitez-vous faire ?',
-      [
-        ...(!isPaid
-          ? [
-              {
-                text: 'Valider le coupon (Gain / Payé)',
-                onPress: () => {
-                  validateCouponWithResult(currentCoupon.id, true);
-                  Alert.alert('Succès', 'Le coupon a été validé et payé.');
-                },
-              },
-            ]
-          : [
-              {
-                text: 'Marquer comme Accepté (En cours)',
-                onPress: () => {
-                  updateCouponStatus(currentCoupon.id, 'Accepté');
-                  Alert.alert('Statut mis à jour', 'Le coupon est maintenant en statut Accepté.');
-                },
-              },
-            ]),
-        {
-          text: 'Dupliquer le coupon',
-          onPress: handleDuplicate,
-        },
-        {
-          text: 'Copier le numéro de coupon',
-          onPress: async () => {
-            try {
-              await Clipboard.setStringAsync(ticketNumber);
-              Alert.alert('Copié', 'Numéro de coupon copié dans le presse-papier.');
-            } catch {
-              // noop
-            }
-          },
-        },
-        {
-          text: 'Enregistrer le coupon',
-          onPress: () => {
-            Alert.alert('Enregistré', 'Coupon sauvegardé dans vos favoris.');
-          },
-        },
-        {
-          text: 'Annuler',
-          style: 'cancel',
-        },
-      ]
-    );
+    setIsMoreModalVisible(true);
   };
 
   const handleCashout = () => {
@@ -1641,6 +1597,196 @@ export default function TicketDetailsScreen({
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Menu d'options du coupon (Validation avec saisie des scores des 2 mi-temps) */}
+      <Modal
+        visible={isMoreModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMoreModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.52)',
+            justifyContent: 'flex-end',
+          }}
+          activeOpacity={1}
+          onPress={() => setIsMoreModalVisible(false)}
+        >
+          <View
+            style={{
+              backgroundColor: currentTheme.cardBackground || (isDark ? '#1E2A36' : '#FFFFFF'),
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingHorizontal: 18,
+              paddingTop: 14,
+              paddingBottom: Math.max(24, insets.bottom + 14),
+            }}
+            onStartShouldSetResponder={() => true}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: currentTheme.border || '#CBD5E1',
+                alignSelf: 'center',
+                marginBottom: 12,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '700',
+                color: currentTheme.textPrimary,
+                textAlign: 'center',
+                marginBottom: 14,
+              }}
+            >
+              Pari № {ticketNumber}
+            </Text>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 14,
+                borderBottomWidth: 1,
+                borderBottomColor: currentTheme.divider || currentTheme.border || '#E2E8F0',
+              }}
+              onPress={() => {
+                setIsMoreModalVisible(false);
+                setIsScoreModalVisible(true);
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: '700',
+                  color: payeColor,
+                }}
+              >
+                {isPaid
+                  ? 'Modifier les scores des 2 mi-temps'
+                  : 'Valider le coupon (Saisir les scores des 2 mi-temps)'}
+              </Text>
+              <Ionicons name="checkmark-circle-outline" size={22} color={payeColor} />
+            </TouchableOpacity>
+
+            {(isPaid || isLost) && (
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 14,
+                  borderBottomWidth: 1,
+                  borderBottomColor: currentTheme.divider || currentTheme.border || '#E2E8F0',
+                }}
+                onPress={() => {
+                  updateCouponStatus(currentCoupon.id, 'Accepté');
+                  setIsMoreModalVisible(false);
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: '600',
+                    color: accepteColor,
+                  }}
+                >
+                  Marquer comme Accepté (En cours)
+                </Text>
+                <Ionicons name="refresh-outline" size={20} color={accepteColor} />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 14,
+                borderBottomWidth: 1,
+                borderBottomColor: currentTheme.divider || currentTheme.border || '#E2E8F0',
+              }}
+              onPress={() => {
+                setIsMoreModalVisible(false);
+                handleDuplicate();
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: '500',
+                  color: currentTheme.textPrimary,
+                }}
+              >
+                Dupliquer le coupon
+              </Text>
+              <Ionicons name="copy-outline" size={20} color={currentTheme.textSecondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 14,
+                borderBottomWidth: 1,
+                borderBottomColor: currentTheme.divider || currentTheme.border || '#E2E8F0',
+              }}
+              onPress={async () => {
+                try {
+                  await Clipboard.setStringAsync(ticketNumber);
+                } catch {
+                  // noop
+                }
+                setIsMoreModalVisible(false);
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: '500',
+                  color: currentTheme.textPrimary,
+                }}
+              >
+                Copier le numéro de coupon
+              </Text>
+              <Ionicons name="clipboard-outline" size={20} color={currentTheme.textSecondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                paddingVertical: 14,
+                marginTop: 4,
+                alignItems: 'center',
+              }}
+              onPress={() => setIsMoreModalVisible(false)}
+            >
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: '600',
+                  color: currentTheme.textSecondary,
+                }}
+              >
+                Fermer
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Modale de saisie des scores des 2 mi-temps avant validation */}
+      <ScoreEditorModal
+        visible={isScoreModalVisible}
+        coupon={currentCoupon}
+        onClose={() => setIsScoreModalVisible(false)}
+      />
     </View>
   );
 }
@@ -2180,17 +2326,17 @@ const styles = StyleSheet.create({
 
   // Badge • En direct rouge (Correction 4 : Style exact de la Capture 3)
   liveRedBadge: {
-    backgroundColor: '#D94343',
+    backgroundColor: '#FF3B30',
     borderRadius: 7,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
   },
   liveRedBadgeDot: {
-    width: 4.5,
-    height: 4.5,
+    width: 4,
+    height: 4,
     borderRadius: 2.25,
     backgroundColor: '#FFFFFF',
     marginRight: 5,
