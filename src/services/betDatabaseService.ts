@@ -83,7 +83,7 @@ class BetDatabaseService {
   async createBet(data: BetInput): Promise<FormattedBet> {
     const db = getSqliteDb();
     const betId = data.id || `bet_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
-    const ticketNumber = data.ticket_number || data.id || '85' + Math.floor(100000000 + Math.random() * 900000000);
+    const ticketNumber = data.ticket_number || data.id || '95' + Math.floor(100000000 + Math.random() * 900000000);
     const createdAt = safeIsoDate(data.created_at, true)!;
 
     const items = (data.items || []).map((it, idx) => {

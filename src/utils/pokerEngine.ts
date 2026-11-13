@@ -71,7 +71,20 @@ export function generateRoundCode(): string {
 }
 
 export function generateCouponId(): string {
-  return `85${Math.floor(100000000 + Math.random() * 900000000)}`;
+  return `95${Math.floor(100000000 + Math.random() * 900000000)}`;
+}
+
+/**
+ * Remplace un préfixe numérique commençant par '8' sur les IDs de ticket
+ * (minimum 8 chiffres) par '9' pour garantir que tous les IDs commencent par 9.
+ */
+export function normalizeTicketIdPrefix(rawId?: string | number | null): string {
+  if (rawId === null || rawId === undefined) return '';
+  const str = String(rawId).trim();
+  if (/^8\d{7,}$/.test(str)) {
+    return `9${str.slice(1)}`;
+  }
+  return str;
 }
 
 export function generateShareCode(): string {

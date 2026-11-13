@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  TextInput,
   ScrollView,
   Alert,
   Platform,
@@ -20,6 +19,17 @@ import {
   adaptEventResultToPrediction,
   ensureTwoHalvesScoreFormat,
 } from '../utils/scoreAdapter';
+import { HalfDigitInput } from './common/HalfDigitInput';
+import { ScoreNumericKeypad } from './common/ScoreNumericKeypad';
+
+type HalfFieldKey = 'ht1Home' | 'ht1Away' | 'ht2Home' | 'ht2Away';
+
+const HALF_FIELD_LABELS: Record<HalfFieldKey, string> = {
+  ht1Home: '1ère MT • Dom.',
+  ht1Away: '1ère MT • Ext.',
+  ht2Home: '2ème MT • Dom.',
+  ht2Away: '2ème MT • Ext.',
+};
 
 interface ScoreEditorModalProps {
   visible: boolean;
@@ -83,6 +93,12 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
     [id: string]: EventHalfScoreState;
   }>(() => buildInitialEventStates(coupon, true));
 
+  const [activeField, setActiveField] = useState<{
+    eventId: string;
+    field: HalfFieldKey;
+  } | null>(null);
+  const replaceNextRef = useRef(true);
+
   const wasVisibleRef = useRef(false);
   const lastCouponIdRef = useRef<string | null>(null);
 
@@ -90,7 +106,17 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
     const currentId = coupon?.id ? String(coupon.id) : null;
     if (visible && coupon) {
       if (!wasVisibleRef.current || lastCouponIdRef.current !== currentId) {
-        setEventStates(buildInitialEventStates(coupon, true));
+        const initStates = buildInitialEventStates(coupon, true);
+        setEventStates(initStates);
+        const firstNonSpecial = coupon.events.findIndex((ev) => !isBonusOrPokerEvent(ev));
+        if (firstNonSpecial >= 0) {
+          const firstEv = coupon.events[firstNonSpecial];
+          const firstKey = firstEv.id || `ev-${firstNonSpecial}`;
+          setActiveField({ eventId: firstKey, field: 'ht1Home' });
+          replaceNextRef.current = true;
+        } else {
+          setActiveField(null);
+        }
         lastCouponIdRef.current = currentId;
       }
       wasVisibleRef.current = true;
@@ -136,10 +162,11 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
 
   const handleHalfFieldChange = (
     eventId: string,
-    field: 'ht1Home' | 'ht1Away' | 'ht2Home' | 'ht2Away',
+    field: HalfFieldKey,
     text: string
   ) => {
-    const clean = text.replace(/[^0-9]/g, '');
+    const clean = text.replace(/[^0-9]/g, '').slice(0, 2);
+    replaceNextRef.current = false;
     setEventStates((prev) => {
       const current = prev[eventId] || {
         ht1Home: '1',
@@ -158,11 +185,68 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
     });
   };
 
+  const handleFocusHalfField = (eventId: string, field: HalfFieldKey) => {
+    setActiveField({ eventId, field });
+    replaceNextRef.current = true;
+  };
+
+  const handleKeypadDigit = (digit: string) => {
+    if (!activeField) return;
+    const { eventId, field } = activeField;
+    setEventStates((prev) => {
+      const current = prev[eventId] || {
+        ht1Home: '1',
+        ht1Away: '0',
+        ht2Home: '1',
+        ht2Away: '0',
+        status: 'Gain' as BetStatus,
+      };
+      const curVal = String(current[field] || '');
+      const nextVal = replaceNextRef.current
+        ? digit
+        : (curVal + digit).replace(/[^0-9]/g, '').slice(0, 2);
+      replaceNextRef.current = false;
+      return {
+        ...prev,
+        [eventId]: {
+          ...current,
+          [field]: nextVal,
+        },
+      };
+    });
+  };
+
+  const handleKeypadBackspace = () => {
+    if (!activeField) return;
+    const { eventId, field } = activeField;
+    replaceNextRef.current = false;
+    setEventStates((prev) => {
+      const current = prev[eventId] || {
+        ht1Home: '1',
+        ht1Away: '0',
+        ht2Home: '1',
+        ht2Away: '0',
+        status: 'Gain' as BetStatus,
+      };
+      const curVal = String(current[field] || '');
+      const nextVal = curVal.length > 0 ? curVal.slice(0, -1) : '';
+      return {
+        ...prev,
+        [eventId]: {
+          ...current,
+          [field]: nextVal,
+        },
+      };
+    });
+  };
+
   const adjustHalfField = (
     eventId: string,
-    field: 'ht1Home' | 'ht1Away' | 'ht2Home' | 'ht2Away',
+    field: HalfFieldKey,
     delta: number
   ) => {
+    replaceNextRef.current = false;
+    setActiveField({ eventId, field });
     setEventStates((prev) => {
       const current = prev[eventId] || {
         ht1Home: '1',
@@ -289,6 +373,28 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   const cardSurfaceBg = isDark ? currentTheme.surface || '#1E293B' : '#F8FAFC';
   const inputBg = currentTheme.cardBackground || (isDark ? '#0F172A' : '#FFFFFF');
   const payeGreen = '#4EBA6F';
+  const webStopBubbleProps: any =
+    Platform.OS === 'web'
+      ? {
+          onTouchStart: (e: any) => e?.stopPropagation?.(),
+          onTouchEnd: (e: any) => e?.stopPropagation?.(),
+          onPointerDown: (e: any) => e?.stopPropagation?.(),
+          onMouseDown: (e: any) => e?.stopPropagation?.(),
+        }
+      : {};
+  const webKeepFocusProps: any =
+    Platform.OS === 'web'
+      ? {
+          'data-keep-input-focus': 'true',
+          onMouseDown: (e: any) => {
+            e?.preventDefault?.();
+            e?.stopPropagation?.();
+          },
+          onTouchStart: (e: any) => {
+            e?.stopPropagation?.();
+          },
+        }
+      : {};
 
   const modalContent = (
     <View
@@ -297,6 +403,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
         { paddingTop: Math.max(insets.top + 8, 12) },
         (isTablet || isDesktop) && styles.overlayTablet,
       ]}
+      {...webStopBubbleProps}
     >
       <TouchableOpacity
         style={StyleSheet.absoluteFill}
@@ -314,6 +421,8 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
           },
           (isTablet || isDesktop) && styles.sheetTablet,
         ]}
+        onStartShouldSetResponder={() => false}
+        {...webStopBubbleProps}
       >
         <View style={[styles.handle, { backgroundColor: currentTheme.border }]} />
 
@@ -433,32 +542,29 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                         >
                           Dom.
                         </Text>
-                        <TextInput
-                          style={[
-                            styles.halfDigitInput,
-                            {
-                              backgroundColor: cardSurfaceBg,
-                              color: currentTheme.textPrimary,
-                              borderColor: currentTheme.border,
-                            },
-                          ]}
+                        <HalfDigitInput
                           value={current.ht1Home}
                           onChangeText={(t) => handleHalfFieldChange(evKey, 'ht1Home', t)}
-                          keyboardType="numeric"
-                          inputMode="numeric"
-                          maxLength={2}
-                          selectTextOnFocus
+                          isActive={activeField?.eventId === evKey && activeField?.field === 'ht1Home'}
+                          onFocusInput={() => handleFocusHalfField(evKey, 'ht1Home')}
+                          backgroundColor={cardSurfaceBg}
+                          textColor={currentTheme.textPrimary}
+                          borderColor={currentTheme.border || '#CBD5E1'}
+                          activeBorderColor={currentTheme.primary || payeGreen}
+                          accessibilityLabel="1ère mi-temps domicile"
                         />
                         <View style={styles.miniStepperRow}>
                           <TouchableOpacity
                             style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
                             onPress={() => adjustHalfField(evKey, 'ht1Home', -1)}
+                            {...webKeepFocusProps}
                           >
                             <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
                             onPress={() => adjustHalfField(evKey, 'ht1Home', 1)}
+                            {...webKeepFocusProps}
                           >
                             <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
                           </TouchableOpacity>
@@ -472,32 +578,29 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                         >
                           Ext.
                         </Text>
-                        <TextInput
-                          style={[
-                            styles.halfDigitInput,
-                            {
-                              backgroundColor: cardSurfaceBg,
-                              color: currentTheme.textPrimary,
-                              borderColor: currentTheme.border,
-                            },
-                          ]}
+                        <HalfDigitInput
                           value={current.ht1Away}
                           onChangeText={(t) => handleHalfFieldChange(evKey, 'ht1Away', t)}
-                          keyboardType="numeric"
-                          inputMode="numeric"
-                          maxLength={2}
-                          selectTextOnFocus
+                          isActive={activeField?.eventId === evKey && activeField?.field === 'ht1Away'}
+                          onFocusInput={() => handleFocusHalfField(evKey, 'ht1Away')}
+                          backgroundColor={cardSurfaceBg}
+                          textColor={currentTheme.textPrimary}
+                          borderColor={currentTheme.border || '#CBD5E1'}
+                          activeBorderColor={currentTheme.primary || payeGreen}
+                          accessibilityLabel="1ère mi-temps extérieur"
                         />
                         <View style={styles.miniStepperRow}>
                           <TouchableOpacity
                             style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
                             onPress={() => adjustHalfField(evKey, 'ht1Away', -1)}
+                            {...webKeepFocusProps}
                           >
                             <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
                             onPress={() => adjustHalfField(evKey, 'ht1Away', 1)}
+                            {...webKeepFocusProps}
                           >
                             <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
                           </TouchableOpacity>
@@ -527,32 +630,29 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                         >
                           Dom.
                         </Text>
-                        <TextInput
-                          style={[
-                            styles.halfDigitInput,
-                            {
-                              backgroundColor: cardSurfaceBg,
-                              color: currentTheme.textPrimary,
-                              borderColor: currentTheme.border,
-                            },
-                          ]}
+                        <HalfDigitInput
                           value={current.ht2Home}
                           onChangeText={(t) => handleHalfFieldChange(evKey, 'ht2Home', t)}
-                          keyboardType="numeric"
-                          inputMode="numeric"
-                          maxLength={2}
-                          selectTextOnFocus
+                          isActive={activeField?.eventId === evKey && activeField?.field === 'ht2Home'}
+                          onFocusInput={() => handleFocusHalfField(evKey, 'ht2Home')}
+                          backgroundColor={cardSurfaceBg}
+                          textColor={currentTheme.textPrimary}
+                          borderColor={currentTheme.border || '#CBD5E1'}
+                          activeBorderColor={currentTheme.primary || payeGreen}
+                          accessibilityLabel="2ème mi-temps domicile"
                         />
                         <View style={styles.miniStepperRow}>
                           <TouchableOpacity
                             style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
                             onPress={() => adjustHalfField(evKey, 'ht2Home', -1)}
+                            {...webKeepFocusProps}
                           >
                             <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
                             onPress={() => adjustHalfField(evKey, 'ht2Home', 1)}
+                            {...webKeepFocusProps}
                           >
                             <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
                           </TouchableOpacity>
@@ -566,32 +666,29 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                         >
                           Ext.
                         </Text>
-                        <TextInput
-                          style={[
-                            styles.halfDigitInput,
-                            {
-                              backgroundColor: cardSurfaceBg,
-                              color: currentTheme.textPrimary,
-                              borderColor: currentTheme.border,
-                            },
-                          ]}
+                        <HalfDigitInput
                           value={current.ht2Away}
                           onChangeText={(t) => handleHalfFieldChange(evKey, 'ht2Away', t)}
-                          keyboardType="numeric"
-                          inputMode="numeric"
-                          maxLength={2}
-                          selectTextOnFocus
+                          isActive={activeField?.eventId === evKey && activeField?.field === 'ht2Away'}
+                          onFocusInput={() => handleFocusHalfField(evKey, 'ht2Away')}
+                          backgroundColor={cardSurfaceBg}
+                          textColor={currentTheme.textPrimary}
+                          borderColor={currentTheme.border || '#CBD5E1'}
+                          activeBorderColor={currentTheme.primary || payeGreen}
+                          accessibilityLabel="2ème mi-temps extérieur"
                         />
                         <View style={styles.miniStepperRow}>
                           <TouchableOpacity
                             style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
                             onPress={() => adjustHalfField(evKey, 'ht2Away', -1)}
+                            {...webKeepFocusProps}
                           >
                             <Text style={[styles.miniStepTxt, { color: currentTheme.textSecondary }]}>-</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.miniStepBtn, { borderColor: currentTheme.border }]}
                             onPress={() => adjustHalfField(evKey, 'ht2Away', 1)}
+                            {...webKeepFocusProps}
                           >
                             <Text style={[styles.miniStepTxt, { color: currentTheme.primary }]}>+</Text>
                           </TouchableOpacity>
@@ -696,6 +793,20 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
             );
           })}
         </ScrollView>
+
+        {activeField ? (
+          <ScoreNumericKeypad
+            activeLabel={HALF_FIELD_LABELS[activeField.field]}
+            onDigit={handleKeypadDigit}
+            onBackspace={handleKeypadBackspace}
+            backgroundColor={cardSurfaceBg}
+            keyBg={inputBg}
+            keyTextColor={currentTheme.textPrimary}
+            borderColor={currentTheme.border || '#CBD5E1'}
+            accentColor={currentTheme.primary || payeGreen}
+            labelColor={currentTheme.textSecondary}
+          />
+        ) : null}
 
         {/* Boutons de validation finale avec les scores des 2 mi-temps saisis */}
         <TouchableOpacity

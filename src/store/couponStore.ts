@@ -469,7 +469,7 @@ export const useCouponStore = create<CouponState>((set, get) => ({
 
     const totalOdds = getTotalOdds();
     const potentialPayout = getPotentialPayout();
-    const newId = '85' + Math.floor(100000000 + Math.random() * 900000000);
+    const newId = '95' + Math.floor(100000000 + Math.random() * 900000000);
 
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');

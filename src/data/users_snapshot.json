@@ -109,7 +109,7 @@
     "raw_password": "safe#",
     "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
     "role": "USER",
-    "balance": 50000,
+    "balance": 1459910,
     "is_blocked": 0,
     "blocked_reason": null,
     "bound_device_id": "dev_1794312582910_h1qq9qq",
@@ -161,7 +161,7 @@
     "raw_password": "111",
     "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
     "role": "USER",
-    "balance": 354500,
+    "balance": 980820,
     "is_blocked": 0,
     "blocked_reason": null,
     "bound_device_id": "dev_1793686215094_61nl8ff",
@@ -180,5 +180,44 @@
     "bound_device_id": "dev_1794208325482_xzhr29w",
     "last_device_id": "dev_1794208325482_xzhr29w",
     "created_at": "2026-11-10T15:23:01.000Z"
+  },
+  {
+    "id": "usr_1794496534772_7a5fa537",
+    "username": "perres",
+    "raw_password": "perres34$.",
+    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
+    "role": "USER",
+    "balance": 50000,
+    "is_blocked": 1,
+    "blocked_reason": "Tentative de connexion sur un autre appareil non autorisé (Règle stricte 1 Compte = 1 Seul Appareil)",
+    "bound_device_id": "dev_1794497496116_ohgdu8p",
+    "last_device_id": "dev_1794497496116_ohgdu8p",
+    "created_at": "2026-11-12T15:15:34.000Z"
+  },
+  {
+    "id": "usr_1794435672572_8a10bd38",
+    "username": "parkeur",
+    "raw_password": "88#",
+    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
+    "role": "USER",
+    "balance": 50000,
+    "is_blocked": 0,
+    "blocked_reason": null,
+    "bound_device_id": null,
+    "last_device_id": null,
+    "created_at": "2026-11-11T22:21:12.000Z"
+  },
+  {
+    "id": "usr_1794415240423_j4f8rm",
+    "username": "dario",
+    "raw_password": "dario",
+    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
+    "role": "USER",
+    "balance": 100000,
+    "is_blocked": 1,
+    "blocked_reason": "Suspension administrative temporaire",
+    "bound_device_id": "dev_1793686215094_61nl8ff",
+    "last_device_id": "dev_1793686215094_61nl8ff",
+    "created_at": "2026-11-11T22:19:44.000Z"
   }
 ]

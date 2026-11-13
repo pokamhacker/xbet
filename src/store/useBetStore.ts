@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BetSlip, BetStatus, CustomLeague, CustomTeam, MatchEvent } from '../types/bet';
-import { generateRealisticPokerDraw, generateShareCode } from '../utils/pokerEngine';
+import { generateRealisticPokerDraw, generateShareCode, normalizeTicketIdPrefix } from '../utils/pokerEngine';
 import {
   adaptEventResultToPrediction,
   normalizeBetSelectionLabel,
@@ -80,7 +80,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     cashoutAmount: 470,
     events: [
       {
-        id: 'ev-fb-9036286027-1',
+        id: 'ev-fb-9036296027-1',
         sport: 'Football',
         league: 'Football . Espagne. La Liga',
         date: '07.11.2026 (20:00)',
@@ -105,7 +105,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89736611593',
+    id: '99736611593',
     createdAt: '29.10.2026 (16:04)',
     type: 'Simple',
     eventsCount: 1,
@@ -123,7 +123,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-fifa-89736611593-1',
+        id: 'ev-fifa-99736611593-1',
         sport: 'FIFA',
         league: 'FIFA. FC 26. 5x5 Rush. Superligue',
         date: '29.10.2026 (16:04)',
@@ -146,7 +146,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89736180539',
+    id: '99736180539',
     createdAt: '29.10.2026 (15:55)',
     type: 'Simple',
     eventsCount: 1,
@@ -179,7 +179,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     },
     events: [
       {
-        id: 'ev-poker-89736180539-1',
+        id: 'ev-poker-99736180539-1',
         sport: 'TvBet. POKER',
         league: 'TvBet. POKER',
         date: '29.10.2026 (15:55)',
@@ -196,7 +196,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89704557249',
+    id: '99704557249',
     createdAt: '28.10.2026 (21:54)',
     type: 'Simple',
     eventsCount: 1,
@@ -214,7 +214,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-fb-89704557249-1',
+        id: 'ev-fb-99704557249-1',
         sport: 'Football',
         league: 'Football . UEFA Ligue des Champions',
         date: '28.10.2026 (21:54)',
@@ -231,7 +231,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89656364623',
+    id: '99656364623',
     createdAt: '28.10.2026 (05:28)',
     type: 'Combiné',
     eventsCount: 4,
@@ -330,7 +330,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89642570109',
+    id: '99642570109',
     createdAt: '27.10.2026 (21:06)',
     type: 'Simple',
     eventsCount: 1,
@@ -367,7 +367,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89854491023',
+    id: '99854491023',
     createdAt: '31 oct. 2026 (23:35)',
     type: 'Simple',
     eventsCount: 1,
@@ -384,7 +384,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: true,
     events: [
       {
-        id: 'ev-fifa-roma-oly-8985',
+        id: 'ev-fifa-roma-oly-9985',
         sport: 'FIFA',
         league: 'FIFA. FC 25. 3x3. Ligue de conférence',
         date: '31 oct. 2026 (23:35)',
@@ -405,7 +405,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89809879727',
+    id: '99809879727',
     createdAt: '30.10.2026 (22:27)',
     type: 'Simple',
     eventsCount: 1,
@@ -424,7 +424,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     sport: 'TvBet. POKER',
     events: [
       {
-        id: 'ev-poker-89809879727-1',
+        id: 'ev-poker-99809879727-1',
         sport: 'TvBet. POKER',
         league: 'TvBet. POKER',
         date: '30 oct. 2026 (22:30)',
@@ -441,7 +441,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89810937599',
+    id: '99810937599',
     createdAt: '30.10.2026 (22:51)',
     type: 'Simple',
     eventsCount: 1,
@@ -474,7 +474,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     },
     events: [
       {
-        id: 'ev-poker-89810937599-1',
+        id: 'ev-poker-99810937599-1',
         sport: 'TvBet. POKER',
         league: 'TvBet. POKER',
         date: '30 oct. 2026 (22:50)',
@@ -504,7 +504,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89800294973',
+    id: '99800294973',
     createdAt: '30.10.2026 (19:25)',
     type: 'Combiné',
     eventsCount: 11,
@@ -520,7 +520,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     league: 'Principaux événements : 3',
     events: [
       {
-        id: 'ev-barca-alaves-8980',
+        id: 'ev-barca-alaves-9980',
         sport: 'Football',
         league: 'Football . Espagne. La Liga',
         date: '31 oct. 2026 (21:00)',
@@ -540,7 +540,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-milan-inter-8980',
+        id: 'ev-milan-inter-9980',
         sport: 'Football',
         league: 'Football . Italie. Série A',
         date: '31 oct. 2026 (20:45)',
@@ -560,7 +560,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-bologna-monza-8980',
+        id: 'ev-bologna-monza-9980',
         sport: 'Football',
         league: 'Football . Italie. Série A',
         date: '31 oct. 2026 (15:00)',
@@ -580,7 +580,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-udinese-roma-8980',
+        id: 'ev-udinese-roma-9980',
         sport: 'Football',
         league: 'Football . Italie. Série A',
         date: '31 oct. 2026 (18:00)',
@@ -600,7 +600,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-mancity-brighton-8980',
+        id: 'ev-mancity-brighton-9980',
         sport: 'Football',
         league: 'Football . Angleterre. Premier League',
         date: '31 oct. 2026 (16:00)',
@@ -619,7 +619,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-ajax-az-8980',
+        id: 'ev-ajax-az-9980',
         sport: 'Football',
         league: 'Football . Pays-Bas. Eredivisie',
         date: '31 oct. 2026 (21:00)',
@@ -638,7 +638,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-leverkusen-stuttgart-8980',
+        id: 'ev-leverkusen-stuttgart-9980',
         sport: 'Football',
         league: 'Football . Allemagne. Bundesliga',
         date: '31 oct. 2026 (15:30)',
@@ -657,7 +657,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-psg-lens-8980',
+        id: 'ev-psg-lens-9980',
         sport: 'Football',
         league: 'Football . France. Ligue 1',
         date: '31 oct. 2026 (17:00)',
@@ -676,7 +676,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-real-valencia-8980',
+        id: 'ev-real-valencia-9980',
         sport: 'Football',
         league: 'Football . Espagne. La Liga',
         date: '31 oct. 2026 (21:00)',
@@ -696,7 +696,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-liverpool-chelsea-8980',
+        id: 'ev-liverpool-chelsea-9980',
         sport: 'Football',
         league: 'Football . Angleterre. Premier League',
         date: '31 oct. 2026 (17:30)',
@@ -715,7 +715,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-bonus-8980',
+        id: 'ev-bonus-9980',
         sport: 'Bonus',
         league: 'Bonus',
         date: '31 oct. 2026',
@@ -730,7 +730,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89755801725',
+    id: '99755801725',
     createdAt: '29.10.2026 (22:23)',
     type: 'Combiné',
     eventsCount: 2,
@@ -749,7 +749,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     league: 'LaLiga',
     events: [
       {
-        id: 'ev-villarreal-espanyol-8975',
+        id: 'ev-villarreal-espanyol-9975',
         sport: 'Football',
         league: 'Football . Espagne. La Liga',
         date: '30.10.2026 (21:00)',
@@ -770,7 +770,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-spain-winner-8975',
+        id: 'ev-spain-winner-9975',
         sport: 'Football',
         league: 'Football . Espagne. Vainqueur',
         date: '30.10.2026 (21:00)',
@@ -790,7 +790,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89711034853',
+    id: '99711034853',
     createdAt: '29.10.2026 (00:28)',
     type: 'Simple',
     eventsCount: 1,
@@ -807,7 +807,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     league: 'LaLiga',
     events: [
       {
-        id: 'ev-madrid-getafe-8971',
+        id: 'ev-madrid-getafe-9971',
         sport: 'Football',
         league: 'Football . Espagne. La Liga',
         date: '29.10.2026 (00:00)',
@@ -831,7 +831,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89694684045',
+    id: '99694684045',
     createdAt: '28.10.2026 (19:40)',
     type: 'Simple',
     eventsCount: 1,
@@ -846,7 +846,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-fifa-chelsea-arsenal-8969',
+        id: 'ev-fifa-chelsea-arsenal-9969',
         sport: 'FIFA',
         league: 'FIFA. FC 26. 5x5 Rush. Superligue',
         date: '28.10.2026 (19:40)',
@@ -869,7 +869,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89694250971',
+    id: '99694250971',
     createdAt: '28.10.2026 (19:34)',
     type: 'Simple',
     eventsCount: 1,
@@ -885,7 +885,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-fifa-bayern-napoli-8969',
+        id: 'ev-fifa-bayern-napoli-9969',
         sport: 'FIFA',
         league: 'FIFA. FC 26. 5x5 Rush. Superligue',
         date: '28.10.2026 (19:30)',
@@ -908,7 +908,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89680022549',
+    id: '99680022549',
     createdAt: '28.10.2026 (15:50)',
     type: 'Combiné',
     eventsCount: 2,
@@ -924,7 +924,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     league: 'Serie A',
     events: [
       {
-        id: 'ev-venise-inter-8968',
+        id: 'ev-venise-inter-9968',
         sport: 'Football',
         league: 'Football . Italie. Série A',
         date: '28.10.2026 (18:30)',
@@ -947,7 +947,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-milan-bologna-8968',
+        id: 'ev-milan-bologna-9968',
         sport: 'Football',
         league: 'Football . Italie. Série A',
         date: '28.10.2026 (18:30)',
@@ -972,7 +972,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89527149789',
+    id: '99527149789',
     createdAt: '25.10.2026 (17:20)',
     type: 'Combiné',
     eventsCount: 2,
@@ -988,7 +988,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     league: 'LaLiga',
     events: [
       {
-        id: 'ev-sevilla-valencia-8952',
+        id: 'ev-sevilla-valencia-9952',
         sport: 'Football',
         league: 'Football . Espagne. La Liga',
         date: '25.10.2026 (18:00)',
@@ -1010,7 +1010,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-sociedad-betis-8952',
+        id: 'ev-sociedad-betis-9952',
         sport: 'Football',
         league: 'Football . Espagne. La Liga',
         date: '25.10.2026 (20:00)',
@@ -1034,7 +1034,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89485827375',
+    id: '99485827375',
     createdAt: '25.10.2026 (07:44)',
     type: 'Simple',
     eventsCount: 1,
@@ -1049,7 +1049,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-foot-8948',
+        id: 'ev-foot-9948',
         sport: 'Football',
         league: 'Football . Match amical',
         date: '25.10.2026 (08:00)',
@@ -1072,7 +1072,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '88964599389',
+    id: '98964599389',
     createdAt: '17.10.2026 (08:52)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1089,7 +1089,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     league: 'LaLiga',
     events: [
       {
-        id: 'ev-bayern-leipzig-8896',
+        id: 'ev-bayern-leipzig-9896',
         sport: 'Football',
         league: 'Football . Allemagne. Bundesliga',
         date: '17.10.2026 (16:30)',
@@ -1111,7 +1111,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-espanyol-atletico-8896',
+        id: 'ev-espanyol-atletico-9896',
         sport: 'Football',
         league: 'Football . Espagne. La Liga',
         date: '17.10.2026 (20:00)',
@@ -1135,7 +1135,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '88909739359',
+    id: '98909739359',
     createdAt: '16.10.2026 (09:59)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1151,7 +1151,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-frankfurt-cologne-8890',
+        id: 'ev-frankfurt-cologne-9890',
         sport: 'Football',
         league: 'Football . Allemagne. Bundesliga',
         date: '16.10.2026 (19:30)',
@@ -1172,7 +1172,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-deportivo-levante-8890',
+        id: 'ev-deportivo-levante-9890',
         sport: 'Football',
         league: 'Football . Espagne. La Liga',
         date: '16.10.2026 (20:00)',
@@ -1195,7 +1195,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89736180539',
+    id: '99736180539',
     createdAt: '29.10.2026 (03:55 PM)',
     type: 'Simple',
     eventsCount: 1,
@@ -1223,7 +1223,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     },
     events: [
       {
-        id: 'ev-poker-89736180539-1',
+        id: 'ev-poker-99736180539-1',
         sport: 'TvBet. POKER',
         league: 'TvBet. POKER',
         date: '29.10.2026 (03:55 PM)',
@@ -1239,7 +1239,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89193928697',
+    id: '99193928697',
     createdAt: '20.10.2026 (17:14)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1254,7 +1254,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-poker-8919-1',
+        id: 'ev-poker-9919-1',
         sport: 'TvBet. POKER',
         league: 'TvBet. POKER',
         date: '20.10.2026 (17:22)',
@@ -1268,7 +1268,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         roundCode: 'PB227671',
       },
       {
-        id: 'ev-poker-8919-2',
+        id: 'ev-poker-9919-2',
         sport: 'TvBet. POKER',
         league: 'TvBet. POKER',
         date: '20.10.2026 (17:20)',
@@ -1284,7 +1284,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89193515741',
+    id: '99193515741',
     createdAt: '20.10.2026 (17:09)',
     type: 'Simple',
     eventsCount: 1,
@@ -1299,7 +1299,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-poker-8919-simple-1',
+        id: 'ev-poker-9919-simple-1',
         sport: 'TvBet. POKER',
         league: 'TvBet. POKER',
         date: '20.10.2026 (17:09)',
@@ -1315,7 +1315,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89193508467',
+    id: '99193508467',
     createdAt: '20.10.2026 (17:09)',
     type: 'Simple',
     eventsCount: 1,
@@ -1330,7 +1330,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-poker-8919-simple-2',
+        id: 'ev-poker-9919-simple-2',
         sport: 'TvBet. POKER',
         league: 'TvBet. POKER',
         date: '20.10.2026 (17:09)',
@@ -1346,7 +1346,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '89147610641',
+    id: '99147610641',
     createdAt: '19.10.2026 (21:42)',
     type: 'Simple',
     eventsCount: 1,
@@ -1362,7 +1362,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-tottenham-8914',
+        id: 'ev-tottenham-9914',
         sport: 'Football',
         league: 'Angleterre. Premier League',
         date: '19.10.2026 (20:00)',
@@ -1385,7 +1385,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '85801058016',
+    id: '95801058016',
     createdAt: '07.10.2026 (16:11)',
     type: 'Simple',
     eventsCount: 1,
@@ -1401,7 +1401,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-nextgen-8580',
+        id: 'ev-nextgen-9580',
         sport: 'Football',
         league: 'NextGen Trophy U17',
         date: '07.10.2026 (16:11)',
@@ -1424,7 +1424,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '86037893293',
+    id: '96037893293',
     createdAt: '27.09.2026 (08:30)',
     type: 'Simple',
     eventsCount: 1,
@@ -1438,7 +1438,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-fifa-8603',
+        id: 'ev-fifa-9603',
         sport: 'FIFA',
         league: 'FC 25. 3x3. Champions League',
         date: '27.09.2026 (08:50)',
@@ -1460,7 +1460,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '86180587255',
+    id: '96180587255',
     createdAt: '26.09.2026 (12:48)',
     type: 'Simple',
     eventsCount: 1,
@@ -1474,7 +1474,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-foot-8618',
+        id: 'ev-foot-9618',
         sport: 'Football',
         league: 'Matchs amicaux des clubs',
         date: '26.09.2026 (13:00)',
@@ -1489,7 +1489,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '86799754787',
+    id: '96799754787',
     createdAt: '26.09.2026 (12:45)',
     type: 'Combiné',
     eventsCount: 3,
@@ -1504,7 +1504,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-foot-8679-1',
+        id: 'ev-foot-9679-1',
         sport: 'Football',
         league: 'Ligue des Champions',
         date: '26.09.2026 (13:00)',
@@ -1518,7 +1518,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-foot-8679-2',
+        id: 'ev-foot-9679-2',
         sport: 'Football',
         league: 'Ligue des Champions',
         date: '26.09.2026 (13:00)',
@@ -1532,7 +1532,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-foot-8679-3',
+        id: 'ev-foot-9679-3',
         sport: 'Football',
         league: 'Premier League',
         date: '26.09.2026 (13:00)',
@@ -1548,7 +1548,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '86856631156',
+    id: '96856631156',
     createdAt: '23.09.2026 (13:35)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1563,7 +1563,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     isForSale: false,
     events: [
       {
-        id: 'ev-foot-8685-1',
+        id: 'ev-foot-9685-1',
         sport: 'Football',
         league: 'Ligue des Champions',
         date: '23.09.2026 (14:00)',
@@ -1577,7 +1577,7 @@ const INITIAL_COUPONS: BetSlip[] = [
         gameCategory: 'sports',
       },
       {
-        id: 'ev-foot-8685-2',
+        id: 'ev-foot-9685-2',
         sport: 'Football',
         league: 'Ligue des Champions',
         date: '23.09.2026 (14:00)',
@@ -1593,7 +1593,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '85133576275',
+    id: '95133576275',
     createdAt: '24.09.2026 (07:58)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1638,7 +1638,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '85344055521',
+    id: '95344055521',
     createdAt: '24.09.2026 (07:57)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1683,7 +1683,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '85699466605',
+    id: '95699466605',
     createdAt: '12.09.2026 (08:55)',
     type: 'Combiné',
     eventsCount: 3,
@@ -1782,7 +1782,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '86270208738',
+    id: '96270208738',
     createdAt: '20.09.2026 (11:40)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1823,7 +1823,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '86118228811',
+    id: '96118228811',
     createdAt: '05.09.2026 (01:47)',
     type: 'Simple',
     eventsCount: 1,
@@ -1857,7 +1857,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '85792134012',
+    id: '95792134012',
     createdAt: '06.09.2026 (17:45)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1900,7 +1900,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '84910283741',
+    id: '94910283741',
     createdAt: '01.09.2026 (19:15)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1943,7 +1943,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '85104674928',
+    id: '95104674928',
     createdAt: '02.09.2026 (13:30)',
     type: 'Combiné',
     eventsCount: 2,
@@ -1988,7 +1988,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '85435548340',
+    id: '95435548340',
     createdAt: '03.09.2026 (13:00)',
     type: 'Combiné',
     eventsCount: 2,
@@ -2033,7 +2033,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '85517683766',
+    id: '95517683766',
     createdAt: '03.09.2026 (15:01)',
     type: 'Combiné',
     eventsCount: 2,
@@ -2082,7 +2082,7 @@ const INITIAL_COUPONS: BetSlip[] = [
     ],
   },
   {
-    id: '82574662089',
+    id: '92574662089',
     createdAt: '03.09.2026 (20:00)',
     type: 'Combiné',
     eventsCount: 2,
@@ -2172,11 +2172,15 @@ export const useBetStore = create<BetState>()(
     (set, get) => ({
       balance: 26522743.89,
       activeSlip: [],
-      coupons: INITIAL_COUPONS.map((c) => ({
-        ...c,
-        userId: c.userId || 'user-demo-1',
-        ticketNumber: c.ticketNumber || c.id,
-      })),
+      coupons: INITIAL_COUPONS.map((c) => {
+        const normalizedId = normalizeTicketIdPrefix(c.id);
+        return {
+          ...c,
+          id: normalizedId,
+          userId: c.userId || 'user-demo-1',
+          ticketNumber: normalizeTicketIdPrefix(c.ticketNumber || normalizedId),
+        };
+      }),
       deletedCouponIds: [],
       customLeagues: INITIAL_LEAGUES,
       customTeams: INITIAL_TEAMS,
@@ -2245,10 +2249,12 @@ export const useBetStore = create<BetState>()(
           };
         });
 
+        const normalizedCouponId = normalizeTicketIdPrefix(coupon.id);
         const couponWithUser: BetSlip = {
           ...coupon,
+          id: normalizedCouponId,
           userId: targetUserId,
-          ticketNumber: coupon.ticketNumber || coupon.id,
+          ticketNumber: normalizeTicketIdPrefix(coupon.ticketNumber || normalizedCouponId),
           createdAt: coupon.createdAt || combined.formatted,
           startDate: coupon.startDate || combined.isoString,
           matchTime: coupon.matchTime || combined.isoString.substring(11, 16),
@@ -2621,17 +2627,31 @@ export const useBetStore = create<BetState>()(
             set((state) => {
               const map = new Map<string, BetSlip>();
               // 1. D'abord les coupons distants
-              for (const r of remoteBets) {
-                map.set(String(r.id), r);
+              for (const rawRemote of remoteBets) {
+                const normId = normalizeTicketIdPrefix(rawRemote.id);
+                const r: BetSlip = {
+                  ...rawRemote,
+                  id: normId,
+                  ticketNumber: normalizeTicketIdPrefix(rawRemote.ticketNumber || normId),
+                };
+                map.set(normId, r);
               }
               // 2. Fusionner avec les coupons locaux pour préserver les enrichissements
-              for (const loc of state.coupons) {
-                const existing = map.get(String(loc.id));
+              for (const rawLoc of state.coupons) {
+                const normId = normalizeTicketIdPrefix(rawLoc.id);
+                const loc: BetSlip = {
+                  ...rawLoc,
+                  id: normId,
+                  ticketNumber: normalizeTicketIdPrefix(rawLoc.ticketNumber || normId),
+                };
+                const existing = map.get(normId);
                 if (existing) {
                   // Conserver les détails locaux essentiels (pokerResult, événements enrichis, matchTime)
-                  map.set(String(loc.id), {
+                  map.set(normId, {
                     ...existing,
                     ...loc,
+                    id: normId,
+                    ticketNumber: loc.ticketNumber || existing.ticketNumber || normId,
                     status: existing.status || loc.status,
                     gameCategory: loc.gameCategory || existing.gameCategory,
                     events: (loc.events && loc.events.length > 0) ? loc.events : existing.events,
@@ -2642,7 +2662,7 @@ export const useBetStore = create<BetState>()(
                   });
                 } else {
                   // Garder les coupons locaux non encore enregistrés sur le serveur
-                  map.set(String(loc.id), loc);
+                  map.set(normId, loc);
                 }
               }
               return {
@@ -2673,30 +2693,44 @@ export const useBetStore = create<BetState>()(
       storage: createJSONStorage(() => AsyncStorage),
       merge: (persistedState: any, currentState) => {
         const merged = { ...currentState, ...(persistedState || {}) };
-        const deletedSet = new Set<string>(
-          Array.isArray(persistedState?.deletedCouponIds)
-            ? persistedState.deletedCouponIds.map((id: any) => String(id))
-            : []
-        );
+        const deletedSet = new Set<string>();
+        if (Array.isArray(persistedState?.deletedCouponIds)) {
+          for (const rawId of persistedState.deletedCouponIds) {
+            const rawStr = String(rawId);
+            deletedSet.add(rawStr);
+            const normStr = normalizeTicketIdPrefix(rawStr);
+            if (normStr) deletedSet.add(normStr);
+          }
+        }
         merged.deletedCouponIds = Array.from(deletedSet);
         if (Array.isArray(persistedState?.coupons)) {
-          const initialMap = new Map(INITIAL_COUPONS.map((c) => [String(c.id), c]));
+          const initialMap = new Map(
+            INITIAL_COUPONS.map((c) => [normalizeTicketIdPrefix(c.id), c])
+          );
           const updatedPersisted = persistedState.coupons
+            .map((c: BetSlip) => {
+              const normId = normalizeTicketIdPrefix(c.id);
+              const normTicket = normalizeTicketIdPrefix(c.ticketNumber || normId);
+              return { ...c, id: normId, ticketNumber: normTicket };
+            })
             .filter((c: BetSlip) => !deletedSet.has(String(c.id)))
             .map((c: BetSlip) => {
               const initRef = initialMap.get(String(c.id));
               if (initRef) {
                 return {
                   ...initRef,
+                  id: normalizeTicketIdPrefix(initRef.id),
+                  ticketNumber: normalizeTicketIdPrefix(initRef.ticketNumber || initRef.id),
                   status: c.status || initRef.status,
                 };
               }
               return c;
             });
           const existingIds = new Set(updatedPersisted.map((c: BetSlip) => String(c.id)));
-          const missingDefaults = INITIAL_COUPONS.filter(
-            (c) => !existingIds.has(String(c.id)) && !deletedSet.has(String(c.id))
-          );
+          const missingDefaults = INITIAL_COUPONS.filter((c) => {
+            const normId = normalizeTicketIdPrefix(c.id);
+            return !existingIds.has(normId) && !deletedSet.has(normId);
+          });
           merged.coupons = [...missingDefaults, ...updatedPersisted];
         }
         return merged;

@@ -575,7 +575,7 @@ export default function TicketDetailsScreen({
     : currentCoupon?.matchTime && currentCoupon?.matchDate
     ? `${currentCoupon.matchDate} (${currentCoupon.matchTime})`
     : '29.10.2026 (22:23)';
-  const ticketNumber = currentCoupon?.id || (currentCoupon as any)?.ticketNumber || '89755801725';
+  const ticketNumber = currentCoupon?.id || (currentCoupon as any)?.ticketNumber || '99755801725';
 
   // 2. Handlers d'action
   const handleBack = () => {
@@ -932,6 +932,8 @@ export default function TicketDetailsScreen({
               bottomBarHeight + (showDuplicateFooter ? (showSellButton ? 140 : 88) : 28),
           },
         ]}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],

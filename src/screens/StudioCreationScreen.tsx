@@ -27,7 +27,7 @@ import {
 } from '../theme/themes';
 import { useBetStore } from '../store/useBetStore';
 import { useAuthStore } from '../store/authStore';
-import { generateCouponId, generateShareCode } from '../utils/pokerEngine';
+import { generateCouponId, generateShareCode, normalizeTicketIdPrefix } from '../utils/pokerEngine';
 import { BetSlip, MatchEvent } from '../types/bet';
 import { SportsPickerModal } from '../components/SportsPickerModal';
 import {
@@ -37,6 +37,8 @@ import {
   resolveCompetitionLogo,
 } from '../data/sportsCatalog';
 import { TeamLogo } from '../components/common/TeamLogo';
+import { HalfDigitInput } from '../components/common/HalfDigitInput';
+import { ScoreNumericKeypad } from '../components/common/ScoreNumericKeypad';
 import { fetchTeamsByLeague, SportsTeam } from '../services/sportsApi';
 import { LiveMatchPickerModal } from '../components/modals/LiveMatchPickerModal';
 import { FIFA_LEAGUES_LIST, getFifaLeagueLogo, FIFA_DEFAULT_TEAMS } from '../constants/fifaLeagues';
@@ -312,6 +314,29 @@ export default function StudioCreationScreen({ navigation }: any) {
   const [studioHt1Away, setStudioHt1Away] = useState('0');
   const [studioHt2Home, setStudioHt2Home] = useState('1');
   const [studioHt2Away, setStudioHt2Away] = useState('0');
+  const [activeStudioHalfField, setActiveStudioHalfField] = useState<
+    'ht1Home' | 'ht1Away' | 'ht2Home' | 'ht2Away'
+  >('ht1Home');
+  const studioReplaceNextRef = React.useRef(true);
+
+  const handleStudioKeypadDigit = (digit: string) => {
+    const apply = (prev: string) =>
+      studioReplaceNextRef.current ? digit : (prev + digit).replace(/[^0-9]/g, '').slice(0, 2);
+    studioReplaceNextRef.current = false;
+    if (activeStudioHalfField === 'ht1Home') setStudioHt1Home(apply);
+    else if (activeStudioHalfField === 'ht1Away') setStudioHt1Away(apply);
+    else if (activeStudioHalfField === 'ht2Home') setStudioHt2Home(apply);
+    else setStudioHt2Away(apply);
+  };
+
+  const handleStudioKeypadBackspace = () => {
+    const trim = (prev: string) => (prev.length > 0 ? prev.slice(0, -1) : '');
+    studioReplaceNextRef.current = false;
+    if (activeStudioHalfField === 'ht1Home') setStudioHt1Home(trim);
+    else if (activeStudioHalfField === 'ht1Away') setStudioHt1Away(trim);
+    else if (activeStudioHalfField === 'ht2Home') setStudioHt2Home(trim);
+    else setStudioHt2Away(trim);
+  };
   // Clé du pronostic rapide actif ('1', 'X', '2', etc. ou 'custom') pour adapter dynamiquement l'intitulé
   const [selectedPredKey, setSelectedPredKey] = useState<string>('1');
   const [predictionPeriod, setPredictionPeriod] = useState<'regular' | 'first_half' | 'second_half'>('regular');
@@ -1050,7 +1075,8 @@ export default function StudioCreationScreen({ navigation }: any) {
       return;
     }
 
-    const finalId = customId.trim() !== '' ? customId.trim() : generateCouponId();
+    const rawCustomId = customId.trim();
+    const finalId = rawCustomId !== '' ? normalizeTicketIdPrefix(rawCustomId) : generateCouponId();
     const hasFifa = eventsToSave.some(
       (e) =>
         e.isFifa ||
@@ -1217,13 +1243,13 @@ export default function StudioCreationScreen({ navigation }: any) {
           <Text style={styles.fieldLabel}>ID personnalisé optionnel</Text>
           <TextInput
             style={styles.input}
-            placeholder="Ex: 82574662089"
+            placeholder="Ex: 95574662089"
             value={customId}
             onChangeText={setCustomId}
             keyboardType="numeric"
           />
           <Text style={styles.helperText}>
-            11 chiffres, commence par 85. Vide = numéro généré automatiquement.
+            11 chiffres, commence par 95. Vide = numéro généré automatiquement.
           </Text>
 
           {/* Checkboxes */}
@@ -2096,30 +2122,40 @@ export default function StudioCreationScreen({ navigation }: any) {
                     1ère mi-temps
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        { width: 46, height: 38, fontSize: 16, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
-                      ]}
+                    <HalfDigitInput
                       value={studioHt1Home}
-                      onChangeText={(t) => setStudioHt1Home(t.replace(/[^0-9]/g, ''))}
-                      keyboardType="numeric"
-                      inputMode="numeric"
-                      maxLength={2}
-                      selectTextOnFocus
+                      onChangeText={(t) => {
+                        studioReplaceNextRef.current = false;
+                        setStudioHt1Home(t);
+                      }}
+                      isActive={activeStudioHalfField === 'ht1Home'}
+                      onFocusInput={() => {
+                        setActiveStudioHalfField('ht1Home');
+                        studioReplaceNextRef.current = true;
+                      }}
+                      backgroundColor="#F8FAFC"
+                      textColor="#0F172A"
+                      borderColor="#CBD5E1"
+                      activeBorderColor={Colors.primaryAccent}
+                      accessibilityLabel="1ère mi-temps domicile"
                     />
                     <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>:</Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        { width: 46, height: 38, fontSize: 16, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
-                      ]}
+                    <HalfDigitInput
                       value={studioHt1Away}
-                      onChangeText={(t) => setStudioHt1Away(t.replace(/[^0-9]/g, ''))}
-                      keyboardType="numeric"
-                      inputMode="numeric"
-                      maxLength={2}
-                      selectTextOnFocus
+                      onChangeText={(t) => {
+                        studioReplaceNextRef.current = false;
+                        setStudioHt1Away(t);
+                      }}
+                      isActive={activeStudioHalfField === 'ht1Away'}
+                      onFocusInput={() => {
+                        setActiveStudioHalfField('ht1Away');
+                        studioReplaceNextRef.current = true;
+                      }}
+                      backgroundColor="#F8FAFC"
+                      textColor="#0F172A"
+                      borderColor="#CBD5E1"
+                      activeBorderColor={Colors.primaryAccent}
+                      accessibilityLabel="1ère mi-temps extérieur"
                     />
                   </View>
                 </View>
@@ -2140,33 +2176,64 @@ export default function StudioCreationScreen({ navigation }: any) {
                     2ème mi-temps
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        { width: 46, height: 38, fontSize: 16, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
-                      ]}
+                    <HalfDigitInput
                       value={studioHt2Home}
-                      onChangeText={(t) => setStudioHt2Home(t.replace(/[^0-9]/g, ''))}
-                      keyboardType="numeric"
-                      inputMode="numeric"
-                      maxLength={2}
-                      selectTextOnFocus
+                      onChangeText={(t) => {
+                        studioReplaceNextRef.current = false;
+                        setStudioHt2Home(t);
+                      }}
+                      isActive={activeStudioHalfField === 'ht2Home'}
+                      onFocusInput={() => {
+                        setActiveStudioHalfField('ht2Home');
+                        studioReplaceNextRef.current = true;
+                      }}
+                      backgroundColor="#F8FAFC"
+                      textColor="#0F172A"
+                      borderColor="#CBD5E1"
+                      activeBorderColor={Colors.primaryAccent}
+                      accessibilityLabel="2ème mi-temps domicile"
                     />
                     <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>:</Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        { width: 46, height: 38, fontSize: 16, textAlign: 'center', fontWeight: '800', paddingVertical: 0 },
-                      ]}
+                    <HalfDigitInput
                       value={studioHt2Away}
-                      onChangeText={(t) => setStudioHt2Away(t.replace(/[^0-9]/g, ''))}
-                      keyboardType="numeric"
-                      inputMode="numeric"
-                      maxLength={2}
-                      selectTextOnFocus
+                      onChangeText={(t) => {
+                        studioReplaceNextRef.current = false;
+                        setStudioHt2Away(t);
+                      }}
+                      isActive={activeStudioHalfField === 'ht2Away'}
+                      onFocusInput={() => {
+                        setActiveStudioHalfField('ht2Away');
+                        studioReplaceNextRef.current = true;
+                      }}
+                      backgroundColor="#F8FAFC"
+                      textColor="#0F172A"
+                      borderColor="#CBD5E1"
+                      activeBorderColor={Colors.primaryAccent}
+                      accessibilityLabel="2ème mi-temps extérieur"
                     />
                   </View>
                 </View>
+              </View>
+              <View style={{ marginTop: 8 }}>
+                <ScoreNumericKeypad
+                  activeLabel={
+                    activeStudioHalfField === 'ht1Home'
+                      ? '1ère MT • Dom.'
+                      : activeStudioHalfField === 'ht1Away'
+                      ? '1ère MT • Ext.'
+                      : activeStudioHalfField === 'ht2Home'
+                      ? '2ème MT • Dom.'
+                      : '2ème MT • Ext.'
+                  }
+                  onDigit={handleStudioKeypadDigit}
+                  onBackspace={handleStudioKeypadBackspace}
+                  backgroundColor="#FFFFFF"
+                  keyBg="#F1F5F9"
+                  keyTextColor="#0F172A"
+                  borderColor="#CBD5E1"
+                  accentColor={Colors.primaryAccent}
+                  labelColor="#475569"
+                />
               </View>
               <Text style={{ fontSize: 12, fontWeight: '700', color: '#16A34A', marginTop: 8, textAlign: 'center' }}>
                 Score calculé : {(parseInt(studioHt1Home, 10) || 0) + (parseInt(studioHt2Home, 10) || 0)}:

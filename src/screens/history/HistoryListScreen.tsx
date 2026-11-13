@@ -378,7 +378,7 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
       }) + ` (${new Date(coupon.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })})`
     : '29.10.2026 (22:23)';
 
-  const ticketNumber = coupon.id || (coupon as any).ticketNumber || '89755801725';
+  const ticketNumber = coupon.id || (coupon as any).ticketNumber || '99755801725';
 
   const totalOddsStr = Number(coupon.totalOdds || 1.921).toFixed(3).replace(/\.?0+$/, '');
   const stakeRounded = Math.round(Number(coupon.stake || 500));
@@ -1065,6 +1065,8 @@ export default function HistoryListScreen() {
       <Animated.FlatList
         ref={flatListRef}
         data={displayCoupons}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
         keyExtractor={(item, index) => item.id || `coupon-${index}`}
         renderItem={({ item }) => (
           <HistoryCard

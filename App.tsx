@@ -135,17 +135,66 @@ export default function App() {
         document.head.appendChild(style);
       }
 
-      // Protection globale contre le vol de focus (ex: ModalFocusTrap de react-native-web)
-      // qui faisait disparaître le clavier virtuel dès l'ouverture d'un TextInput de score.
+      // Protection globale contre le vol de focus (ex: ModalFocusTrap / ScrollView de react-native-web)
+      // qui faisait disparaître le clavier virtuel dès l'ouverture ou pendant la frappe d'un champ de score.
       const w = window as any;
       if (!w.__inputFocusGuardInstalled && typeof HTMLElement !== 'undefined') {
         w.__inputFocusGuardInstalled = true;
+        w.__lastInputFocusAt = 0;
+        w.__userTappedOutsideInput = false;
+        w.__lastOutsideTapAt = 0;
+        w.__lastExplicitKeyBlurAt = 0;
+
+        const isEditableOrKeepFocus = (target: EventTarget | null): boolean => {
+          const el = target as HTMLElement | null;
+          if (!el || typeof el !== 'object') return false;
+          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) {
+            return true;
+          }
+          if (typeof el.closest === 'function') {
+            return Boolean(el.closest('input, textarea, [contenteditable="true"], [data-keep-input-focus="true"]'));
+          }
+          return false;
+        };
+
+        document.addEventListener(
+          'focusin',
+          (e) => {
+            if (isEditableOrKeepFocus(e.target)) {
+              w.__lastInputFocusAt = Date.now();
+              w.__userTappedOutsideInput = false;
+            }
+          },
+          true
+        );
+
+        const markPointerTarget = (e: Event) => {
+          if (isEditableOrKeepFocus(e.target)) {
+            w.__userTappedOutsideInput = false;
+          } else {
+            w.__userTappedOutsideInput = true;
+            w.__lastOutsideTapAt = Date.now();
+          }
+        };
+        document.addEventListener('pointerdown', markPointerTarget, true);
+        document.addEventListener('touchstart', markPointerTarget, { capture: true, passive: true });
+
+        document.addEventListener(
+          'keydown',
+          (e) => {
+            if (e.key === 'Enter' || e.key === 'Escape') {
+              w.__lastExplicitKeyBlurAt = Date.now();
+            }
+          },
+          true
+        );
+
         const origFocus = HTMLElement.prototype.focus;
         HTMLElement.prototype.focus = function (options?: FocusOptions) {
           const active = document.activeElement as HTMLElement | null;
           if (
             active &&
-            (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+            (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable) &&
             this !== active &&
             this.tagName !== 'INPUT' &&
             this.tagName !== 'TEXTAREA' &&
@@ -155,6 +204,24 @@ export default function App() {
             return;
           }
           return origFocus.call(this, options);
+        };
+
+        const origBlur = HTMLElement.prototype.blur;
+        HTMLElement.prototype.blur = function () {
+          const isInput =
+            this.tagName === 'INPUT' || this.tagName === 'TEXTAREA' || this.isContentEditable;
+          const active = document.activeElement as HTMLElement | null;
+          if (isInput && active === this && this.dataset?.keepKeyboardOpen === 'true') {
+            const now = Date.now();
+            const tappedOutsideRecently =
+              w.__userTappedOutsideInput && now - (w.__lastOutsideTapAt || 0) < 700;
+            const keyBlurRecently = now - (w.__lastExplicitKeyBlurAt || 0) < 300;
+            if (!tappedOutsideRecently && !keyBlurRecently) {
+              // Bloquer les .blur() programmatiques déclenchés par ScrollView / Responder / Resize
+              return;
+            }
+          }
+          return origBlur.call(this);
         };
       }
     }
