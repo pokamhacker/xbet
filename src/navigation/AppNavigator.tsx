@@ -94,6 +94,37 @@ export default function AppNavigator() {
   const isBottomBarHidden = useThemeStore((state) => state.isBottomBarHidden);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
+  const screenBg = getScreenBgColor(currentTheme);
+  const headerBg = getHeaderBgColor(currentTheme);
+  // Placé impérativement avant les return anticipés pour respecter la règle des hooks React
+  const navTheme = React.useMemo(
+    () => ({
+      dark: Boolean(currentTheme?.isDark),
+      colors: {
+        primary: currentTheme?.primary || '#4A84C4',
+        background: screenBg,
+        card: headerBg,
+        text: currentTheme?.textPrimary || '#002B49',
+        border: currentTheme?.border || '#E2E8F0',
+        notification: currentTheme?.primary || '#4A84C4',
+      },
+      fonts: {
+        regular: { fontFamily: 'System', fontWeight: '400' as const },
+        medium: { fontFamily: 'System', fontWeight: '500' as const },
+        bold: { fontFamily: 'System', fontWeight: '700' as const },
+        heavy: { fontFamily: 'System', fontWeight: '900' as const },
+      },
+    }),
+    [
+      currentTheme?.isDark,
+      currentTheme?.primary,
+      currentTheme?.textPrimary,
+      currentTheme?.border,
+      screenBg,
+      headerBg,
+    ]
+  );
+
   // Écoute des événements WebSocket en direct (blocage instantané, déconnexion forcée)
   useSocketSync();
   // Android portrait ratio (e.g., 1080×2400) or any portrait window occupies 100% width and height.
@@ -175,36 +206,6 @@ export default function AppNavigator() {
     'StudioMortalKombat',
   ];
   const shouldShowBottomBar = !HIDDEN_BOTTOM_BAR_ROUTES.includes(currentRoute) && !isBottomBarHidden;
-
-  const screenBg = getScreenBgColor(currentTheme);
-  const headerBg = getHeaderBgColor(currentTheme);
-  const navTheme = React.useMemo(
-    () => ({
-      dark: Boolean(currentTheme?.isDark),
-      colors: {
-        primary: currentTheme?.primary || '#4A84C4',
-        background: screenBg,
-        card: headerBg,
-        text: currentTheme?.textPrimary || '#002B49',
-        border: currentTheme?.border || '#E2E8F0',
-        notification: currentTheme?.primary || '#4A84C4',
-      },
-      fonts: {
-        regular: { fontFamily: 'System', fontWeight: '400' as const },
-        medium: { fontFamily: 'System', fontWeight: '500' as const },
-        bold: { fontFamily: 'System', fontWeight: '700' as const },
-        heavy: { fontFamily: 'System', fontWeight: '900' as const },
-      },
-    }),
-    [
-      currentTheme?.isDark,
-      currentTheme?.primary,
-      currentTheme?.textPrimary,
-      currentTheme?.border,
-      screenBg,
-      headerBg,
-    ]
-  );
 
   return (
     <View style={[styles.desktopOuterContainer, !isDesktopLandscape && { backgroundColor: screenBg }]}>

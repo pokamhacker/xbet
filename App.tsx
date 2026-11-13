@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Platform, StatusBar } from 'react-native';
+import { Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
@@ -19,6 +19,63 @@ import {
 } from './src/theme/themes';
 
 setupCleanLogging();
+
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; errorMsg: string }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, errorMsg: '' };
+  }
+
+  static getDerivedStateFromError(error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error || 'Erreur inconnue');
+    return { hasError: true, errorMsg: msg };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: '#0F172A',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginBottom: 8 }}>
+            Une erreur d'affichage est survenue
+          </Text>
+          <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginBottom: 18 }}>
+            {this.state.errorMsg}
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              this.setState({ hasError: false, errorMsg: '' });
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.location.reload();
+              }
+            }}
+            style={{
+              backgroundColor: '#16A34A',
+              paddingHorizontal: 18,
+              paddingVertical: 11,
+              borderRadius: 10,
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>
+              Recharger l'application
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const { currentTheme } = useThemeStore();
@@ -234,7 +291,9 @@ export default function App() {
         barStyle={barStyle}
         {...({ translucent: true, backgroundColor: 'transparent' } as any)}
       />
-      <AppNavigator />
+      <AppErrorBoundary>
+        <AppNavigator />
+      </AppErrorBoundary>
     </SafeAreaProvider>
   );
 }
