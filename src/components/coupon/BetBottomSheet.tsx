@@ -9,11 +9,9 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { useThemeStore } from '../../store/themeStore';
 import { BetLayersIcon } from '../icons/BetLayersIcon';
-import { DiagonalCouponTicketIcon } from '../common/CouponIcons';
-import { useResponsive } from '../../utils/responsive';
 import { formatCleanOdds } from '../../utils/oddsFormatter';
 
 export interface BetBottomSheetProps {
@@ -71,1182 +69,680 @@ export const BetBottomSheet: React.FC<BetBottomSheetProps> = ({
   oddsPolicy,
   onOddsPolicyChange,
   oddsTrend = 'stable',
-  theme,
+  previousTotalOdds = null,
 }) => {
-  const { currentTheme: storeTheme, currentBrand } = useThemeStore();
-  const activeTheme = theme || storeTheme;
-  const isDark = Boolean(activeTheme?.isDark);
+  const { currentTheme } = useThemeStore();
+  const isDark = currentTheme.isDark;
+  const isMelbet = currentTheme.name.toLowerCase().includes('melbet');
 
-  const themeName = String(
-    activeTheme?.name || activeTheme?.key || currentBrand || '1xbet'
-  ).toLowerCase();
-
-  const isParipesa = themeName.includes('paripesa');
-  const isMegaPari = themeName.includes('megapari');
-  const isMelbet = themeName.includes('melbet');
-  const isWinWin = themeName.includes('winwin');
-  const isBetWinner = themeName.includes('betwinner');
-  const isBlack = themeName.includes('black');
-
-  // ===========================================================================
-  // PALETTE DYNAMIQUE PAR MARQUE & THÈME (CLAIR / SOMBRE / NOIR)
-  // ===========================================================================
-  const upperBg = isParipesa
-    ? isDark
-      ? isBlack
-        ? '#0C0E13'
-        : '#282F39'
-      : '#FFFFFF'
-    : isMegaPari
-      ? isDark
-        ? isBlack
-          ? '#0B0E12'
-          : '#1A1F25'
-        : '#FFFFFF'
-      : isDark
-        ? isBlack
-          ? '#121720'
-          : isMelbet
-            ? '#2B3036'
-            : '#26374B'
-        : '#F3F6FA';
-
-  const lowerBg = isParipesa
-    ? isDark
-      ? isBlack
-        ? '#0C0E13'
-        : '#282F39'
-      : '#FFFFFF'
-    : isMegaPari
-      ? isDark
-        ? isBlack
-          ? '#0B0E12'
-          : '#1A1F25'
-        : '#FFFFFF'
-      : isDark
-        ? isBlack
-          ? '#0B0F14'
-          : isMelbet
-            ? '#30353B'
-            : '#2A3F54'
-        : '#FFFFFF';
-
-  const textNavyOrWhite = isDark
-    ? '#FFFFFF'
-    : isParipesa
-      ? '#0B1A33'
-      : isMegaPari
-        ? '#1E242C'
-        : '#00325E';
-
-  const textMuted = isParipesa
-    ? isDark
-      ? '#8E99AB'
-      : '#5E7396'
-    : isMegaPari
-      ? isDark
-        ? '#8A939E'
-        : '#64748B'
-      : isDark
-        ? isMelbet
-          ? '#878C92'
-          : '#8FA2B6'
-        : '#6E849B';
-
-  const subtextMuted = isDark
-    ? isMelbet
-      ? '#9CA3AF'
-      : '#8FA2B6'
-    : '#5C7690';
-
-  const handleColor = isParipesa
-    ? isDark
-      ? '#4A5260'
-      : '#D5DCE6'
-    : isMegaPari
-      ? isDark
-        ? '#4F5661'
-        : '#CBD5E1'
-      : isDark
-        ? '#4E6175'
-        : '#D0D8E2';
-
-  const gearBtnBg = isDark
-    ? isBlack
-      ? '#1A222E'
-      : isMelbet
-        ? '#24292F'
-        : '#22303F'
-    : '#FFFFFF';
-
-  const brandAccent = isParipesa
-    ? isDark
-      ? '#4460F2'
-      : '#2E45CF'
-    : isMegaPari
-      ? '#CB3222'
-      : isMelbet
-        ? isDark
-          ? '#B9711A'
-          : '#E7B12C'
-        : isWinWin
-          ? '#7CBD17'
-          : isBetWinner
-            ? isDark
-              ? '#008E5A'
-              : '#007348'
-            : isDark
-              ? '#589BD8'
-              : '#4A8FD6';
-
-  const actionBtnBg = isParipesa
-    ? isDark
-      ? '#4460F2'
-      : '#2E45CF'
-    : isMegaPari
-      ? '#CB3222'
-      : isMelbet
-        ? isDark
-          ? '#B9711A'
-          : '#E7B12C'
-        : isWinWin
-          ? '#7CBD17'
-          : isBetWinner
-            ? isDark
-              ? '#008E5A'
-              : '#007348'
-            : '#48B254';
-
-  const actionBtnTextColor =
-    isMelbet && !isDark ? '#00325E' : '#FFFFFF';
-
-  const subPanelBg = isParipesa
-    ? isDark
-      ? isBlack
-        ? '#14171F'
-        : '#1D212A'
-      : '#EBEEF3'
-    : isMegaPari
-      ? isDark
-        ? isBlack
-          ? '#050608'
-          : '#111111'
-        : '#EEF0F4'
-      : isDark
-        ? isBlack
-          ? '#121720'
-          : isMelbet
-            ? '#24292F'
-            : '#222F3F'
-        : '#EBEEF3';
-
-  const inputBorderColor = isDark
-    ? isParipesa
-      ? '#2E3442'
-      : isMegaPari
-        ? '#28303A'
-        : isMelbet
-          ? '#38434D'
-          : '#33465A'
-    : '#E2E8F0';
-
-  const { isTablet, insets } = useResponsive();
-
-  // Animation fluide État réduit <-> État étendu
+  // Animation fluide d'ouverture/fermeture
   const expandAnim = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.timing(expandAnim, {
       toValue: isExpanded ? 1 : 0,
-      duration: 250,
+      duration: 220,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
   }, [isExpanded, expandAnim]);
 
-  const expandedMaxHeight = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 480],
-  });
+  // Couleurs calibrées dynamiquement (Melbet & 1xBet, Sombre & Clair)
+  const accentColor = isMelbet
+    ? '#E58E26'
+    : currentTheme.colors.primary || '#228BE6';
 
-  const expandedOpacity = expandAnim.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [0, 0.3, 1],
-  });
+  const pariButtonBg = isMelbet
+    ? '#C87D20'
+    : currentTheme.colors.accentGreen || currentTheme.colors.primary || '#54962B';
 
-  const cleanCurrentOdds = formatCleanOdds(totalOdds || '4.98');
-  const balanceDisplay = formatExactBalance(userBalance);
-  const payoutDisplay = formatExactPayout(potentialPayout);
+  const sheetBg = isMelbet
+    ? isDark
+      ? '#2E343B'
+      : '#FFFFFF'
+    : isDark
+      ? currentTheme.colors.cardBackground || '#1E2733'
+      : '#FFFFFF';
 
-  const policyShortText =
-    oddsPolicy === 'up'
-      ? 'accepter si la cote augmente'
-      : oddsPolicy === 'any'
-        ? 'accepter tout changement'
-        : 'me demander de confirmer';
+  const recessedCardBg = isMelbet
+    ? isDark
+      ? '#262B31'
+      : '#F3F5F8'
+    : isDark
+      ? '#161F2C'
+      : '#F1F5F9';
 
-  // Ancrage direct à bottom: 0 (fusionné sans aucun espace avec la PersistentBottomBar)
-  const sideInset = isTablet ? 32 : 0;
-  const androidBottomPad = Platform.OS === 'android' ? 12 : 0;
-  const bottomInset =
-    (insets?.bottom ?? 0) > 0
-      ? Math.max(insets.bottom, androidBottomPad)
-      : Platform.OS === 'ios'
-        ? 20
-        : androidBottomPad;
-  const barHeight = 56 + bottomInset;
-  const bottomDockOffset = 0;
-  const fusedBottomPadding = barHeight + 22;
+  const handleColor = isDark ? '#4A5058' : '#CBD5E1';
+  const textPrimary = isDark ? '#FFFFFF' : '#111827';
+  const textSecondary = isDark ? '#8A949E' : '#64748B';
+  const stepButtonBg = isMelbet
+    ? isDark
+      ? '#323840'
+      : '#E5E7EB'
+    : isDark
+      ? '#243042'
+      : '#E2E8F0';
 
-  // Contenu étendu partagé (Mise | Code promo | Cote de référence) adapté à tous les thèmes
-  const renderExpandedBettingPanel = () => (
-    <Animated.View
-      style={{
-        maxHeight: expandedMaxHeight,
-        opacity: expandedOpacity,
-        overflow: 'hidden',
-        backgroundColor: lowerBg,
-      }}
-      pointerEvents={isExpanded ? 'auto' : 'none'}
+  const oddsDisplayColor =
+    oddsTrend === 'up'
+      ? '#4EAA25'
+      : oddsTrend === 'down'
+        ? '#E53935'
+        : textPrimary;
+
+  const oddsPolicyLabel =
+    oddsPolicy === 'ask'
+      ? 'Me demander de confirmer'
+      : oddsPolicy === 'up'
+        ? 'Accepter toute hausse'
+        : 'Accepter tout changement';
+
+  const handleCycleOddsPolicy = () => {
+    const nextPolicy =
+      oddsPolicy === 'ask' ? 'up' : oddsPolicy === 'up' ? 'any' : 'ask';
+    onOddsPolicyChange(nextPolicy);
+  };
+
+  return (
+    <View
+      style={[
+        styles.sheetContainer,
+        {
+          backgroundColor: sheetBg,
+          borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)',
+        },
+      ]}
     >
-      <View style={styles.expandedContentPadding}>
-        {/* 3 Onglets Pilules : Mise | Code promo | Cote de référence */}
-        <View style={[styles.tabsRow, { backgroundColor: subPanelBg }]}>
-          {(['Mise', 'Code promo', 'Cote de référence'] as const).map((tab) => {
-            const isActive = betTab === tab;
-            return (
-              <TouchableOpacity
-                key={tab}
-                activeOpacity={0.8}
-                onPress={() => onBetTabChange(tab)}
-                style={[
-                  styles.tabPill,
-                  isActive && {
-                    backgroundColor: lowerBg,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 2,
-                    elevation: 2,
-                  },
-                ]}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.tabPillText,
-                    {
-                      color: isActive ? textNavyOrWhite : textMuted,
-                      fontWeight: isActive ? '700' : '500',
-                    },
-                  ]}
-                >
-                  {tab}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+      {/* Poignée supérieure centrée (width: 32, height: 4, borderRadius: 2, marginVertical: 8) */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={onToggleExpand}
+        style={styles.handleHitSlop}
+      >
+        <View style={[styles.handleBar, { backgroundColor: handleColor }]} />
+      </TouchableOpacity>
+
+      {/* 1. Bloc encadré de résumé Événements / Cote */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={onToggleExpand}
+        style={[styles.summaryBox, { backgroundColor: recessedCardBg }]}
+      >
+        {/* Ligne 1 : Événements */}
+        <View style={styles.summaryRow}>
+          <Text style={[styles.summaryLabel, { color: textSecondary }]}>
+            Événements
+          </Text>
+          <View style={styles.summaryEventsRight}>
+            <BetLayersIcon size={15} color={accentColor} />
+            <Text style={[styles.summaryEventsValue, { color: textPrimary }]}>
+              {eventsCount}
+            </Text>
+          </View>
         </View>
 
-        {betTab === 'Mise' && (
-          <>
-            {/* Carte Solde avec bouton + et lien Recharger */}
-            <View
-              style={[
-                styles.balanceCard,
-                { backgroundColor: isDark ? subPanelBg : '#F8FAFC' },
-              ]}
-            >
-              <View style={styles.balanceLeft}>
-                <TouchableOpacity
-                  style={[styles.plusCircle, { backgroundColor: actionBtnBg }]}
-                  onPress={onOpenDeposit}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="add" size={18} color={actionBtnTextColor} />
-                </TouchableOpacity>
-                <View>
-                  <Text style={[styles.balanceSmallLabel, { color: textMuted }]}>
-                    Solde disponible
-                  </Text>
-                  <Text
-                    style={[
-                      styles.balanceValueText,
-                      { color: textNavyOrWhite },
-                    ]}
-                  >
-                    {balanceDisplay} ₣
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                onPress={onOpenDeposit}
-                style={styles.paramLinkRow}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={[styles.paramLinkText, { color: brandAccent }]}>
-                  Recharger
-                </Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={14}
-                  color={brandAccent}
-                  style={{ marginLeft: 2 }}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Champ de saisie de mise avec steppers */}
-            <View
-              style={[
-                styles.stakeInputBox,
-                {
-                  backgroundColor: isDark ? subPanelBg : '#F8FAFC',
-                  borderColor: inputBorderColor,
-                },
-              ]}
-            >
-              <TextInput
-                style={[styles.stakeInputField, { color: textNavyOrWhite }]}
-                value={stake ? String(stake) : ''}
-                onChangeText={(txt) => {
-                  const num = parseInt(txt.replace(/[^0-9]/g, ''), 10);
-                  onStakeChange(Number.isNaN(num) ? 0 : num);
-                }}
-                keyboardType="numeric"
-                placeholder="500"
-                placeholderTextColor={textMuted}
-              />
-              <Text style={[styles.currencySuffix, { color: textMuted }]}>
-                ₣
+        {/* Ligne 2 (marginTop: 6) : Cote */}
+        <View style={[styles.summaryRow, { marginTop: 6 }]}>
+          <Text style={[styles.summaryLabel, { color: textSecondary }]}>
+            Cote
+          </Text>
+          <View style={styles.summaryOddsRight}>
+            {previousTotalOdds && oddsTrend !== 'stable' && (
+              <Text style={[styles.previousOddsStrike, { color: textSecondary }]}>
+                {formatCleanOdds(previousTotalOdds)}
               </Text>
-
-              <View style={styles.stepperRightGroup}>
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => onStakeChange(Math.max(90, (stake || 500) - 100))}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.stepperMinusText, { color: brandAccent }]}>
-                    —
-                  </Text>
-                </TouchableOpacity>
-
-                <View
-                  style={[
-                    styles.stepperDivider,
-                    { backgroundColor: inputBorderColor },
-                  ]}
-                />
-
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => onStakeChange((stake || 0) + 500)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.stepperPlusText, { color: brandAccent }]}>
-                    +
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Limites & Gains potentiels */}
-            <View style={styles.financialBlock}>
-              <Text style={[styles.limitsText, { color: textMuted }]}>
-                Min : 90 ₣ – Max : 1 000 000 ₣
+            )}
+            {oddsTrend !== 'stable' && (
+              <Text style={[styles.oddsArrow, { color: oddsDisplayColor }]}>
+                {oddsTrend === 'up' ? '▲' : '▼'}
               </Text>
-              <Text style={[styles.payoutRowText, { color: textNavyOrWhite }]}>
-                Gains potentiels :{' '}
-                <Text style={[styles.payoutGreenText, { color: actionBtnBg }]}>
-                  {payoutDisplay} ₣
-                </Text>
-              </Text>
-            </View>
-
-            {/* Puces de paris rapides */}
-            <View style={styles.quickPillsRow}>
-              {[90, 1000, 2500, 5000].map((amt) => (
-                <TouchableOpacity
-                  key={amt}
-                  style={[
-                    styles.quickPill,
-                    { backgroundColor: subPanelBg },
-                  ]}
-                  activeOpacity={0.8}
-                  onPress={() => onStakeChange(amt)}
-                >
-                  <Text
-                    style={[styles.quickPillText, { color: textNavyOrWhite }]}
-                  >
-                    {amt.toLocaleString('fr-FR')} ₣
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
-
-        {betTab === 'Code promo' && (
-          <View style={styles.altTabWrap}>
-            <Text style={[styles.altTabTitle, { color: textMuted }]}>
-              Saisissez votre code promo :
+            )}
+            <Text style={[styles.summaryOddsValue, { color: oddsDisplayColor }]}>
+              {formatCleanOdds(totalOdds)}
             </Text>
-            <TextInput
-              style={[
-                styles.promoInput,
-                {
-                  backgroundColor: isDark ? subPanelBg : '#F8FAFC',
-                  color: textNavyOrWhite,
-                  borderColor: inputBorderColor,
-                },
-              ]}
-              placeholder="Ex : PROMO2026"
-              placeholderTextColor={textMuted}
-              value={promoCode}
-              onChangeText={onPromoCodeChange}
-              autoCapitalize="characters"
-            />
           </View>
-        )}
+        </View>
+      </TouchableOpacity>
 
-        {betTab === 'Cote de référence' && (
-          <View style={styles.altTabWrap}>
-            {[
-              { id: 'up', label: 'Accepter si la cote augmente' },
-              { id: 'any', label: 'Accepter tout changement de cote' },
-              { id: 'ask', label: 'Me demander de confirmer' },
-            ].map((item) => {
-              const isChecked = oddsPolicy === item.id;
+      {/* ÉTAT REPLIÉ (Collapsed) : Bouton Pari pleine largeur en bas */}
+      {!isExpanded && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={onPlaceBet}
+          style={[styles.collapsedPariButton, { backgroundColor: pariButtonBg }]}
+        >
+          <Text style={styles.collapsedPariButtonText}>Pari</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* ÉTAT DÉPLIÉ (Expanded) : Structure exacte Vidéo 1 */}
+      {isExpanded && (
+        <Animated.View
+          style={{
+            opacity: expandAnim,
+          }}
+        >
+          {/* 2. Ligne de gestion des cotes */}
+          <View style={styles.oddsChangeRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.oddsChangeTitle, { color: textPrimary }]}>
+                Quand les cotes changent
+              </Text>
+              <Text style={[styles.oddsChangeSubtitle, { color: textSecondary }]}>
+                {oddsPolicyLabel}
+              </Text>
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={handleCycleOddsPolicy}
+              style={styles.parametresButton}
+            >
+              <Text style={[styles.parametresText, { color: accentColor }]}>
+                Paramètres
+              </Text>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M9 6L15 12L9 18"
+                  stroke={accentColor}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+          </View>
+
+          {/* 3. Barre d'onglets (Segmented Control) */}
+          <View style={[styles.segmentedTrack, { backgroundColor: recessedCardBg }]}>
+            {(['Mise', 'Code promo', 'Cote de référence'] as const).map((tab) => {
+              const active = betTab === tab;
               return (
                 <TouchableOpacity
-                  key={item.id}
+                  key={tab}
+                  activeOpacity={0.85}
+                  onPress={() => onBetTabChange(tab)}
                   style={[
-                    styles.policyRow,
-                    {
-                      backgroundColor: isDark ? subPanelBg : '#F8FAFC',
-                      borderColor: inputBorderColor,
-                    },
+                    styles.segmentedTab,
+                    active && { backgroundColor: pariButtonBg },
                   ]}
-                  onPress={() => onOddsPolicyChange(item.id as 'ask' | 'up' | 'any')}
-                  activeOpacity={0.75}
                 >
-                  <Ionicons
-                    name={isChecked ? 'radio-button-on' : 'radio-button-off'}
-                    size={19}
-                    color={isChecked ? actionBtnBg : textMuted}
-                    style={{ marginRight: 10 }}
-                  />
                   <Text
                     style={[
-                      styles.policyLabel,
+                      styles.segmentedTabText,
                       {
-                        color: textNavyOrWhite,
-                        fontWeight: isChecked ? '700' : '500',
+                        color: active ? '#FFFFFF' : textSecondary,
+                        fontWeight: active ? '700' : '500',
                       },
                     ]}
+                    numberOfLines={1}
                   >
-                    {item.label}
+                    {tab}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-        )}
-      </View>
-    </Animated.View>
-  );
 
-  // ===========================================================================
-  // LAYOUT A : PARIPESA (Encadré Événements / Cote + Bouton bleu pleine largeur)
-  // ===========================================================================
-  if (isParipesa) {
-    return (
-      <>
-        {isExpanded && (
-          <TouchableOpacity
-            style={styles.backdrop}
-            activeOpacity={1}
-            onPress={onToggleExpand}
-          />
-        )}
-
-        <View
-          style={[
-            styles.container,
-            {
-              left: sideInset,
-              right: sideInset,
-              bottom: bottomDockOffset,
-              backgroundColor: lowerBg,
-            },
-          ]}
-        >
-          <View style={[styles.paripesaInnerWrap, { paddingBottom: fusedBottomPadding }]}>
-            {/* Poignée supérieure centrée */}
-            <TouchableOpacity
-              style={styles.handleTouchable}
-              onPress={onToggleExpand}
-              activeOpacity={0.7}
-              accessibilityLabel="Ouvrir ou fermer le panneau de mise"
-            >
-              <View style={[styles.handleBar, { backgroundColor: handleColor }]} />
-            </TouchableOpacity>
-
-            {/* Encadré résumé Événements / Cote */}
-            <TouchableOpacity
-              style={[styles.paripesaSummaryBox, { backgroundColor: subPanelBg }]}
-              activeOpacity={0.85}
-              onPress={onToggleExpand}
-            >
-              <View style={styles.paripesaSummaryRow}>
-                <Text style={[styles.paripesaSummaryLabel, { color: textMuted }]}>
-                  Événements
-                </Text>
-                <View style={styles.paripesaSummaryRight}>
-                  <BetLayersIcon
-                    size={15}
-                    color={brandAccent}
-                    primaryColor={brandAccent}
+          {/* 4. Carte Solde */}
+          <View style={[styles.soldeCard, { backgroundColor: recessedCardBg }]}>
+            <View style={styles.soldeLeftRow}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={onOpenDeposit}
+                style={[styles.soldePlusCircle, { backgroundColor: pariButtonBg }]}
+              >
+                <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                  <Path
+                    d="M12 5V19M5 12H19"
+                    stroke="#FFFFFF"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
                   />
-                  <Text
+                </Svg>
+              </TouchableOpacity>
+              <View>
+                <Text style={[styles.soldeLabel, { color: textSecondary }]}>
+                  Solde
+                </Text>
+                <Text style={[styles.soldeAmount, { color: textPrimary }]}>
+                  {formatExactBalance(userBalance)} F
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={onOpenDeposit}
+              style={styles.changeAccountBtn}
+            >
+              <Text style={[styles.changeAccountText, { color: accentColor }]}>
+                Changer de compte
+              </Text>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M9 6L15 12L9 18"
+                  stroke={accentColor}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+          </View>
+
+          {/* 5. Ligne de saisie de Mise (ou Code promo) + Bouton Pari CÔTE À CÔTE */}
+          {betTab === 'Mise' ? (
+            <View style={styles.stakeAndPariRow}>
+              <View style={styles.stakeLeftCol}>
+                <View style={[styles.stakeInputContainer, { backgroundColor: recessedCardBg }]}>
+                  <TextInput
                     style={[
-                      styles.paripesaSummaryValue,
-                      { color: textNavyOrWhite, marginLeft: 5 },
+                      styles.stakeInput,
+                      { color: textPrimary },
+                      Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                    ]}
+                    keyboardType="numeric"
+                    value={stake > 0 ? String(stake) : ''}
+                    placeholder="0"
+                    placeholderTextColor={textSecondary}
+                    onChangeText={(txt) => {
+                      const num = parseInt(txt.replace(/[^0-9]/g, ''), 10);
+                      onStakeChange(Number.isNaN(num) ? 0 : num);
+                    }}
+                  />
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    onPress={() => onStakeChange(Math.max(90, stake - 100))}
+                    style={[styles.stepBtnBox, { backgroundColor: stepButtonBg }]}
+                  >
+                    <Text style={[styles.stepMinusSymbol, { color: textSecondary }]}>
+                      —
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    onPress={() => onStakeChange(stake + 100)}
+                    style={[
+                      styles.stepBtnBox,
+                      { backgroundColor: stepButtonBg, marginLeft: 6 },
                     ]}
                   >
-                    {eventsCount}
-                  </Text>
+                    <Text style={[styles.stepPlusSymbol, { color: accentColor }]}>
+                      +
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={[styles.limitsText, { color: textSecondary }]}>
+                  90 F - 1 910 000 F
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onPlaceBet}
+                style={[styles.sidePariButton, { backgroundColor: pariButtonBg }]}
+              >
+                <Text style={styles.sidePariButtonText}>Pari</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.stakeAndPariRow}>
+              <View style={styles.stakeLeftCol}>
+                <View style={[styles.stakeInputContainer, { backgroundColor: recessedCardBg }]}>
+                  <TextInput
+                    style={[
+                      styles.stakeInput,
+                      { color: textPrimary, fontSize: 14.5 },
+                      Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                    ]}
+                    placeholder={
+                      betTab === 'Code promo'
+                        ? 'Saisir le code promo'
+                        : 'Cote de référence'
+                    }
+                    placeholderTextColor={textSecondary}
+                    value={promoCode}
+                    onChangeText={onPromoCodeChange}
+                  />
                 </View>
               </View>
-
-              <View style={[styles.paripesaSummaryRow, { marginTop: 6 }]}>
-                <Text style={[styles.paripesaSummaryLabel, { color: textMuted }]}>
-                  Cote
-                </Text>
-                <Text
-                  style={[
-                    styles.paripesaSummaryValue,
-                    {
-                      color:
-                        oddsTrend === 'down'
-                          ? '#E04F4F'
-                          : textNavyOrWhite,
-                    },
-                  ]}
-                >
-                  {cleanCurrentOdds}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Contenu étendu (Mise | Code promo | Cote de référence) */}
-            {renderExpandedBettingPanel()}
-
-            {/* Bouton Pari bleu pleine largeur */}
-            <TouchableOpacity
-              style={[styles.pariButton, { backgroundColor: actionBtnBg }]}
-              activeOpacity={0.88}
-              onPress={onPlaceBet}
-            >
-              <Text style={[styles.pariButtonText, { color: actionBtnTextColor }]}>
-                Pari
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </>
-    );
-  }
-
-  // ===========================================================================
-  // LAYOUT B : MEGAPARI (3 Colonnes : Événements | Cote | Bouton Pari rouge)
-  // ===========================================================================
-  if (isMegaPari) {
-    return (
-      <>
-        {isExpanded && (
-          <TouchableOpacity
-            style={styles.backdrop}
-            activeOpacity={1}
-            onPress={onToggleExpand}
-          />
-        )}
-
-        <View
-          style={[
-            styles.container,
-            {
-              left: sideInset,
-              right: sideInset,
-              bottom: bottomDockOffset,
-              backgroundColor: lowerBg,
-            },
-          ]}
-        >
-          {/* Poignée supérieure centrée */}
-          <TouchableOpacity
-            style={styles.handleTouchable}
-            onPress={onToggleExpand}
-            activeOpacity={0.7}
-            accessibilityLabel="Ouvrir ou fermer le panneau de mise"
-          >
-            <View style={[styles.handleBar, { backgroundColor: handleColor }]} />
-          </TouchableOpacity>
-
-          {/* Contenu étendu (Mise | Code promo | Cote de référence) */}
-          {renderExpandedBettingPanel()}
-
-          {/* Barre 3 colonnes : Événements | Cote | Bouton Pari */}
-          <View style={[styles.megapariBarRow, { paddingBottom: fusedBottomPadding }]}>
-            {/* Colonne 1 : Icône rouge + Nombre au-dessus de "Événements" */}
-            <TouchableOpacity
-              style={styles.megapariStatCol}
-              activeOpacity={0.8}
-              onPress={onToggleExpand}
-            >
-              <View style={styles.megapariCountTopRow}>
-                <BetLayersIcon
-                  size={16}
-                  color={brandAccent}
-                  primaryColor={brandAccent}
-                />
-                <Text
-                  style={[
-                    styles.megapariCountValue,
-                    { color: textNavyOrWhite },
-                  ]}
-                >
-                  {eventsCount}
-                </Text>
-              </View>
-              <Text style={[styles.megapariStatLabel, { color: textMuted }]}>
-                Événements
-              </Text>
-            </TouchableOpacity>
-
-            {/* Colonne 2 : Cote totale au-dessus de "Cote" */}
-            <TouchableOpacity
-              style={styles.megapariStatCol}
-              activeOpacity={0.8}
-              onPress={onToggleExpand}
-            >
-              <Text
-                style={[
-                  styles.megapariOddsValue,
-                  {
-                    color:
-                      oddsTrend === 'down'
-                        ? '#E04F4F'
-                        : textNavyOrWhite,
-                  },
-                ]}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onPlaceBet}
+                style={[styles.sidePariButton, { backgroundColor: pariButtonBg }]}
               >
-                {cleanCurrentOdds}
-              </Text>
-              <Text style={[styles.megapariStatLabel, { color: textMuted }]}>
-                Cote
-              </Text>
-            </TouchableOpacity>
+                <Text style={styles.sidePariButtonText}>Pari</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-            {/* Colonne 3 : Bouton Pari rouge à droite */}
-            <TouchableOpacity
-              style={[styles.megapariPariBtn, { backgroundColor: actionBtnBg }]}
-              activeOpacity={0.88}
-              onPress={onPlaceBet}
-            >
-              <Text style={styles.pariButtonText}>Pari</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </>
-    );
-  }
-
-  // ===========================================================================
-  // LAYOUT C : 1XBET / MELBET / WINWIN / BETWINNER (Double étage + Engrenage)
-  // ===========================================================================
-  return (
-    <>
-      {isExpanded && (
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onToggleExpand}
-        />
-      )}
-
-      <View
-        style={[
-          styles.container,
-          {
-            left: sideInset,
-            right: sideInset,
-            bottom: bottomDockOffset,
-          },
-        ]}
-      >
-        {/* 1. SOUS-SECTION SUPÉRIEURE (RÉSUMÉ #F3F6FA CLAIR / #26374B SOMBRE) */}
-        <View style={[styles.upperSection, { backgroundColor: upperBg }]}>
-          {/* Poignée supérieure centrée */}
-          <TouchableOpacity
-            style={styles.handleTouchable}
-            onPress={onToggleExpand}
-            activeOpacity={0.7}
-            accessibilityLabel="Ouvrir ou fermer le panneau de mise"
-          >
-            <View style={[styles.handleBar, { backgroundColor: handleColor }]} />
-          </TouchableOpacity>
-
-          <View style={styles.upperBodyRow}>
-            {/* Colonne Gauche : 3 lignes */}
-            <TouchableOpacity
-              style={styles.upperLeftCol}
-              activeOpacity={0.8}
-              onPress={onToggleExpand}
-            >
-              {/* Ligne 1 : Icône ticket diagonal (si 1 événement) ou couches + Nombre */}
-              <View style={styles.countRow}>
-                {eventsCount <= 1 ? (
-                  <DiagonalCouponTicketIcon size={15} color={subtextMuted} />
-                ) : (
-                  <BetLayersIcon
-                    size={14}
-                    color={subtextMuted}
-                    primaryColor={subtextMuted}
-                  />
-                )}
-                <Text style={[styles.countValue, { color: textNavyOrWhite }]}>
-                  {eventsCount}
-                </Text>
-              </View>
-
-              {/* Ligne 2 : Label Cotes: + Cote en rouge si baisse ou couleur principale */}
-              <View style={styles.oddsRow}>
-                <Text style={[styles.oddsLabel, { color: textMuted }]}>
-                  Cotes:{' '}
-                </Text>
-                <Text
-                  style={[
-                    styles.oddsValue,
-                    {
-                      color:
-                        oddsTrend === 'down'
-                          ? '#E04F4F'
-                          : textNavyOrWhite,
-                    },
-                  ]}
-                >
-                  {oddsTrend === 'down' ? `↓${cleanCurrentOdds}` : cleanCurrentOdds}
-                </Text>
-              </View>
-
-              {/* Ligne 3 : Mention de confirmation avec valeur en gras */}
-              <Text
-                style={[styles.policySubtext, { color: textMuted }]}
-                numberOfLines={1}
-              >
-                Si la cote change:{' '}
-                <Text style={[styles.policySubtextBold, { color: subtextMuted }]}>
-                  {policyShortText}
-                </Text>
-              </Text>
-            </TouchableOpacity>
-
-            {/* Colonne Droite : Bouton Paramètres carré arrondi avec engrenage */}
-            <TouchableOpacity
-              style={[styles.settingsButton, { backgroundColor: gearBtnBg }]}
-              onPress={() => {
-                if (!isExpanded) {
-                  onBetTabChange('Cote de référence');
-                  onToggleExpand();
-                } else {
-                  onOddsPolicyChange(
-                    oddsPolicy === 'ask' ? 'up' : oddsPolicy === 'up' ? 'any' : 'ask'
-                  );
-                }
-              }}
-              activeOpacity={0.75}
-              accessibilityLabel="Paramètres du coupon"
-            >
-              <Ionicons name="settings-sharp" size={20} color={brandAccent} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 2. CONTENU ÉTENDU DYNAMIQUE (ANIMÉ LORS DU DÉPLIEMENT) */}
-        {renderExpandedBettingPanel()}
-
-        {/* 3. SOUS-SECTION INFÉRIEURE : BOUTON PARI PLEINE LARGEUR */}
-        <View
-          style={[
-            styles.lowerSection,
-            { backgroundColor: lowerBg, paddingBottom: fusedBottomPadding },
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.pariButton, { backgroundColor: actionBtnBg }]}
-            activeOpacity={0.88}
-            onPress={onPlaceBet}
-          >
-            <Text style={[styles.pariButtonText, { color: actionBtnTextColor }]}>
-              Pari
+          {/* 6. Lignes d'informations sous la mise */}
+          <View style={styles.payoutInfoRow}>
+            <Text style={[styles.payoutLabel, { color: isDark ? '#C8D0D8' : textSecondary }]}>
+              Gains potentiels:{' '}
             </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </>
+            <Text style={[styles.payoutValue, { color: accentColor }]}>
+              {formatExactPayout(potentialPayout)} F
+            </Text>
+          </View>
+
+          <View style={styles.advancebetRow}>
+            <Text style={[styles.advancebetLabel, { color: isDark ? '#C8D0D8' : textSecondary }]}>
+              Advancebet disponible: <Text style={{ color: textPrimary, fontWeight: '700' }}>—</Text>
+            </Text>
+            <TouchableOpacity activeOpacity={0.75} style={styles.demandeBtn}>
+              <Text style={[styles.demandeText, { color: accentColor }]}>
+                Demande
+              </Text>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C15.3019 3 18.1885 4.77814 19.7545 7.42909M19.7545 7.42909V3M19.7545 7.42909H15.5"
+                  stroke={accentColor}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+          </View>
+
+          {/* 7. Section Paris rapides */}
+          <View style={styles.quickBetsSection}>
+            <Text style={[styles.quickBetsTitle, { color: textPrimary }]}>
+              Paris rapides
+            </Text>
+            <Text style={[styles.quickBetsSubtitle, { color: textSecondary }]}>
+              Choisissez un montant de mise pour placer un pari
+            </Text>
+            <View style={styles.quickBetsRow}>
+              {[90, 1000, 5000].map((amt) => (
+                <TouchableOpacity
+                  key={amt}
+                  activeOpacity={0.85}
+                  onPress={() => onStakeChange(amt)}
+                  style={[styles.quickBetBtn, { backgroundColor: pariButtonBg }]}
+                >
+                  <Text style={styles.quickBetBtnText}>
+                    {formatExactBalance(amt)} F
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </Animated.View>
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    zIndex: 15,
-  },
-  container: {
-    position: 'absolute',
-    zIndex: 25,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-      default: {
-        boxShadow: '0 -3px 8px rgba(0, 0, 0, 0.08)',
-      },
-    }),
-  },
-  upperSection: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    paddingHorizontal: 16,
+  sheetContainer: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
     paddingBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 14,
   },
-  handleTouchable: {
-    paddingTop: 8,
-    paddingBottom: 8,
+  handleHitSlop: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   handleBar: {
-    width: 36,
+    width: 32,
     height: 4,
     borderRadius: 2,
+    marginVertical: 8,
   },
-  upperBodyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  upperLeftCol: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  countRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  countValue: {
-    fontSize: 14.5,
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-  oddsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 3,
-  },
-  oddsLabel: {
-    fontSize: 13,
-    fontWeight: '400',
-  },
-  oddsValue: {
-    fontSize: 14.5,
-    fontWeight: '700',
-  },
-  policySubtext: {
-    fontSize: 12,
-    fontWeight: '400',
-    marginTop: 3,
-  },
-  policySubtextBold: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  settingsButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lowerSection: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  summaryBox: {
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 14,
-    marginTop: -6,
-  },
-  pariButton: {
-    width: '100%',
-    height: 46,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pariButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // Styles PariPesa Bottom Sheet
-  paripesaInnerWrap: {
-    paddingHorizontal: 12,
-    paddingBottom: 14,
-  },
-  paripesaSummaryBox: {
-    borderRadius: 10,
-    paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 10,
   },
-  paripesaSummaryRow: {
+  summaryRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  paripesaSummaryRight: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
-  paripesaSummaryLabel: {
+  summaryLabel: {
     fontSize: 13.5,
     fontWeight: '400',
   },
-  paripesaSummaryValue: {
-    fontSize: 14.5,
-    fontWeight: '700',
-  },
-
-  // Styles MegaPari Bottom Sheet
-  megapariBarRow: {
+  summaryEventsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingTop: 2,
-    paddingBottom: 14,
+    gap: 6,
   },
-  megapariStatCol: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  summaryEventsValue: {
+    fontSize: 14,
+    fontWeight: '700',
   },
-  megapariCountTopRow: {
+  summaryOddsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
   },
-  megapariCountValue: {
-    fontSize: 15.5,
-    fontWeight: '700',
-    marginLeft: 5,
-  },
-  megapariOddsValue: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  megapariStatLabel: {
+  previousOddsStrike: {
     fontSize: 12.5,
-    fontWeight: '400',
+    textDecorationLine: 'line-through',
+  },
+  oddsArrow: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  summaryOddsValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  collapsedPariButton: {
+    height: 46,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  collapsedPariButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  oddsChangeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  oddsChangeTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  oddsChangeSubtitle: {
+    fontSize: 12,
     marginTop: 2,
   },
-  megapariPariBtn: {
-    height: 44,
-    minWidth: 122,
-    paddingHorizontal: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Styles Panneau Étendu (3 Onglets)
-  expandedContentPadding: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  tabsRow: {
+  parametresButton: {
     flexDirection: 'row',
-    borderRadius: 10,
-    padding: 3,
-    marginBottom: 10,
+    alignItems: 'center',
+    gap: 3,
   },
-  tabPill: {
+  parametresText: {
+    fontSize: 13.5,
+    fontWeight: '500',
+  },
+  segmentedTrack: {
+    flexDirection: 'row',
+    height: 34,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  segmentedTab: {
     flex: 1,
-    paddingVertical: 7,
+    height: 34,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
-  tabPillText: {
+  segmentedTabText: {
     fontSize: 12.5,
   },
-  balanceCard: {
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  soldeCard: {
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  balanceLeft: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
-  plusCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  soldeLeftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  soldePlusCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
-  balanceSmallLabel: {
+  soldeLabel: {
     fontSize: 11.5,
+    fontWeight: '400',
   },
-  balanceValueText: {
-    fontSize: 14.5,
+  soldeAmount: {
+    fontSize: 15,
     fontWeight: '700',
+    marginTop: 1,
   },
-  paramLinkRow: {
+  changeAccountBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 3,
   },
-  paramLinkText: {
-    fontSize: 12.5,
-    fontWeight: '600',
+  changeAccountText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
-  stakeInputBox: {
+  stakeAndPariRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 10,
+  },
+  stakeLeftCol: {
+    flex: 1,
+  },
+  stakeInputContainer: {
     height: 46,
     borderRadius: 10,
-    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 12,
     paddingRight: 6,
-    marginBottom: 8,
   },
-  stakeInputField: {
+  stakeInput: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     paddingVertical: 0,
   },
-  currencySuffix: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  stepperRightGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stepperBtn: {
+  stepBtnBox: {
     width: 32,
     height: 32,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepperMinusText: {
-    fontSize: 16,
+  stepMinusSymbol: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  stepPlusSymbol: {
+    fontSize: 18,
     fontWeight: '600',
   },
-  stepperPlusText: {
-    fontSize: 20,
+  limitsText: {
+    fontSize: 11.5,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  sidePariButton: {
+    width: 115,
+    height: 46,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sidePariButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15.5,
+    fontWeight: '700',
+  },
+  payoutInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  payoutLabel: {
+    fontSize: 13,
     fontWeight: '500',
   },
-  stepperDivider: {
-    width: 1,
-    height: 18,
+  payoutValue: {
+    fontSize: 13.5,
+    fontWeight: '700',
   },
-  financialBlock: {
+  advancebetRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginTop: 6,
   },
-  limitsText: {
-    fontSize: 12,
-  },
-  payoutRowText: {
+  advancebetLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  payoutGreenText: {
+  demandeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  demandeText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  quickBetsSection: {
+    marginTop: 10,
+  },
+  quickBetsTitle: {
+    fontSize: 13.5,
     fontWeight: '700',
   },
-  quickPillsRow: {
-    flexDirection: 'row',
-    gap: 8,
+  quickBetsSubtitle: {
+    fontSize: 11.5,
+    marginTop: 2,
     marginBottom: 8,
   },
-  quickPill: {
+  quickBetsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickBetBtn: {
     flex: 1,
-    paddingVertical: 7,
+    height: 40,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  altTabWrap: {
-    paddingVertical: 6,
-    marginBottom: 8,
-  },
-  altTabTitle: {
-    fontSize: 12.5,
-    marginBottom: 6,
-  },
-  promoInput: {
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
+  quickBetBtnText: {
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600',
-  },
-  policyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 6,
-  },
-  policyLabel: {
-    fontSize: 13,
+    fontWeight: '700',
   },
 });
 

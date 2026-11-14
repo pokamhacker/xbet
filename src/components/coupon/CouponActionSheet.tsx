@@ -1,42 +1,25 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
-import { useThemeStore } from '../../stores/themeStore';
+import React from 'react';
 import {
-  SaveCouponActionIcon,
-  LoadCouponActionIcon,
-  CreateCouponActionIcon,
-} from '../common/CouponIcons';
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  Pressable,
+} from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import { useThemeStore } from '../../store/themeStore';
+import { CreateCouponActionIcon } from '../common/CouponIcons';
 
-const ShareCouponActionIcon: React.FC<{ size?: number; color?: string }> = ({
-  size = 24,
-  color = '#567994',
-}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M14 5 L20 11 L14 17"
-      stroke={color}
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <Path
-      d="M20 11 H11.5 C7.5 11 4.5 14 4.5 18 V19"
-      stroke={color}
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
-export interface CouponActionSheetProps {
+interface CouponActionSheetProps {
   visible: boolean;
   onClose: () => void;
   onSaveCoupon: () => void;
   onLoadCoupon: () => void;
   onCreateCoupon: () => void;
-  onShareCoupon?: () => void;
+  onShareCoupon: () => void;
+  hasEvents?: boolean;
+  theme?: any;
 }
 
 export const CouponActionSheet: React.FC<CouponActionSheetProps> = ({
@@ -47,189 +30,217 @@ export const CouponActionSheet: React.FC<CouponActionSheetProps> = ({
   onCreateCoupon,
   onShareCoupon,
 }) => {
-  const { currentTheme, setBottomBarHidden } = useThemeStore();
-  const isDark = currentTheme?.isDark ?? false;
+  const { currentTheme } = useThemeStore();
+  const isDark = currentTheme.isDark;
+  const isMelbet = currentTheme.name.toLowerCase().includes('melbet');
 
-  const sheetBg = currentTheme?.cardBackground || (isDark ? '#1E293B' : '#FFFFFF');
-  const textColor = currentTheme?.textPrimary || (isDark ? '#F8FAFC' : '#1E242B');
-  const titleColor = currentTheme?.textPrimary || (isDark ? '#F8FAFC' : '#1E242B');
-  const iconColor = isDark ? '#94A3B8' : '#567994';
-  const borderColor = currentTheme?.border || (isDark ? '#334155' : '#F0F2F5');
-  const handleColor = isDark ? '#475569' : '#CBD5E1';
+  const sheetBg = isMelbet
+    ? isDark
+      ? '#262B31'
+      : '#FFFFFF'
+    : isDark
+      ? currentTheme.colors.cardBackground || '#1E2733'
+      : '#FFFFFF';
 
-  // Masquer la barre de navigation globale dès que l'interface "Choisissez une action" est ouverte
-  useEffect(() => {
-    if (visible) {
-      setBottomBarHidden(true);
-    }
-    return () => {
-      setBottomBarHidden(false);
-    };
-  }, [visible, setBottomBarHidden]);
+  const handleColor = isDark ? '#545B64' : '#CBD5E1';
+  const titleColor = isDark ? '#FFFFFF' : '#111827';
+  const itemTextColor = isDark ? '#E5E7EB' : '#1F2937';
+  const iconColor = isDark ? '#8A949E' : '#64748B';
+  const dividerColor = isDark
+    ? 'rgba(255, 255, 255, 0.06)'
+    : 'rgba(0, 0, 0, 0.07)';
 
-  const handleClose = () => {
-    setBottomBarHidden(false);
-    onClose();
-  };
+  const actions = [
+    {
+      id: 'save',
+      label: 'Enregistrer le coupon de pari',
+      onPress: () => {
+        onClose();
+        setTimeout(() => onSaveCoupon(), 120);
+      },
+      renderIcon: () => (
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 4V15M12 15L8 11M12 15L16 11"
+            stroke={iconColor}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M4 16V18.5C4 19.6 4.9 20.5 6 20.5H18C19.1 20.5 20 19.6 20 18.5V16"
+            stroke={iconColor}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      ),
+    },
+    {
+      id: 'load',
+      label: 'Charger le coupon de pari',
+      onPress: () => {
+        onClose();
+        setTimeout(() => onLoadCoupon(), 120);
+      },
+      renderIcon: () => (
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 15V4M12 4L8 8M12 4L16 8"
+            stroke={iconColor}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M4 16V18.5C4 19.6 4.9 20.5 6 20.5H18C19.1 20.5 20 19.6 20 18.5V16"
+            stroke={iconColor}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      ),
+    },
+    {
+      id: 'create',
+      label: 'Créer un coupon de pari',
+      onPress: () => {
+        onClose();
+        setTimeout(() => onCreateCoupon(), 120);
+      },
+      renderIcon: () => <CreateCouponActionIcon size={20} color={iconColor} />,
+    },
+    {
+      id: 'share',
+      label: 'Share your bet slip',
+      onPress: () => {
+        onClose();
+        setTimeout(() => onShareCoupon(), 120);
+      },
+      renderIcon: () => (
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 15V4M12 4L8 8M12 4L16 8"
+            stroke={iconColor}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M6 12H5C3.89543 12 3 12.8954 3 14V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V14C21 12.8954 20.1046 12 19 12H18"
+            stroke={iconColor}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      ),
+    },
+  ];
 
   return (
     <Modal
-      animationType="slide"
-      onRequestClose={handleClose}
-      transparent
       visible={visible}
-      statusBarTranslucent={true}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
     >
-      <TouchableOpacity activeOpacity={1} onPress={handleClose} style={styles.overlay}>
-        <TouchableOpacity
-          activeOpacity={1}
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable
           style={[styles.sheetContainer, { backgroundColor: sheetBg }]}
           onPress={(e) => e.stopPropagation()}
         >
-          {/* Poignée du Bottom Sheet */}
-          <View style={[styles.handle, { backgroundColor: handleColor }]} />
+          {/* Poignée supérieure */}
+          <View style={styles.handleWrapper}>
+            <View style={[styles.handle, { backgroundColor: handleColor }]} />
+          </View>
 
           {/* Titre centré */}
-          <Text style={[styles.title, { color: titleColor }]}>Choisissez une action</Text>
+          <Text style={[styles.sheetTitle, { color: titleColor }]}>
+            Choisissez une action
+          </Text>
 
-          {/* Option 1: Enregistrer */}
-          <TouchableOpacity
-            style={[styles.optionRow, { borderBottomColor: borderColor }]}
-            activeOpacity={0.7}
-            onPress={() => {
-              handleClose();
-              onSaveCoupon();
-            }}
-          >
-            <View style={styles.iconWrapper}>
-              <SaveCouponActionIcon color={iconColor} size={22} />
-            </View>
-            <Text style={[styles.optionText, { color: textColor }]}>
-              Enregistrer le coupon de pari
-            </Text>
-          </TouchableOpacity>
-
-          {/* Option 2: Charger */}
-          <TouchableOpacity
-            style={[styles.optionRow, { borderBottomColor: borderColor }]}
-            activeOpacity={0.7}
-            onPress={() => {
-              handleClose();
-              onLoadCoupon();
-            }}
-          >
-            <View style={styles.iconWrapper}>
-              <LoadCouponActionIcon color={iconColor} size={22} />
-            </View>
-            <Text style={[styles.optionText, { color: textColor }]}>
-              Charger le coupon de pari
-            </Text>
-          </TouchableOpacity>
-
-          {/* Option 3: Créer */}
-          <TouchableOpacity
-            style={[styles.optionRow, { borderBottomColor: borderColor }]}
-            activeOpacity={0.7}
-            onPress={() => {
-              handleClose();
-              onCreateCoupon();
-            }}
-          >
-            <View style={styles.iconWrapper}>
-              <CreateCouponActionIcon color={iconColor} size={22} />
-            </View>
-            <Text style={[styles.optionText, { color: textColor }]}>
-              Créer coupon de pari
-            </Text>
-          </TouchableOpacity>
-
-          {/* Option 4: Partage */}
-          <TouchableOpacity
-            style={[styles.optionRow, { borderBottomWidth: 0 }]}
-            activeOpacity={0.7}
-            onPress={() => {
-              handleClose();
-              if (onShareCoupon) {
-                onShareCoupon();
-              } else {
-                onSaveCoupon();
-              }
-            }}
-          >
-            <View style={styles.iconWrapper}>
-              <ShareCouponActionIcon color={iconColor} size={22} />
-            </View>
-            <Text style={[styles.optionText, { color: textColor }]}>
-              Partage de votre coupon de pari
-            </Text>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </TouchableOpacity>
+          {/* Liste des 4 actions */}
+          <View style={styles.actionsList}>
+            {actions.map((item, idx) => (
+              <React.Fragment key={item.id}>
+                <TouchableOpacity
+                  style={styles.actionRow}
+                  activeOpacity={0.7}
+                  onPress={item.onPress}
+                >
+                  <View style={styles.iconBox}>{item.renderIcon()}</View>
+                  <Text style={[styles.actionLabel, { color: itemTextColor }]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+                {idx < actions.length - 1 && (
+                  <View
+                    style={[styles.separator, { backgroundColor: dividerColor }]}
+                  />
+                )}
+              </React.Fragment>
+            ))}
+          </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.52)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     justifyContent: 'flex-end',
-    width: '100%',
-    height: '100%',
-    zIndex: 99999,
-    ...(Platform.OS === 'web'
-      ? ({
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-        } as any)
-      : {}),
   },
   sheetContainer: {
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingHorizontal: 20,
+    paddingBottom: 28,
+    paddingHorizontal: 16,
+  },
+  handleWrapper: {
+    alignItems: 'center',
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 22,
+    paddingBottom: 8,
   },
   handle: {
-    width: 38,
+    width: 34,
     height: 4,
-    backgroundColor: '#CBD5E1',
     borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 14,
   },
-  title: {
-    fontSize: 18,
+  sheetTitle: {
+    fontSize: 16.5,
     fontWeight: '700',
-    color: '#1E242B',
     textAlign: 'center',
     marginBottom: 14,
   },
-  optionRow: {
+  actionsList: {
+    width: '100%',
+  },
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F2F5',
   },
-  iconWrapper: {
-    width: 30,
-    height: 30,
+  iconBox: {
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
   },
-  optionText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1E242B',
+  actionLabel: {
+    fontSize: 14.5,
+    fontWeight: '400',
+    flex: 1,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    width: '100%',
   },
 });
 

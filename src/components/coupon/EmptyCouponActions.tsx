@@ -1,206 +1,19 @@
-import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import Svg, { Path, Rect, Circle } from 'react-native-svg';
-import { useThemeStore } from '../../stores/themeStore';
-import { useCouponStore } from '../../store/couponStore';
-import { useResponsive } from '../../utils/responsive';
-import { Typography } from '../../theme/theme';
-
-// ============================================================================
-// ICÔNES VECTORIELLES PIXEL-PERFECT REPRODUISANT FIDÈLEMENT LA CAPTURE 1XBET
-// ============================================================================
-
-/**
- * 1. Icône Plus (+) pour "Recharger le compte"
- */
-const PlusIcon: React.FC<{ size?: number; color?: string }> = ({
-  size = 22,
-  color = '#FFFFFF',
-}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M12 4.5 V19.5 M4.5 12 H19.5"
-      stroke={color}
-      strokeWidth={3}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
-/**
- * 2. Icône Loupe de recherche pour "Recherche d'événement"
- */
-const SearchIcon: React.FC<{ size?: number; color?: string }> = ({
-  size = 22,
-  color = '#2563EB',
-}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Circle cx="10.5" cy="10.5" r="6" stroke={color} strokeWidth={2.6} />
-    <Path
-      d="M15 15 L20 20"
-      stroke={color}
-      strokeWidth={2.6}
-      strokeLinecap="round"
-    />
-  </Svg>
-);
-
-/**
- * 3. Icône Deux Billets / Cartes superposées pour "Pari combiné du jour"
- * (Reproduction vectorielle exacte de l'asset officiel assets/icons/combine.png)
- */
-const CombineBetIcon: React.FC<{ size?: number; color?: string; badgeBg?: string }> = ({
-  size = 22,
-  color = '#2563EB',
-  badgeBg = '#EBF3FE',
-}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {/* Plaque Supérieure avec découpe cercle et ligne */}
-    <Rect x="2" y="3" width="20" height="8.5" rx="4.25" fill={color} />
-    <Circle cx="6.5" cy="7.25" r="2.2" fill={badgeBg} />
-    <Rect x="10.5" y="6" width="8" height="2.5" rx="1.25" fill={badgeBg} />
-
-    {/* Plaque Inférieure avec découpe cercle */}
-    <Rect x="2" y="13.5" width="20" height="8.5" rx="4.25" fill={color} />
-    <Circle cx="6.5" cy="17.75" r="2.2" fill={badgeBg} />
-  </Svg>
-);
-
-/**
- * 4. Icône Curseurs / Sliders pour "Créer coupon de pari"
- * (Deux lignes horizontales avec curseurs décalés)
- */
-const SlidersIcon: React.FC<{ size?: number; color?: string }> = ({
-  size = 22,
-  color = '#2563EB',
-}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {/* Piste Supérieure */}
-    <Rect x="2.5" y="6.8" width="19" height="2.4" rx="1.2" fill={color} />
-    {/* Curseur Supérieur (gauche) */}
-    <Rect x="5.5" y="3.5" width="3.4" height="9" rx="1.2" fill={color} />
-
-    {/* Piste Inférieure */}
-    <Rect x="2.5" y="15.8" width="19" height="2.4" rx="1.2" fill={color} />
-    {/* Curseur Inférieur (droite) */}
-    <Rect x="14" y="12.5" width="3.4" height="9" rx="1.2" fill={color} />
-  </Svg>
-);
-
-/**
- * 5. Icône Upload pour "Charger le coupon de pari"
- * (Flèche vers le haut au-dessus d'une barre horizontale de base)
- */
-const UploadTrayIcon: React.FC<{ size?: number; color?: string }> = ({
-  size = 22,
-  color = '#2563EB',
-}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {/* Tige de la flèche */}
-    <Rect x="10.7" y="6.5" width="2.6" height="9.5" rx="1.2" fill={color} />
-    {/* Pointe de la flèche */}
-    <Path
-      d="M6.5 10.5 L12 4.5 L17.5 10.5"
-      stroke={color}
-      strokeWidth={2.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    {/* Barre horizontale inférieure */}
-    <Rect x="5" y="18.5" width="14" height="2.5" rx="1.25" fill={color} />
-  </Svg>
-);
-
-// ============================================================================
-// CARTE D'ACTION INDIVIDUELLE (ACTION CARD ITEM)
-// ============================================================================
-
-interface ActionCardItemProps {
-  renderIcon: () => React.ReactNode;
-  title: string;
-  subtitle: string;
-  badgeBg: string;
-  cardBg: string;
-  titleColor: string;
-  subtitleColor: string;
-  borderColor?: string;
-  onPress: () => void;
-  font: (size: number) => number;
-  moderateScale: (size: number) => number;
-}
-
-const ActionCardItem: React.FC<ActionCardItemProps> = ({
-  renderIcon,
-  title,
-  subtitle,
-  badgeBg,
-  cardBg,
-  titleColor,
-  subtitleColor,
-  borderColor,
-  onPress,
-  font,
-  moderateScale,
-}) => {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.78}
-      onPress={onPress}
-      style={[
-        styles.cardContainer,
-        {
-          backgroundColor: cardBg,
-          borderColor: borderColor || 'transparent',
-          borderWidth: borderColor ? 1 : 0,
-          paddingVertical: moderateScale(13),
-          paddingHorizontal: moderateScale(14),
-        },
-      ]}
-    >
-      {/* Conteneur circulaire de l'icône */}
-      <View
-        style={[
-          styles.iconBadge,
-          {
-            backgroundColor: badgeBg,
-            width: moderateScale(46),
-            height: moderateScale(46),
-            borderRadius: moderateScale(23),
-          },
-        ]}
-      >
-        {renderIcon()}
-      </View>
-
-      {/* Textes de la carte */}
-      <View style={styles.textContainer}>
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.titleText,
-            { color: titleColor, fontSize: font(15.5) },
-          ]}
-        >
-          {title}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.subtitleText,
-            { color: subtitleColor, fontSize: font(13) },
-          ]}
-        >
-          {subtitle}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-// ============================================================================
-// COMPOSANT PRINCIPAL : EMPTY COUPON ACTIONS
-// ============================================================================
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { useThemeStore } from '../../store/themeStore';
+import { useBetStore } from '../../store/useBetStore';
+import {
+  CreateCouponActionIcon,
+  LoadCouponActionIcon,
+  TrophyCupIcon,
+} from '../common/CouponIcons';
 
 export interface EmptyCouponActionsProps {
   navigation?: any;
@@ -210,266 +23,335 @@ export interface EmptyCouponActionsProps {
   onCombine?: () => void;
   onCreateCoupon?: () => void;
   onLoadCoupon?: () => void;
+  onRechargeAccount?: () => void;
+  onEventSearch?: () => void;
+  onDailyAccumulator?: () => void;
+  onGenerateCoupon?: () => void;
+  onCreateManualCoupon?: () => void;
 }
 
 export const EmptyCouponActions: React.FC<EmptyCouponActionsProps> = ({
-  navigation,
-  userBalance = '0 F',
+  userBalance: propUserBalance,
   onDeposit,
   onSearch,
   onCombine,
   onCreateCoupon,
   onLoadCoupon,
+  onRechargeAccount,
+  onEventSearch,
+  onDailyAccumulator,
+  onGenerateCoupon,
 }) => {
-  const { currentTheme, currentBrand } = useThemeStore();
-  const { font, moderateScale, isTablet } = useResponsive();
+  const { currentTheme } = useThemeStore();
+  const balance = useBetStore((state) => state.balance);
+  const [favoriteExpanded, setFavoriteExpanded] = useState(false);
 
-  const isDark = Boolean(currentTheme?.isDark);
+  const isDark = currentTheme.isDark;
+  const isMelbet = currentTheme.name.toLowerCase().includes('melbet');
 
-  // Couleur primaire de marque (1xBet bleu #2563EB, Melbet or #F3A000, WinWin vert #7CBD17, MegaPari rouge #D3242A, etc.)
-  const primaryColor = currentTheme?.colors?.primary || currentTheme?.primary || '#2563EB';
+  // Couleurs calibrées multi-thèmes (1xBet & Melbet)
+  const accentColor = isMelbet
+    ? '#E58E26'
+    : currentTheme.colors.primary || '#228BE6';
 
-  // Fond des pastilles thématiques (s'adapte à la couleur primaire douce de chaque marque)
-  const softBadgeBg = isDark
-    ? (currentTheme?.primarySoft || '#1E293B')
-    : (currentTheme?.primarySoft || '#E8F1FC');
+  const cardBg = isMelbet
+    ? isDark
+      ? '#262B31'
+      : currentTheme.colors.cardBackground || '#FFFFFF'
+    : isDark
+      ? currentTheme.colors.cardBackground || '#1E2733'
+      : '#FFFFFF';
 
-  // Pastille officielle pour "Recharger le compte"
-  const greenBadgeBg =
-    currentTheme?.depositButton?.bg ||
-    currentTheme?.colors?.accentGreen ||
-    currentTheme?.status?.paye ||
-    '#22C55E';
+  const iconCircleBg = isMelbet
+    ? isDark
+      ? '#323840'
+      : '#ECEFF3'
+    : isDark
+      ? '#2B3647'
+      : '#EEF2F7';
 
-  // Couleurs des cartes et textes selon le thème
-  const cardBg = currentTheme?.cardBackground || (isDark ? '#212D3B' : '#FFFFFF');
-  const borderColor = isDark ? (currentTheme?.border || '#2C3A4B') : undefined;
+  const titleColor = isDark ? '#FFFFFF' : '#111827';
+  const subtitleColor = isDark ? '#8A949E' : '#64748B';
 
-  // Typographies thématiques
-  const mainNoticeTitleColor = isDark ? (currentTheme?.textPrimary || '#FFFFFF') : (currentTheme?.textPrimary || '#1D3B58');
-  const mainNoticeSubtitleColor = isDark ? (currentTheme?.textSecondary || '#8E9CAE') : (currentTheme?.textSecondary || '#5B7B9A');
-  const cardTitleColor = currentTheme?.textPrimary || (isDark ? '#FFFFFF' : '#101E33');
-  const cardSubtitleColor = currentTheme?.textSecondary || (isDark ? '#8E9CAE' : '#64748B');
-
-  // Nettoyage et formatage strict du solde ("Votre solde : 148326760 F" comme sur la capture)
-  const cleanBalanceText = useMemo(() => {
-    if (!userBalance) return '0 F';
-    let s = String(userBalance).trim();
-    s = s.replace(/^Votre solde\s*:\s*/i, '');
-    s = s.replace(/₣/g, 'F');
-    if (!s.endsWith('F')) {
-      s = `${s} F`;
-    }
-    return s;
-  }, [userBalance]);
-
-  // Handlers avec fallbacks sécurisés
-  const handleDepositPress = () => {
-    if (onDeposit) {
-      onDeposit();
-    } else if (navigation?.navigate) {
-      navigation.navigate('DepositScreen');
-    }
-  };
-
-  const handleSearchPress = () => {
-    if (onSearch) {
-      onSearch();
-    } else if (navigation?.navigate) {
-      try {
-        navigation.navigate('SearchScreen');
-      } catch (e) {
-        navigation.navigate('Populaire');
-      }
-    }
-  };
-
-  const handleCombinePress = () => {
-    if (onCombine) {
-      onCombine();
-    } else if (navigation?.navigate) {
-      navigation.navigate('AccumulatorScreen');
-    }
-  };
-
-  const handleCreatePress = () => {
-    if (onCreateCoupon) {
-      onCreateCoupon();
-    } else if (navigation?.navigate) {
-      navigation.navigate('StudioCreation');
-    }
-  };
-
-  const handleLoadPress = () => {
-    if (onLoadCoupon) {
-      onLoadCoupon();
-    } else {
-      useCouponStore.getState().setLoadSheetVisible(true);
-    }
-  };
+  const formattedBalance =
+    propUserBalance ||
+    `${Number(balance || 0).toLocaleString('fr-FR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })} F`;
 
   return (
-    <View style={[styles.container, isTablet && styles.tabletContainer]}>
-      {/* 1. Bloc de texte d'en-tête (Structure exacte de la capture) */}
-      <View style={styles.noticeHeader}>
-        <Text style={[styles.headerTitle, { color: mainNoticeTitleColor, fontSize: font(17.5) }]}>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Titre et sous-titre calibrés comme Vidéo 1 (marginTop: 28, marginBottom: 18) */}
+      <View style={styles.emptyHeaderContainer}>
+        <Text style={[styles.emptyTitle, { color: titleColor }]}>
           Votre coupon de pari est vide
         </Text>
-        <Text style={[styles.headerSubtitle, { color: mainNoticeSubtitleColor, fontSize: font(13.5) }]}>
-          Ajoutez un événement au coupon de pari ou sélectionnez l'une des options
+        <Text style={[styles.emptySubtitle, { color: subtitleColor }]}>
+          Ajoutez un événement au coupon de pari ou choisissez l'une des options
         </Text>
       </View>
 
-      {/* 2. Pile des 5 Cartes d'Actions */}
-      <View style={styles.cardsStack}>
-        {/* CARTE 1 : Recharger le compte (Cercle vert + Croix blanche) */}
-        <ActionCardItem
-          badgeBg={greenBadgeBg}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          titleColor={cardTitleColor}
-          subtitleColor={cardSubtitleColor}
-          title="Recharger le compte"
-          subtitle={`Votre solde : ${cleanBalanceText}`}
-          onPress={handleDepositPress}
-          font={font}
-          moderateScale={moderateScale}
-          renderIcon={() => <PlusIcon size={moderateScale(24)} color="#FFFFFF" />}
-        />
+      {/* Liste des cartes d'options compactes */}
+      <View style={styles.cardsList}>
+        {/* 1. Recharger le compte */}
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: cardBg }]}
+          activeOpacity={0.75}
+          onPress={onDeposit || onRechargeAccount}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: accentColor }]}>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M12 5V19M5 12H19"
+                stroke={isMelbet && isDark ? '#1A1E23' : '#FFFFFF'}
+                strokeWidth={2.5}
+                strokeLinecap="round"
+              />
+            </Svg>
+          </View>
+          <View style={styles.textBlock}>
+            <Text style={[styles.cardTitle, { color: titleColor }]} numberOfLines={1}>
+              Recharger le compte
+            </Text>
+            <Text style={[styles.cardSubtitle, { color: subtitleColor }]} numberOfLines={1}>
+              Votre solde: {formattedBalance}
+            </Text>
+          </View>
+        </TouchableOpacity>
 
-        {/* CARTE 2 : Recherche d'événement (Cercle bleu pastel + Loupe bleue) */}
-        <ActionCardItem
-          badgeBg={softBadgeBg}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          titleColor={cardTitleColor}
-          subtitleColor={cardSubtitleColor}
-          title="Recherche d'événement"
-          subtitle="Uniquement pour vous"
-          onPress={handleSearchPress}
-          font={font}
-          moderateScale={moderateScale}
-          renderIcon={() => <SearchIcon size={moderateScale(22)} color={primaryColor} />}
-        />
+        {/* 2. Recherche d'événement */}
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: cardBg }]}
+          activeOpacity={0.75}
+          onPress={onSearch || onEventSearch}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: iconCircleBg }]}>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+              <Circle
+                cx="11"
+                cy="11"
+                r="6.5"
+                stroke={accentColor}
+                strokeWidth={2.2}
+              />
+              <Path
+                d="M16 16L20.5 20.5"
+                stroke={accentColor}
+                strokeWidth={2.2}
+                strokeLinecap="round"
+              />
+            </Svg>
+          </View>
+          <View style={styles.textBlock}>
+            <Text style={[styles.cardTitle, { color: titleColor }]} numberOfLines={1}>
+              Recherche d'événement
+            </Text>
+            <Text style={[styles.cardSubtitle, { color: subtitleColor }]} numberOfLines={1}>
+              Uniquement pour vous
+            </Text>
+          </View>
+        </TouchableOpacity>
 
-        {/* CARTE 3 : Pari combiné du jour (Cercle bleu pastel + Deux tickets superposés) */}
-        <ActionCardItem
-          badgeBg={softBadgeBg}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          titleColor={cardTitleColor}
-          subtitleColor={cardSubtitleColor}
-          title="Pari combiné du jour"
-          subtitle="Meilleures offres du jour"
-          onPress={handleCombinePress}
-          font={font}
-          moderateScale={moderateScale}
-          renderIcon={() => (
-            <CombineBetIcon
-              size={moderateScale(23)}
-              color={primaryColor}
-              badgeBg={softBadgeBg}
-            />
-          )}
-        />
+        {/* 3. Combiné du jour */}
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: cardBg }]}
+          activeOpacity={0.75}
+          onPress={onCombine || onDailyAccumulator}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: iconCircleBg }]}>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+              <Rect
+                x="3.5"
+                y="6"
+                width="14"
+                height="10"
+                rx="2"
+                stroke={accentColor}
+                strokeWidth={2}
+              />
+              <Path
+                d="M7.5 19H18.5C19.6 19 20.5 18.1 20.5 17V9"
+                stroke={accentColor}
+                strokeWidth={2}
+                strokeLinecap="round"
+              />
+            </Svg>
+          </View>
+          <View style={styles.textBlock}>
+            <Text style={[styles.cardTitle, { color: titleColor }]} numberOfLines={1}>
+              Combiné du jour
+            </Text>
+            <Text style={[styles.cardSubtitle, { color: subtitleColor }]} numberOfLines={1}>
+              Meilleures offres du jour
+            </Text>
+          </View>
+        </TouchableOpacity>
 
-        {/* CARTE 4 : Créer coupon de pari (Cercle bleu pastel + Curseurs/Sliders) */}
-        <ActionCardItem
-          badgeBg={softBadgeBg}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          titleColor={cardTitleColor}
-          subtitleColor={cardSubtitleColor}
-          title="Créer coupon de pari"
-          subtitle="Générez votre coupon de pari"
-          onPress={handleCreatePress}
-          font={font}
-          moderateScale={moderateScale}
-          renderIcon={() => <SlidersIcon size={moderateScale(22)} color={primaryColor} />}
-        />
+        {/* 4. Créer un coupon de pari */}
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: cardBg }]}
+          activeOpacity={0.75}
+          onPress={onCreateCoupon || onGenerateCoupon}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: iconCircleBg }]}>
+            <CreateCouponActionIcon size={18} color={accentColor} />
+          </View>
+          <View style={styles.textBlock}>
+            <Text style={[styles.cardTitle, { color: titleColor }]} numberOfLines={1}>
+              Créer un coupon de pari
+            </Text>
+            <Text style={[styles.cardSubtitle, { color: subtitleColor }]} numberOfLines={1}>
+              Générez votre coupon de pari
+            </Text>
+          </View>
+        </TouchableOpacity>
 
-        {/* CARTE 5 : Charger le coupon de pari (Cercle bleu pastel + Flèche plateau) */}
-        <ActionCardItem
-          badgeBg={softBadgeBg}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          titleColor={cardTitleColor}
-          subtitleColor={cardSubtitleColor}
-          title="Charger le coupon de pari"
-          subtitle="Chargez votre coupon de pari"
-          onPress={handleLoadPress}
-          font={font}
-          moderateScale={moderateScale}
-          renderIcon={() => <UploadTrayIcon size={moderateScale(22)} color={primaryColor} />}
-        />
+        {/* 5. Charger le coupon de pari */}
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: cardBg }]}
+          activeOpacity={0.75}
+          onPress={onLoadCoupon}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: iconCircleBg }]}>
+            <LoadCouponActionIcon size={18} color={accentColor} />
+          </View>
+          <View style={styles.textBlock}>
+            <Text style={[styles.cardTitle, { color: titleColor }]} numberOfLines={1}>
+              Charger le coupon de pari
+            </Text>
+            <Text style={[styles.cardSubtitle, { color: subtitleColor }]} numberOfLines={1}>
+              Chargez votre coupon de pari
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* 6. Bet on the favorite — EXCLUSIVEMENT SUR MELBET */}
+        {isMelbet && (
+          <TouchableOpacity
+            style={[styles.actionCard, { backgroundColor: cardBg }]}
+            activeOpacity={0.75}
+            onPress={() => setFavoriteExpanded((prev) => !prev)}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: iconCircleBg }]}>
+              <TrophyCupIcon size={18} color="#E58E26" />
+            </View>
+            <Text
+              style={[styles.favoriteTitle, { color: titleColor }]}
+              numberOfLines={1}
+            >
+              Bet on the favorite
+            </Text>
+            <View style={[styles.favoriteCountBadge, { backgroundColor: iconCircleBg }]}>
+              <Text style={styles.favoriteCountText}>3</Text>
+            </View>
+            <View style={[styles.favoriteChevronBtn, { backgroundColor: iconCircleBg }]}>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d={favoriteExpanded ? 'M6 15L12 9L18 15' : 'M6 9L12 15L18 9'}
+                  stroke="#8A949E"
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
-// ============================================================================
-// STYLES PIXEL-PERFECT ET RESPONSIVE
-// ============================================================================
-
 const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    paddingTop: 20,
-    paddingBottom: 28,
+  scrollView: {
+    flex: 1,
   },
-  tabletContainer: {
-    maxWidth: 580,
-    alignSelf: 'center',
+  contentContainer: {
+    paddingHorizontal: 2,
+    paddingBottom: 120,
   },
-  noticeHeader: {
+  emptyHeaderContainer: {
+    marginTop: 28,
+    marginBottom: 18,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 22,
-    paddingHorizontal: 20,
   },
-  headerTitle: {
+  emptyTitle: {
+    fontSize: 16.5,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 6,
-    fontFamily: Typography.fontFamily,
     letterSpacing: -0.2,
   },
-  headerSubtitle: {
+  emptySubtitle: {
+    fontSize: 13,
     fontWeight: '400',
     textAlign: 'center',
-    lineHeight: 19,
-    fontFamily: Typography.fontFamily,
-    maxWidth: 360,
+    lineHeight: 18,
   },
-  cardsStack: {
+  cardsList: {
     width: '100%',
-    gap: 10,
   },
-  cardContainer: {
+  actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
-    marginBottom: 0,
+    minHeight: 58,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 8,
   },
-  iconBadge: {
-    justifyContent: 'center',
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
     alignItems: 'center',
-    marginRight: 15,
+    justifyContent: 'center',
   },
-  textContainer: {
+  textBlock: {
     flex: 1,
     justifyContent: 'center',
   },
-  titleText: {
-    fontWeight: '700',
-    marginBottom: 2.5,
-    fontFamily: Typography.fontFamily,
-    letterSpacing: -0.2,
-  },
-  subtitleText: {
-    fontWeight: '400',
-    fontFamily: Typography.fontFamily,
+  cardTitle: {
+    fontSize: 14.5,
+    fontWeight: '600',
+    marginBottom: 2,
     letterSpacing: -0.1,
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  favoriteTitle: {
+    flex: 1,
+    fontSize: 14.5,
+    fontWeight: '600',
+  },
+  favoriteCountBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favoriteCountText: {
+    color: '#E58E26',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  favoriteChevronBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

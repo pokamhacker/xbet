@@ -1,6 +1,11 @@
 import React from 'react';
-import Svg, { Path, Rect, G } from 'react-native-svg';
+import Svg, { Path, Rect, G, Circle } from 'react-native-svg';
 import { useThemeStore } from '../../store/themeStore';
+
+export interface IconProps {
+  size?: number;
+  color?: string;
+}
 
 /**
  * 1. TrashBinIcon: reproduction vectorielle pixel-perfect de l'icône Corbeille du Header Coupon
@@ -280,6 +285,86 @@ export const CreateCouponActionIcon: React.FC<{
         d="M14.5 18 H20.5"
         stroke={iconColor}
         strokeWidth={2.6}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+};
+
+// ============================================================================
+// 8. ICÔNE MENU ACTIONS COUPON (3 points horizontaux centraux + traits haut/bas)
+// ============================================================================
+export const CouponMenuDotsIcon: React.FC<IconProps> = ({
+  size = 20,
+  color,
+}) => {
+  const { currentTheme } = useThemeStore();
+  const iconColor = color || '#8A949E' || currentTheme.colors.textSecondary;
+
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Petit trait horizontal supérieur */}
+      <Path
+        d="M8.5 5.5H15.5"
+        stroke={iconColor}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+      {/* 3 points horizontaux centraux */}
+      <Circle cx="5.5" cy="12" r="1.8" fill={iconColor} />
+      <Circle cx="12" cy="12" r="1.8" fill={iconColor} />
+      <Circle cx="18.5" cy="12" r="1.8" fill={iconColor} />
+      {/* Petit trait horizontal inférieur */}
+      <Path
+        d="M8.5 18.5H15.5"
+        stroke={iconColor}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+};
+
+// ============================================================================
+// 9. ICÔNE TROPHÉE / COUPE (Bet on the favorite - Melbet)
+// ============================================================================
+export const TrophyCupIcon: React.FC<IconProps> = ({
+  size = 18,
+  color,
+}) => {
+  const { currentTheme } = useThemeStore();
+  const iconColor = color || currentTheme.colors.primary;
+
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Coupe centrale */}
+      <Path
+        d="M7 4H17V10C17 12.7614 14.7614 15 12 15C9.23858 15 7 12.7614 7 10V4Z"
+        stroke={iconColor}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      {/* Anse gauche */}
+      <Path
+        d="M7 6H4.5C3.94772 6 3.5 6.44772 3.5 7V8.5C3.5 10.1569 4.84315 11.5 6.5 11.5H7"
+        stroke={iconColor}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Anse droite */}
+      <Path
+        d="M17 6H19.5C20.0523 6 20.5 6.44772 20.5 7V8.5C20.5 10.1569 19.1569 11.5 17.5 11.5H17"
+        stroke={iconColor}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Pied et socle */}
+      <Path
+        d="M12 15V19M8.5 19H15.5"
+        stroke={iconColor}
+        strokeWidth={2}
         strokeLinecap="round"
       />
     </Svg>

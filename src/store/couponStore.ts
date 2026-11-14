@@ -18,6 +18,7 @@ interface CouponState {
   stake: number;
   isLoadSheetVisible: boolean;
   isBetSheetVisible: boolean;
+  lastSavedCode: string;
   savedCoupons: Record<string, SavedCouponEntry>;
 
   ticketType: 'Simple' | 'Combiné' | 'Système';
@@ -70,7 +71,15 @@ export const useCouponStore = create<CouponState>((set, get) => ({
   stake: 500,
   isLoadSheetVisible: false,
   isBetSheetVisible: false,
+  lastSavedCode: '6R4N6',
   savedCoupons: {
+    '6R4N6': {
+      code: '6R4N6',
+      stake: 500,
+      totalOdds: 15.988,
+      createdAt: '14.11.2026 (11:07)',
+      events: [DEFAULT_COUPON_EVENT],
+    },
     PB314888: {
       code: 'PB314888',
       stake: 2500,
@@ -238,6 +247,7 @@ export const useCouponStore = create<CouponState>((set, get) => ({
     };
 
     set((state) => ({
+      lastSavedCode: code,
       savedCoupons: {
         ...state.savedCoupons,
         [code]: entry,
@@ -253,7 +263,7 @@ export const useCouponStore = create<CouponState>((set, get) => ({
       return { success: false, message: 'Veuillez saisir un code valide.', count: 0 };
     }
 
-    // 0. Vérifier dans les coupons sauvegardés localement (PB314888, etc.)
+    // 0. Vérifier dans les coupons sauvegardés localement (PB314888, 6R4N6, etc.)
     const saved = get().savedCoupons[code];
     if (saved && saved.events.length > 0) {
       const clonedEvents = saved.events.map((ev, idx) => ({
@@ -264,7 +274,8 @@ export const useCouponStore = create<CouponState>((set, get) => ({
       set({
         activeEvents: clonedEvents,
         currentSelections: clonedEvents,
-        stake: saved.stake || 1000,
+        stake: saved.stake || 500,
+        ticketType: clonedEvents.length > 1 ? 'Combiné' : 'Simple',
         isLoadSheetVisible: false,
       });
       return {

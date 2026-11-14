@@ -30,12 +30,18 @@ import { useAuthStore } from '../store/authStore';
 import { formatCleanOdds } from '../utils/oddsFormatter';
 import { EventCard, OddTrendDirection } from '../components/coupon/EventCard';
 import { BetBottomSheet } from '../components/coupon/BetBottomSheet';
-import { SaveCouponModal } from '../components/coupon/SaveCouponModal';
+import {
+  SaveCouponModal,
+  ClearCouponConfirmModal,
+} from '../components/coupon/SaveCouponModal';
 import { CouponActionSheet } from '../components/coupon/CouponActionSheet';
 import { EmptyCouponActions } from '../components/coupon/EmptyCouponActions';
 import { LoadCouponModal } from '../components/coupon/LoadCouponModal';
 import { BrandLogo } from '../components/common/BrandLogo';
-import { TrashBinIcon } from '../components/common/CouponIcons';
+import {
+  TrashBinIcon,
+  CouponMenuDotsIcon,
+} from '../components/common/CouponIcons';
 import {
   createAppRefreshControl,
   useAppRefresh,
@@ -94,6 +100,7 @@ export default function CouponScreen({ navigation }: any) {
   const [showTicketTypeMenu, setShowTicketTypeMenu] = useState(false);
   const [show3DotsMenu, setShow3DotsMenu] = useState(false);
   const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
+  const [isClearConfirmVisible, setIsClearConfirmVisible] = useState(false);
   const [savedCouponCode, setSavedCouponCode] = useState('');
   const [isBoosterDismissed, setIsBoosterDismissed] = useState(false);
 
@@ -435,9 +442,9 @@ export default function CouponScreen({ navigation }: any) {
                   </Text>
                   <Ionicons
                     name="chevron-down"
-                    size={16}
+                    size={15}
                     color={headerSelectorColor}
-                    style={{ marginLeft: 5 }}
+                    style={{ marginLeft: 6 }}
                   />
                 </TouchableOpacity>
               </View>
@@ -445,17 +452,17 @@ export default function CouponScreen({ navigation }: any) {
               {/* Espace gauche pour le centrage horizontal strict */}
               <View style={{ width: 44 }} />
 
-              {/* Icônes d'actions (droite) : Corbeille + 3 points (verticaux sur MegaPari, horizontaux ailleurs) */}
+              {/* Icônes d'actions (droite) : Corbeille fine (20x20, #8A949E) + Menu actions (20x20, gap: 18) */}
               <View style={styles.headerRightActions}>
                 <TouchableOpacity
-                  onPress={handleClearAll}
+                  onPress={() => setIsClearConfirmVisible(true)}
                   style={styles.headerActionBtn}
                   activeOpacity={0.7}
                   accessibilityLabel="Vider le coupon"
                 >
                   <TrashBinIcon
                     size={20}
-                    color={trashIconColor}
+                    color="#8A949E"
                     cutoutColor={headerBg}
                   />
                 </TouchableOpacity>
@@ -466,10 +473,9 @@ export default function CouponScreen({ navigation }: any) {
                   accessibilityLabel="Options du coupon"
                   activeOpacity={0.7}
                 >
-                  <MaterialCommunityIcons
-                    name={isMegaPari ? 'dots-vertical' : 'dots-horizontal'}
-                    size={22}
-                    color={dotsIconColor}
+                  <CouponMenuDotsIcon
+                    size={20}
+                    color="#8A949E"
                   />
                 </TouchableOpacity>
               </View>
@@ -796,6 +802,15 @@ export default function CouponScreen({ navigation }: any) {
         onClose={() => setIsSaveModalVisible(false)}
       />
 
+      <ClearCouponConfirmModal
+        visible={isClearConfirmVisible}
+        onCancel={() => setIsClearConfirmVisible(false)}
+        onConfirm={() => {
+          setIsClearConfirmVisible(false);
+          handleClearAll();
+        }}
+      />
+
       {/* ===================================================================== */}
       {/* 9. MODALE DE CHARGEMENT DE COUPON (LoadCouponModal)                   */}
       {/* ===================================================================== */}
@@ -864,10 +879,10 @@ const styles = StyleSheet.create({
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 18,
   },
   headerActionBtn: {
-    padding: 4,
+    padding: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
