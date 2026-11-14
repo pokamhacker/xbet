@@ -1393,6 +1393,7 @@ export default function TicketDetailsScreen({
                       <TeamLogo
                         teamName={ev.homeTeam}
                         logoUrl={ev.homeLogo}
+                        leagueName={ev.league}
                         size={34}
                       />
                     </View>
@@ -1415,6 +1416,7 @@ export default function TicketDetailsScreen({
                       <TeamLogo
                         teamName={ev.awayTeam}
                         logoUrl={ev.awayLogo}
+                        leagueName={ev.league}
                         size={34}
                       />
                       <Text

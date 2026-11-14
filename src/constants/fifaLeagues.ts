@@ -1,3 +1,5 @@
+import { makeNationalFlagUrl } from '../data/nationalTeams';
+
 export interface FifaLeague {
   id: string;
   name: string;
@@ -298,18 +300,18 @@ export const FIFA_DEFAULT_TEAMS: Record<string, FifaTeamData[]> = {
     { id: 'fifa-czv', name: 'Étoile Rouge de Belgrade', shortName: 'CZV', logo: 'https://media.api-sports.io/football/teams/598.png', country: 'Serbie' },
   ],
   globe: [
-    { id: 'fifa-fra', name: 'France', shortName: 'FRA', logo: 'https://media.api-sports.io/football/teams/2.png', country: 'France' },
-    { id: 'fifa-arg', name: 'Argentine', shortName: 'ARG', logo: 'https://media.api-sports.io/football/teams/26.png', country: 'Argentine' },
-    { id: 'fifa-bra', name: 'Brésil', shortName: 'BRA', logo: 'https://media.api-sports.io/football/teams/6.png', country: 'Brésil' },
-    { id: 'fifa-eng', name: 'Angleterre', shortName: 'ENG', logo: 'https://media.api-sports.io/football/teams/10.png', country: 'Angleterre' },
-    { id: 'fifa-esp', name: 'Espagne', shortName: 'ESP', logo: 'https://media.api-sports.io/football/teams/9.png', country: 'Espagne' },
-    { id: 'fifa-ger', name: 'Allemagne', shortName: 'GER', logo: 'https://media.api-sports.io/football/teams/25.png', country: 'Allemagne' },
-    { id: 'fifa-por', name: 'Portugal', shortName: 'POR', logo: 'https://media.api-sports.io/football/teams/27.png', country: 'Portugal' },
-    { id: 'fifa-ita', name: 'Italie', shortName: 'ITA', logo: 'https://media.api-sports.io/football/teams/768.png', country: 'Italie' },
-    { id: 'fifa-ned', name: 'Pays-Bas', shortName: 'NED', logo: 'https://media.api-sports.io/football/teams/1118.png', country: 'Pays-Bas' },
-    { id: 'fifa-bel', name: 'Belgique', shortName: 'BEL', logo: 'https://media.api-sports.io/football/teams/1.png', country: 'Belgique' },
-    { id: 'fifa-cro', name: 'Croatie', shortName: 'CRO', logo: 'https://media.api-sports.io/football/teams/3.png', country: 'Croatie' },
-    { id: 'fifa-sui', name: 'Suisse', shortName: 'SUI', logo: 'https://media.api-sports.io/football/teams/15.png', country: 'Suisse' },
-    { id: 'fifa-den', name: 'Danemark', shortName: 'DEN', logo: 'https://media.api-sports.io/football/teams/21.png', country: 'Danemark' },
+    { id: 'fifa-fra', name: 'France', shortName: 'FRA', logo: makeNationalFlagUrl('fr'), country: 'France' },
+    { id: 'fifa-arg', name: 'Argentine', shortName: 'ARG', logo: makeNationalFlagUrl('ar'), country: 'Argentine' },
+    { id: 'fifa-bra', name: 'Brésil', shortName: 'BRA', logo: makeNationalFlagUrl('br'), country: 'Brésil' },
+    { id: 'fifa-eng', name: 'Angleterre', shortName: 'ENG', logo: makeNationalFlagUrl('gb-eng'), country: 'Angleterre' },
+    { id: 'fifa-esp', name: 'Espagne', shortName: 'ESP', logo: makeNationalFlagUrl('es'), country: 'Espagne' },
+    { id: 'fifa-ger', name: 'Allemagne', shortName: 'GER', logo: makeNationalFlagUrl('de'), country: 'Allemagne' },
+    { id: 'fifa-por', name: 'Portugal', shortName: 'POR', logo: makeNationalFlagUrl('pt'), country: 'Portugal' },
+    { id: 'fifa-ita', name: 'Italie', shortName: 'ITA', logo: makeNationalFlagUrl('it'), country: 'Italie' },
+    { id: 'fifa-ned', name: 'Pays-Bas', shortName: 'NED', logo: makeNationalFlagUrl('nl'), country: 'Pays-Bas' },
+    { id: 'fifa-bel', name: 'Belgique', shortName: 'BEL', logo: makeNationalFlagUrl('be'), country: 'Belgique' },
+    { id: 'fifa-cro', name: 'Croatie', shortName: 'CRO', logo: makeNationalFlagUrl('hr'), country: 'Croatie' },
+    { id: 'fifa-sui', name: 'Suisse', shortName: 'SUI', logo: makeNationalFlagUrl('ch'), country: 'Suisse' },
+    { id: 'fifa-den', name: 'Danemark', shortName: 'DEN', logo: makeNationalFlagUrl('dk'), country: 'Danemark' },
   ],
 };

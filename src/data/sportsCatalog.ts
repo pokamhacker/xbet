@@ -6,6 +6,11 @@
 import { EXTENDED_LEAGUES_DATA } from '../constants/sportsData';
 import { AFRICAN_COUNTRIES, findAfricanCountry } from './africanCountries';
 import {
+  findNationalTeam,
+  makeNationalFlagUrl,
+  resolveNationalTeamFlag,
+} from './nationalTeams';
+import {
   FIFA_LEAGUES_LIST,
   getFifaLeagueLogo,
   getFifaLeagueCountry,
@@ -666,60 +671,60 @@ const BASE_SPORTS_CATALOG: Competition[] = [
     continent: 'Europe',
     logo: 'https://media.api-sports.io/football/leagues/5.png',
     teams: [
-      { id: 'unl-france', name: 'France', shortName: 'FRA', logo: 'https://media.api-sports.io/football/teams/2.png', country: 'France', leagueId: 'uefa-nations-league' },
-      { id: 'unl-espagne', name: 'Espagne', shortName: 'ESP', logo: 'https://media.api-sports.io/football/teams/9.png', country: 'Espagne', leagueId: 'uefa-nations-league' },
-      { id: 'unl-allemagne', name: 'Allemagne', shortName: 'GER', logo: 'https://media.api-sports.io/football/teams/25.png', country: 'Allemagne', leagueId: 'uefa-nations-league' },
-      { id: 'unl-portugal', name: 'Portugal', shortName: 'POR', logo: 'https://media.api-sports.io/football/teams/27.png', country: 'Portugal', leagueId: 'uefa-nations-league' },
-      { id: 'unl-italie', name: 'Italie', shortName: 'ITA', logo: 'https://media.api-sports.io/football/teams/768.png', country: 'Italie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-pays-bas', name: 'Pays-Bas', shortName: 'NED', logo: 'https://media.api-sports.io/football/teams/1118.png', country: 'Pays-Bas', leagueId: 'uefa-nations-league' },
-      { id: 'unl-angleterre', name: 'Angleterre', shortName: 'ENG', logo: 'https://media.api-sports.io/football/teams/10.png', country: 'Angleterre', leagueId: 'uefa-nations-league' },
-      { id: 'unl-belgique', name: 'Belgique', shortName: 'BEL', logo: 'https://media.api-sports.io/football/teams/1.png', country: 'Belgique', leagueId: 'uefa-nations-league' },
-      { id: 'unl-croatie', name: 'Croatie', shortName: 'CRO', logo: 'https://media.api-sports.io/football/teams/3.png', country: 'Croatie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-suisse', name: 'Suisse', shortName: 'SUI', logo: 'https://media.api-sports.io/football/teams/15.png', country: 'Suisse', leagueId: 'uefa-nations-league' },
-      { id: 'unl-danemark', name: 'Danemark', shortName: 'DEN', logo: 'https://media.api-sports.io/football/teams/21.png', country: 'Danemark', leagueId: 'uefa-nations-league' },
-      { id: 'unl-autriche', name: 'Autriche', shortName: 'AUT', logo: 'https://media.api-sports.io/football/teams/775.png', country: 'Autriche', leagueId: 'uefa-nations-league' },
-      { id: 'unl-serbie', name: 'Serbie', shortName: 'SRB', logo: 'https://media.api-sports.io/football/teams/14.png', country: 'Serbie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-pologne', name: 'Pologne', shortName: 'POL', logo: 'https://media.api-sports.io/football/teams/24.png', country: 'Pologne', leagueId: 'uefa-nations-league' },
-      { id: 'unl-ecosse', name: 'Écosse', shortName: 'SCO', logo: 'https://media.api-sports.io/football/teams/1108.png', country: 'Écosse', leagueId: 'uefa-nations-league' },
-      { id: 'unl-hongrie', name: 'Hongrie', shortName: 'HUN', logo: 'https://media.api-sports.io/football/teams/769.png', country: 'Hongrie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-ukraine', name: 'Ukraine', shortName: 'UKR', logo: 'https://media.api-sports.io/football/teams/772.png', country: 'Ukraine', leagueId: 'uefa-nations-league' },
-      { id: 'unl-turquie', name: 'Turquie', shortName: 'TUR', logo: 'https://media.api-sports.io/football/teams/777.png', country: 'Turquie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-suede', name: 'Suède', shortName: 'SWE', logo: 'https://media.api-sports.io/football/teams/5.png', country: 'Suède', leagueId: 'uefa-nations-league' },
-      { id: 'unl-norvege', name: 'Norvège', shortName: 'NOR', logo: 'https://media.api-sports.io/football/teams/1090.png', country: 'Norvège', leagueId: 'uefa-nations-league' },
-      { id: 'unl-tchequie', name: 'République Tchèque', shortName: 'CZE', logo: 'https://media.api-sports.io/football/teams/770.png', country: 'République Tchèque', leagueId: 'uefa-nations-league' },
-      { id: 'unl-pays-de-galles', name: 'Pays de Galles', shortName: 'WAL', logo: 'https://media.api-sports.io/football/teams/767.png', country: 'Pays de Galles', leagueId: 'uefa-nations-league' },
-      { id: 'unl-grece', name: 'Grèce', shortName: 'GRE', logo: 'https://media.api-sports.io/football/teams/1117.png', country: 'Grèce', leagueId: 'uefa-nations-league' },
-      { id: 'unl-roumanie', name: 'Roumanie', shortName: 'ROU', logo: 'https://media.api-sports.io/football/teams/774.png', country: 'Roumanie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-slovaquie', name: 'Slovaquie', shortName: 'SVK', logo: 'https://media.api-sports.io/football/teams/773.png', country: 'Slovaquie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-slovenie', name: 'Slovénie', shortName: 'SVN', logo: 'https://media.api-sports.io/football/teams/1091.png', country: 'Slovénie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-irlande', name: 'Irlande', shortName: 'IRL', logo: 'https://media.api-sports.io/football/teams/776.png', country: 'Irlande', leagueId: 'uefa-nations-league' },
-      { id: 'unl-georgie', name: 'Géorgie', shortName: 'GEO', logo: 'https://media.api-sports.io/football/teams/1104.png', country: 'Géorgie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-finlande', name: 'Finlande', shortName: 'FIN', logo: 'https://media.api-sports.io/football/teams/1099.png', country: 'Finlande', leagueId: 'uefa-nations-league' },
-      { id: 'unl-islande', name: 'Islande', shortName: 'ISL', logo: 'https://media.api-sports.io/football/teams/18.png', country: 'Islande', leagueId: 'uefa-nations-league' },
-      { id: 'unl-bosnie', name: 'Bosnie-Herzégovine', shortName: 'BIH', logo: 'https://media.api-sports.io/football/teams/1113.png', country: 'Bosnie-Herzégovine', leagueId: 'uefa-nations-league' },
-      { id: 'unl-israel', name: 'Israël', shortName: 'ISR', logo: 'https://media.api-sports.io/football/teams/1115.png', country: 'Israël', leagueId: 'uefa-nations-league' },
-      { id: 'unl-albanie', name: 'Albanie', shortName: 'ALB', logo: 'https://media.api-sports.io/football/teams/778.png', country: 'Albanie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-montenegro', name: 'Monténégro', shortName: 'MNE', logo: 'https://media.api-sports.io/football/teams/1109.png', country: 'Monténégro', leagueId: 'uefa-nations-league' },
-      { id: 'unl-armenie', name: 'Arménie', shortName: 'ARM', logo: 'https://media.api-sports.io/football/teams/1094.png', country: 'Arménie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-bulgarie', name: 'Bulgarie', shortName: 'BUL', logo: 'https://media.api-sports.io/football/teams/1103.png', country: 'Bulgarie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-kosovo', name: 'Kosovo', shortName: 'KOS', logo: 'https://media.api-sports.io/football/teams/1111.png', country: 'Kosovo', leagueId: 'uefa-nations-league' },
-      { id: 'unl-luxembourg', name: 'Luxembourg', shortName: 'LUX', logo: 'https://media.api-sports.io/football/teams/1105.png', country: 'Luxembourg', leagueId: 'uefa-nations-league' },
-      { id: 'unl-irlande-du-nord', name: 'Irlande du Nord', shortName: 'NIR', logo: 'https://media.api-sports.io/football/teams/1102.png', country: 'Irlande du Nord', leagueId: 'uefa-nations-league' },
-      { id: 'unl-bielorussie', name: 'Biélorussie', shortName: 'BLR', logo: 'https://media.api-sports.io/football/teams/1100.png', country: 'Biélorussie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-kazakhstan', name: 'Kazakhstan', shortName: 'KAZ', logo: 'https://media.api-sports.io/football/teams/1095.png', country: 'Kazakhstan', leagueId: 'uefa-nations-league' },
-      { id: 'unl-azerbaidjan', name: 'Azerbaïdjan', shortName: 'AZE', logo: 'https://media.api-sports.io/football/teams/1096.png', country: 'Azerbaïdjan', leagueId: 'uefa-nations-league' },
-      { id: 'unl-estonie', name: 'Estonie', shortName: 'EST', logo: 'https://media.api-sports.io/football/teams/1101.png', country: 'Estonie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-chypre', name: 'Chypre', shortName: 'CYP', logo: 'https://media.api-sports.io/football/teams/1106.png', country: 'Chypre', leagueId: 'uefa-nations-league' },
-      { id: 'unl-macedoine-du-nord', name: 'Macédoine du Nord', shortName: 'MKD', logo: 'https://media.api-sports.io/football/teams/1107.png', country: 'Macédoine du Nord', leagueId: 'uefa-nations-league' },
-      { id: 'unl-iles-feroe', name: 'Îles Féroé', shortName: 'FRO', logo: 'https://media.api-sports.io/football/teams/1098.png', country: 'Îles Féroé', leagueId: 'uefa-nations-league' },
-      { id: 'unl-lettonie', name: 'Lettonie', shortName: 'LVA', logo: 'https://media.api-sports.io/football/teams/1092.png', country: 'Lettonie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-lituanie', name: 'Lituanie', shortName: 'LTU', logo: 'https://media.api-sports.io/football/teams/1097.png', country: 'Lituanie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-moldavie', name: 'Moldavie', shortName: 'MDA', logo: 'https://media.api-sports.io/football/teams/1112.png', country: 'Moldavie', leagueId: 'uefa-nations-league' },
-      { id: 'unl-malte', name: 'Malte', shortName: 'MLT', logo: 'https://media.api-sports.io/football/teams/1110.png', country: 'Malte', leagueId: 'uefa-nations-league' },
-      { id: 'unl-andorre', name: 'Andorre', shortName: 'AND', logo: 'https://media.api-sports.io/football/teams/1114.png', country: 'Andorre', leagueId: 'uefa-nations-league' },
-      { id: 'unl-gibraltar', name: 'Gibraltar', shortName: 'GIB', logo: 'https://media.api-sports.io/football/teams/1093.png', country: 'Gibraltar', leagueId: 'uefa-nations-league' },
-      { id: 'unl-liechtenstein', name: 'Liechtenstein', shortName: 'LIE', logo: 'https://media.api-sports.io/football/teams/1116.png', country: 'Liechtenstein', leagueId: 'uefa-nations-league' },
-      { id: 'unl-saint-marin', name: 'Saint-Marin', shortName: 'SMR', logo: 'https://media.api-sports.io/football/teams/1119.png', country: 'Saint-Marin', leagueId: 'uefa-nations-league' },
+      { id: 'unl-france', name: 'France', shortName: 'FRA', logo: makeNationalFlagUrl('fr'), country: 'France', leagueId: 'uefa-nations-league' },
+      { id: 'unl-espagne', name: 'Espagne', shortName: 'ESP', logo: makeNationalFlagUrl('es'), country: 'Espagne', leagueId: 'uefa-nations-league' },
+      { id: 'unl-allemagne', name: 'Allemagne', shortName: 'GER', logo: makeNationalFlagUrl('de'), country: 'Allemagne', leagueId: 'uefa-nations-league' },
+      { id: 'unl-portugal', name: 'Portugal', shortName: 'POR', logo: makeNationalFlagUrl('pt'), country: 'Portugal', leagueId: 'uefa-nations-league' },
+      { id: 'unl-italie', name: 'Italie', shortName: 'ITA', logo: makeNationalFlagUrl('it'), country: 'Italie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-pays-bas', name: 'Pays-Bas', shortName: 'NED', logo: makeNationalFlagUrl('nl'), country: 'Pays-Bas', leagueId: 'uefa-nations-league' },
+      { id: 'unl-angleterre', name: 'Angleterre', shortName: 'ENG', logo: makeNationalFlagUrl('gb-eng'), country: 'Angleterre', leagueId: 'uefa-nations-league' },
+      { id: 'unl-belgique', name: 'Belgique', shortName: 'BEL', logo: makeNationalFlagUrl('be'), country: 'Belgique', leagueId: 'uefa-nations-league' },
+      { id: 'unl-croatie', name: 'Croatie', shortName: 'CRO', logo: makeNationalFlagUrl('hr'), country: 'Croatie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-suisse', name: 'Suisse', shortName: 'SUI', logo: makeNationalFlagUrl('ch'), country: 'Suisse', leagueId: 'uefa-nations-league' },
+      { id: 'unl-danemark', name: 'Danemark', shortName: 'DEN', logo: makeNationalFlagUrl('dk'), country: 'Danemark', leagueId: 'uefa-nations-league' },
+      { id: 'unl-autriche', name: 'Autriche', shortName: 'AUT', logo: makeNationalFlagUrl('at'), country: 'Autriche', leagueId: 'uefa-nations-league' },
+      { id: 'unl-serbie', name: 'Serbie', shortName: 'SRB', logo: makeNationalFlagUrl('rs'), country: 'Serbie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-pologne', name: 'Pologne', shortName: 'POL', logo: makeNationalFlagUrl('pl'), country: 'Pologne', leagueId: 'uefa-nations-league' },
+      { id: 'unl-ecosse', name: 'Écosse', shortName: 'SCO', logo: makeNationalFlagUrl('gb-sct'), country: 'Écosse', leagueId: 'uefa-nations-league' },
+      { id: 'unl-hongrie', name: 'Hongrie', shortName: 'HUN', logo: makeNationalFlagUrl('hu'), country: 'Hongrie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-ukraine', name: 'Ukraine', shortName: 'UKR', logo: makeNationalFlagUrl('ua'), country: 'Ukraine', leagueId: 'uefa-nations-league' },
+      { id: 'unl-turquie', name: 'Turquie', shortName: 'TUR', logo: makeNationalFlagUrl('tr'), country: 'Turquie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-suede', name: 'Suède', shortName: 'SWE', logo: makeNationalFlagUrl('se'), country: 'Suède', leagueId: 'uefa-nations-league' },
+      { id: 'unl-norvege', name: 'Norvège', shortName: 'NOR', logo: makeNationalFlagUrl('no'), country: 'Norvège', leagueId: 'uefa-nations-league' },
+      { id: 'unl-tchequie', name: 'République Tchèque', shortName: 'CZE', logo: makeNationalFlagUrl('cz'), country: 'République Tchèque', leagueId: 'uefa-nations-league' },
+      { id: 'unl-pays-de-galles', name: 'Pays de Galles', shortName: 'WAL', logo: makeNationalFlagUrl('gb-wls'), country: 'Pays de Galles', leagueId: 'uefa-nations-league' },
+      { id: 'unl-grece', name: 'Grèce', shortName: 'GRE', logo: makeNationalFlagUrl('gr'), country: 'Grèce', leagueId: 'uefa-nations-league' },
+      { id: 'unl-roumanie', name: 'Roumanie', shortName: 'ROU', logo: makeNationalFlagUrl('ro'), country: 'Roumanie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-slovaquie', name: 'Slovaquie', shortName: 'SVK', logo: makeNationalFlagUrl('sk'), country: 'Slovaquie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-slovenie', name: 'Slovénie', shortName: 'SVN', logo: makeNationalFlagUrl('si'), country: 'Slovénie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-irlande', name: 'Irlande', shortName: 'IRL', logo: makeNationalFlagUrl('ie'), country: 'Irlande', leagueId: 'uefa-nations-league' },
+      { id: 'unl-georgie', name: 'Géorgie', shortName: 'GEO', logo: makeNationalFlagUrl('ge'), country: 'Géorgie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-finlande', name: 'Finlande', shortName: 'FIN', logo: makeNationalFlagUrl('fi'), country: 'Finlande', leagueId: 'uefa-nations-league' },
+      { id: 'unl-islande', name: 'Islande', shortName: 'ISL', logo: makeNationalFlagUrl('is'), country: 'Islande', leagueId: 'uefa-nations-league' },
+      { id: 'unl-bosnie', name: 'Bosnie-Herzégovine', shortName: 'BIH', logo: makeNationalFlagUrl('ba'), country: 'Bosnie-Herzégovine', leagueId: 'uefa-nations-league' },
+      { id: 'unl-israel', name: 'Israël', shortName: 'ISR', logo: makeNationalFlagUrl('il'), country: 'Israël', leagueId: 'uefa-nations-league' },
+      { id: 'unl-albanie', name: 'Albanie', shortName: 'ALB', logo: makeNationalFlagUrl('al'), country: 'Albanie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-montenegro', name: 'Monténégro', shortName: 'MNE', logo: makeNationalFlagUrl('me'), country: 'Monténégro', leagueId: 'uefa-nations-league' },
+      { id: 'unl-armenie', name: 'Arménie', shortName: 'ARM', logo: makeNationalFlagUrl('am'), country: 'Arménie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-bulgarie', name: 'Bulgarie', shortName: 'BUL', logo: makeNationalFlagUrl('bg'), country: 'Bulgarie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-kosovo', name: 'Kosovo', shortName: 'KOS', logo: makeNationalFlagUrl('xk'), country: 'Kosovo', leagueId: 'uefa-nations-league' },
+      { id: 'unl-luxembourg', name: 'Luxembourg', shortName: 'LUX', logo: makeNationalFlagUrl('lu'), country: 'Luxembourg', leagueId: 'uefa-nations-league' },
+      { id: 'unl-irlande-du-nord', name: 'Irlande du Nord', shortName: 'NIR', logo: makeNationalFlagUrl('gb-nir'), country: 'Irlande du Nord', leagueId: 'uefa-nations-league' },
+      { id: 'unl-bielorussie', name: 'Biélorussie', shortName: 'BLR', logo: makeNationalFlagUrl('by'), country: 'Biélorussie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-kazakhstan', name: 'Kazakhstan', shortName: 'KAZ', logo: makeNationalFlagUrl('kz'), country: 'Kazakhstan', leagueId: 'uefa-nations-league' },
+      { id: 'unl-azerbaidjan', name: 'Azerbaïdjan', shortName: 'AZE', logo: makeNationalFlagUrl('az'), country: 'Azerbaïdjan', leagueId: 'uefa-nations-league' },
+      { id: 'unl-estonie', name: 'Estonie', shortName: 'EST', logo: makeNationalFlagUrl('ee'), country: 'Estonie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-chypre', name: 'Chypre', shortName: 'CYP', logo: makeNationalFlagUrl('cy'), country: 'Chypre', leagueId: 'uefa-nations-league' },
+      { id: 'unl-macedoine-du-nord', name: 'Macédoine du Nord', shortName: 'MKD', logo: makeNationalFlagUrl('mk'), country: 'Macédoine du Nord', leagueId: 'uefa-nations-league' },
+      { id: 'unl-iles-feroe', name: 'Îles Féroé', shortName: 'FRO', logo: makeNationalFlagUrl('fo'), country: 'Îles Féroé', leagueId: 'uefa-nations-league' },
+      { id: 'unl-lettonie', name: 'Lettonie', shortName: 'LVA', logo: makeNationalFlagUrl('lv'), country: 'Lettonie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-lituanie', name: 'Lituanie', shortName: 'LTU', logo: makeNationalFlagUrl('lt'), country: 'Lituanie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-moldavie', name: 'Moldavie', shortName: 'MDA', logo: makeNationalFlagUrl('md'), country: 'Moldavie', leagueId: 'uefa-nations-league' },
+      { id: 'unl-malte', name: 'Malte', shortName: 'MLT', logo: makeNationalFlagUrl('mt'), country: 'Malte', leagueId: 'uefa-nations-league' },
+      { id: 'unl-andorre', name: 'Andorre', shortName: 'AND', logo: makeNationalFlagUrl('ad'), country: 'Andorre', leagueId: 'uefa-nations-league' },
+      { id: 'unl-gibraltar', name: 'Gibraltar', shortName: 'GIB', logo: makeNationalFlagUrl('gi'), country: 'Gibraltar', leagueId: 'uefa-nations-league' },
+      { id: 'unl-liechtenstein', name: 'Liechtenstein', shortName: 'LIE', logo: makeNationalFlagUrl('li'), country: 'Liechtenstein', leagueId: 'uefa-nations-league' },
+      { id: 'unl-saint-marin', name: 'Saint-Marin', shortName: 'SMR', logo: makeNationalFlagUrl('sm'), country: 'Saint-Marin', leagueId: 'uefa-nations-league' },
     ],
   },
   {
@@ -734,7 +739,7 @@ const BASE_SPORTS_CATALOG: Competition[] = [
         id: 'team-france',
         name: 'France',
         shortName: 'FRA',
-        logo: 'https://media.api-sports.io/football/teams/2.png',
+        logo: makeNationalFlagUrl('fr'),
         country: 'France',
         leagueId: 'fifa-world-cup',
       },
@@ -742,7 +747,7 @@ const BASE_SPORTS_CATALOG: Competition[] = [
         id: 'team-bresil',
         name: 'Brésil',
         shortName: 'BRA',
-        logo: 'https://media.api-sports.io/football/teams/6.png',
+        logo: makeNationalFlagUrl('br'),
         country: 'Brésil',
         leagueId: 'fifa-world-cup',
       },
@@ -750,7 +755,7 @@ const BASE_SPORTS_CATALOG: Competition[] = [
         id: 'team-argentine',
         name: 'Argentine',
         shortName: 'ARG',
-        logo: 'https://media.api-sports.io/football/teams/26.png',
+        logo: makeNationalFlagUrl('ar'),
         country: 'Argentine',
         leagueId: 'fifa-world-cup',
       },
@@ -758,7 +763,7 @@ const BASE_SPORTS_CATALOG: Competition[] = [
         id: 'team-angleterre',
         name: 'Angleterre',
         shortName: 'ENG',
-        logo: 'https://media.api-sports.io/football/teams/10.png',
+        logo: makeNationalFlagUrl('gb-eng'),
         country: 'Angleterre',
         leagueId: 'fifa-world-cup',
       },
@@ -1364,16 +1369,16 @@ export function getTeamById(idOrName: string): Team | undefined {
     if (found) return found;
   }
 
-  // 1b. Résolution directe des 54 pays africains (alias FR/EN, abréviations, sans accents)
-  const africanCountry = findAfricanCountry(idOrName);
-  if (africanCountry) {
+  // 1b. Résolution directe des sélections nationales (Afrique + Monde, alias FR/EN, plein cadre flagcdn)
+  const nationalCountry = findNationalTeam(idOrName) || findAfricanCountry(idOrName);
+  if (nationalCountry) {
     return {
-      id: africanCountry.id,
-      name: africanCountry.name,
-      shortName: africanCountry.shortName,
-      logo: africanCountry.logo,
-      country: africanCountry.name,
-      leagueId: 'caf-can',
+      id: nationalCountry.id,
+      name: nationalCountry.name,
+      shortName: nationalCountry.shortName,
+      logo: nationalCountry.logo,
+      country: nationalCountry.name,
+      leagueId: findAfricanCountry(idOrName) ? 'caf-can' : 'fifa-world-cup',
     };
   }
 
@@ -1416,9 +1421,13 @@ export function getTeamById(idOrName: string): Team | undefined {
 }
 
 /**
- * Résout le logo officiel API-Sports CDN d'une équipe ou renvoie null si introuvable
+ * Résout le logo officiel CDN d'une équipe (ou le drapeau plein cadre flagcdn pour les sélections nationales)
  */
 export function resolveTeamLogo(idOrName: string): string | null {
+  const nationalFlag = resolveNationalTeamFlag(idOrName);
+  if (nationalFlag) {
+    return nationalFlag;
+  }
   const team = getTeamById(idOrName);
   if (team && team.logo && !team.logo.includes('ui-avatars')) {
     return team.logo;

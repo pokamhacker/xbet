@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
+import { TeamLogo } from '../components/common/TeamLogo';
 import { Asset } from 'expo-asset';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused } from '@react-navigation/native';
@@ -31,6 +32,7 @@ import { useResponsive } from '../utils/responsive';
 import { useThemeStore } from '../stores/themeStore';
 import { useCouponStore } from '../store/couponStore';
 import { getTeamById } from '../data/sportsCatalog';
+import { isNationalTeamEntity, resolveNationalTeamFlag } from '../data/nationalTeams';
 import { MatchEvent } from '../types/bet';
 import { Typography } from '../theme/theme';
 import { getEventLiveProgress, getEventStartTime } from '../utils/dateFormatter';
@@ -180,6 +182,10 @@ const CLUB_CREST_MAP: Record<string, string> = {
 };
 
 const resolveClubLogoUrl = (teamName: string, rawLogo?: string): string | null => {
+  const nationalFlag = resolveNationalTeamFlag(teamName);
+  if (nationalFlag) {
+    return nationalFlag;
+  }
   const lowerName = (teamName || '').trim().toLowerCase();
   if (lowerName.includes('monchengladbach') || lowerName.includes('mönchengladbach') || lowerName.includes('gladbach')) {
     return 'https://media.api-sports.io/football/teams/163.png';
@@ -293,6 +299,8 @@ const JerseyFallbackBadge: React.FC<{ size?: number }> = ({ size = 34 }) => (
  */
 const FifaHeaderTeamBadge: React.FC<{
   logoUrl: string | null;
+  teamName?: string;
+  leagueName?: string;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   starBgColor?: string;
@@ -300,22 +308,25 @@ const FifaHeaderTeamBadge: React.FC<{
   side?: 'left' | 'right';
 }> = ({
   logoUrl,
+  teamName,
+  leagueName,
   isFavorite,
   onToggleFavorite,
   starBgColor = '#5582A7',
   size = 38,
   side = 'left',
 }) => {
-    const [imgError, setImgError] = useState(false);
+    const isNational = isNationalTeamEntity(teamName, leagueName, logoUrl || undefined);
 
     return (
       <View style={[styles.teamCrestOuter, { width: size + 6, height: size + 6 }]}>
-        {logoUrl && !imgError ? (
-          <Image
-            source={{ uri: logoUrl }}
-            style={{ width: size, height: size }}
-            resizeMode="contain"
-            onError={() => setImgError(true)}
+        {logoUrl || isNational ? (
+          <TeamLogo
+            teamName={teamName || ''}
+            logoUrl={logoUrl || undefined}
+            leagueName={leagueName}
+            size={size}
+            isNationalTeam={isNational ? true : undefined}
           />
         ) : (
           <JerseyFallbackBadge size={size} />
@@ -344,16 +355,23 @@ const FifaHeaderTeamBadge: React.FC<{
 /**
  * Petit blason d'équipe pour la carte "Statistiques de match" (Mi-temps 1 & Mi-temps 2)
  */
-const MiniClubCrest: React.FC<{ logoUrl: string | null }> = ({ logoUrl }) => {
-  const [err, setErr] = useState(false);
-  if (logoUrl && !err) {
+const MiniClubCrest: React.FC<{
+  logoUrl: string | null;
+  teamName?: string;
+  leagueName?: string;
+}> = ({ logoUrl, teamName, leagueName }) => {
+  const isNational = isNationalTeamEntity(teamName, leagueName, logoUrl || undefined);
+  if (logoUrl || isNational) {
     return (
-      <Image
-        source={{ uri: logoUrl }}
-        style={styles.miniCrestImg}
-        resizeMode="contain"
-        onError={() => setErr(true)}
-      />
+      <View style={{ marginRight: 9 }}>
+        <TeamLogo
+          teamName={teamName || ''}
+          logoUrl={logoUrl || undefined}
+          leagueName={leagueName}
+          size={23}
+          isNationalTeam={isNational ? true : undefined}
+        />
+      </View>
     );
   }
   return (
@@ -412,6 +430,7 @@ const FifaChampionshipStreamPlayer: React.FC<{
   awayTeamName: string;
   homeLogoUrl: string | null;
   awayLogoUrl: string | null;
+  leagueName?: string;
   homeScore: string | number;
   awayScore: string | number;
   matchSeconds: number;
@@ -426,6 +445,7 @@ const FifaChampionshipStreamPlayer: React.FC<{
   awayTeamName,
   homeLogoUrl,
   awayLogoUrl,
+  leagueName,
   homeScore,
   awayScore,
   matchSeconds,
@@ -716,7 +736,12 @@ const FifaChampionshipStreamPlayer: React.FC<{
             <View style={styles.rushHudMainBar}>
               <View style={styles.rushTeamSide}>
                 {homeLogoUrl ? (
-                  <Image source={{ uri: homeLogoUrl }} style={styles.rushMiniLogo} resizeMode="contain" />
+                  <TeamLogo
+                    teamName={homeTeamName}
+                    logoUrl={homeLogoUrl}
+                    leagueName={leagueName}
+                    size={7}
+                  />
                 ) : null}
                 <Text style={styles.rushTeamAbbrText} numberOfLines={1}>
                   {homeRushAbbr}
@@ -734,7 +759,12 @@ const FifaChampionshipStreamPlayer: React.FC<{
                   {awayRushAbbr}
                 </Text>
                 {awayLogoUrl ? (
-                  <Image source={{ uri: awayLogoUrl }} style={styles.rushMiniLogo} resizeMode="contain" />
+                  <TeamLogo
+                    teamName={awayTeamName}
+                    logoUrl={awayLogoUrl}
+                    leagueName={leagueName}
+                    size={7}
+                  />
                 ) : null}
               </View>
             </View>
@@ -1840,6 +1870,8 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
             <View style={styles.teamSideLeft}>
               <FifaHeaderTeamBadge
                 logoUrl={homeLogoUrl}
+                teamName={homeTeamName}
+                leagueName={competitionTitle}
                 isFavorite={favHome}
                 onToggleFavorite={() => setFavHome((v) => !v)}
                 starBgColor={starBadgeColor}
@@ -1876,6 +1908,8 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
               </Text>
               <FifaHeaderTeamBadge
                 logoUrl={awayLogoUrl}
+                teamName={awayTeamName}
+                leagueName={competitionTitle}
                 isFavorite={favAway}
                 onToggleFavorite={() => setFavAway((v) => !v)}
                 starBgColor={starBadgeColor}
@@ -1944,6 +1978,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
                   awayTeamName={awayTeamName}
                   homeLogoUrl={homeLogoUrl}
                   awayLogoUrl={awayLogoUrl}
+                  leagueName={competitionTitle}
                   homeScore={isPreMatch ? 0 : homeScoreNum}
                   awayScore={isPreMatch ? 0 : awayScoreNum}
                   matchSeconds={activeElapsedSeconds}
@@ -1974,7 +2009,11 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
                     <View style={styles.matchStatsTeamsCol}>
                       <View style={styles.matchStatsTeamRow}>
                         <View style={styles.matchStatsTeamInfo}>
-                          <MiniClubCrest logoUrl={homeLogoUrl} />
+                          <MiniClubCrest
+                            logoUrl={homeLogoUrl}
+                            teamName={homeTeamName}
+                            leagueName={competitionTitle}
+                          />
                           <Text style={styles.matchStatsTeamName} numberOfLines={1}>
                             {homeTeamName}
                           </Text>
@@ -1986,7 +2025,11 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
 
                       <View style={styles.matchStatsTeamRow}>
                         <View style={styles.matchStatsTeamInfo}>
-                          <MiniClubCrest logoUrl={awayLogoUrl} />
+                          <MiniClubCrest
+                            logoUrl={awayLogoUrl}
+                            teamName={awayTeamName}
+                            leagueName={competitionTitle}
+                          />
                           <Text style={styles.matchStatsTeamName} numberOfLines={1}>
                             {awayTeamName}
                           </Text>
@@ -2008,7 +2051,11 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
                       <View style={styles.matchStatsTeamsCol}>
                         <View style={styles.matchStatsTeamRow}>
                           <View style={styles.matchStatsTeamInfo}>
-                            <MiniClubCrest logoUrl={homeLogoUrl} />
+                            <MiniClubCrest
+                              logoUrl={homeLogoUrl}
+                              teamName={homeTeamName}
+                              leagueName={competitionTitle}
+                            />
                             <Text style={styles.matchStatsTeamName} numberOfLines={1}>
                               {homeTeamName}
                             </Text>
@@ -2020,7 +2067,11 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
 
                         <View style={styles.matchStatsTeamRow}>
                           <View style={styles.matchStatsTeamInfo}>
-                            <MiniClubCrest logoUrl={awayLogoUrl} />
+                            <MiniClubCrest
+                              logoUrl={awayLogoUrl}
+                              teamName={awayTeamName}
+                              leagueName={competitionTitle}
+                            />
                             <Text style={styles.matchStatsTeamName} numberOfLines={1}>
                               {awayTeamName}
                             </Text>

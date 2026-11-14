@@ -5,6 +5,7 @@ import Svg, { Path } from 'react-native-svg';
 import { MatchEvent } from '../types/bet';
 import { Colors, Typography } from '../theme/theme';
 import { getTeamById } from '../data/sportsCatalog';
+import { isNationalTeamEntity } from '../data/nationalTeams';
 import { useThemeStore } from '../stores/themeStore';
 import { MatchScoreView } from './MatchScoreView';
 import { useResponsive } from '../utils/responsive';
@@ -112,20 +113,26 @@ export const MatchEventCard: React.FC<MatchEventCardProps> = ({
   const awayRawLogo = event.awayTeam?.logo;
   const homeCatalog = getTeamById(event.homeTeam?.name || '');
   const awayCatalog = getTeamById(event.awayTeam?.name || '');
+  const homeIsNational = isNationalTeamEntity(event.homeTeam?.name, event.league, homeRawLogo);
+  const awayIsNational = isNationalTeamEntity(event.awayTeam?.name, event.league, awayRawLogo);
 
   const homeLogoUri =
     (homeRawLogo && (homeRawLogo.startsWith('jersey:') || homeRawLogo === 'generic-player'))
       ? (homeCatalog?.logo || homeRawLogo)
-      : (homeRawLogo && !homeRawLogo.includes('ui-avatars') ? homeRawLogo : null) ||
-        homeCatalog?.logo ||
-        'generic-player';
+      : (homeIsNational && homeCatalog?.logo)
+        ? homeCatalog.logo
+        : (homeRawLogo && !homeRawLogo.includes('ui-avatars') ? homeRawLogo : null) ||
+          homeCatalog?.logo ||
+          'generic-player';
 
   const awayLogoUri =
     (awayRawLogo && (awayRawLogo.startsWith('jersey:') || awayRawLogo === 'generic-player'))
-      ? awayRawLogo
-      : (awayRawLogo && !awayRawLogo.includes('ui-avatars') ? awayRawLogo : null) ||
-        awayCatalog?.logo ||
-        'generic-player';
+      ? (awayCatalog?.logo || awayRawLogo)
+      : (awayIsNational && awayCatalog?.logo)
+        ? awayCatalog.logo
+        : (awayRawLogo && !awayRawLogo.includes('ui-avatars') ? awayRawLogo : null) ||
+          awayCatalog?.logo ||
+          'generic-player';
 
   return (
     <TouchableOpacity
@@ -230,6 +237,7 @@ export const MatchEventCard: React.FC<MatchEventCardProps> = ({
           detailedScore={detailedScoreDisplay}
           textColor={currentTheme.isDark ? currentTheme.textPrimary : '#1E242B'}
           detailedScoreColor={currentTheme.isDark ? currentTheme.textSecondary : '#7F8C8D'}
+          leagueName={event.league}
         />
       )}
 

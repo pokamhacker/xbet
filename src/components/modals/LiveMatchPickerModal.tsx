@@ -16,6 +16,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useThemeStore } from '../../store/themeStore';
 import { useFootballStore } from '../../store/useFootballStore';
 import { useCouponStore } from '../../store/couponStore';
+import { TeamLogo } from '../common/TeamLogo';
 import { MatchEvent } from '../../types/bet';
 import apiFootballService, { ApiFootballFixtureItem } from '../../services/apiFootballService';
 import { formatBetDate } from '../../utils/dateFormatter';
@@ -399,11 +400,14 @@ export const LiveMatchPickerModal: React.FC<LiveMatchPickerModalProps> = ({
                     <View style={styles.teamsRow}>
                       {/* Équipe Domicile */}
                       <View style={styles.teamCol}>
-                        <Image
-                          source={{ uri: item.teams.home.logo }}
-                          style={styles.teamLogo}
-                          resizeMode="contain"
-                        />
+                        <View style={{ marginBottom: 6 }}>
+                          <TeamLogo
+                            teamName={item.teams.home.name}
+                            logoUrl={item.teams.home.logo}
+                            leagueName={item.league?.name}
+                            size={42}
+                          />
+                        </View>
                         <Text
                           style={[styles.teamName, { color: theme.textPrimary }]}
                           numberOfLines={1}
@@ -432,11 +436,14 @@ export const LiveMatchPickerModal: React.FC<LiveMatchPickerModalProps> = ({
 
                       {/* Équipe Extérieure */}
                       <View style={styles.teamCol}>
-                        <Image
-                          source={{ uri: item.teams.away.logo }}
-                          style={styles.teamLogo}
-                          resizeMode="contain"
-                        />
+                        <View style={{ marginBottom: 6 }}>
+                          <TeamLogo
+                            teamName={item.teams.away.name}
+                            logoUrl={item.teams.away.logo}
+                            leagueName={item.league?.name}
+                            size={42}
+                          />
+                        </View>
                         <Text
                           style={[styles.teamName, { color: theme.textPrimary }]}
                           numberOfLines={1}

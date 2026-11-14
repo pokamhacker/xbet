@@ -7,6 +7,8 @@ interface TeamLogoProps {
   teamName?: string;
   shortCode?: string;
   size?: number;
+  leagueName?: string;
+  isNationalTeam?: boolean;
 }
 
 export const TeamLogo: React.FC<TeamLogoProps> = ({
@@ -14,12 +16,16 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
   name,
   teamName,
   size = 36,
+  leagueName,
+  isNationalTeam,
 }) => {
   return (
     <CommonTeamLogo
       teamName={teamName || name || ''}
       logoUrl={logoUrl}
       size={size}
+      leagueName={leagueName}
+      isNationalTeam={isNationalTeam}
     />
   );
 };

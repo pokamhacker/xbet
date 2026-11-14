@@ -1649,7 +1649,12 @@ export default function StudioCreationScreen({ navigation }: any) {
                     activeOpacity={0.7}
                     onPress={() => handleAssignTeam(team)}
                   >
-                    <TeamLogo teamName={team.name} logoUrl={team.logo} size={24} />
+                    <TeamLogo
+                      teamName={team.name}
+                      logoUrl={team.logo}
+                      leagueName={selectedLeague}
+                      size={24}
+                    />
                     <Text
                       style={[
                         styles.teamQuickChipText,
@@ -1740,7 +1745,12 @@ export default function StudioCreationScreen({ navigation }: any) {
                   </View>
                   <View style={styles.slotLogoWrap}>
                     {homeTeam ? (
-                      <TeamLogo teamName={homeTeam} logoUrl={homeTeamLogo} size={36} />
+                      <TeamLogo
+                        teamName={homeTeam}
+                        logoUrl={homeTeamLogo}
+                        leagueName={selectedLeague}
+                        size={36}
+                      />
                     ) : (
                       <Ionicons name="shield-outline" size={24} color={Colors.primary} />
                     )}
@@ -1785,7 +1795,12 @@ export default function StudioCreationScreen({ navigation }: any) {
                   </View>
                   <View style={styles.slotLogoWrap}>
                     {awayTeam ? (
-                      <TeamLogo teamName={awayTeam} logoUrl={awayTeamLogo} size={36} />
+                      <TeamLogo
+                        teamName={awayTeam}
+                        logoUrl={awayTeamLogo}
+                        leagueName={selectedLeague}
+                        size={36}
+                      />
                     ) : (
                       <Ionicons name="shield-outline" size={24} color="#EA580C" />
                     )}

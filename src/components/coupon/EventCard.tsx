@@ -295,7 +295,7 @@ export const EventCard: React.FC<EventCardProps> = ({
               resizeMode="contain"
             />
           ) : (
-            <TeamLogo teamName={homeName} logoUrl={homeLogoUri} size={30} />
+            <TeamLogo teamName={homeName} logoUrl={homeLogoUri} leagueName={event.league} size={30} />
           )}
         </View>
 
@@ -309,7 +309,7 @@ export const EventCard: React.FC<EventCardProps> = ({
               resizeMode="contain"
             />
           ) : (
-            <TeamLogo teamName={awayName} logoUrl={awayLogoUri} size={30} />
+            <TeamLogo teamName={awayName} logoUrl={awayLogoUri} leagueName={event.league} size={30} />
           )}
         </View>
 

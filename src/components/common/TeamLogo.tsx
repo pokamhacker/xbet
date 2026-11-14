@@ -2,11 +2,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Path, Text as SvgText } from 'react-native-svg';
 import { resolveTeamLogo } from '../../data/sportsCatalog';
+import {
+  isNationalTeamEntity,
+  resolveNationalTeamFallbackFlag,
+  resolveNationalTeamFlag,
+} from '../../data/nationalTeams';
+import { NationalTeamLogo3D } from './NationalTeamLogo3D';
 
 interface TeamLogoProps {
   teamName: string;
   logoUrl?: string;
   size?: number; // Défaut : 36px
+  leagueName?: string;
+  isNationalTeam?: boolean;
 }
 
 const SHIELD_PALETTES: Array<{ primary: string; secondary: string; accent: string }> = [
@@ -33,19 +41,34 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
   teamName,
   logoUrl,
   size = 36,
+  leagueName,
+  isNationalTeam,
 }) => {
   const [failedStage, setFailedStage] = useState<number>(0);
 
+  const isNational = useMemo(() => {
+    if (typeof isNationalTeam === 'boolean') return isNationalTeam;
+    return isNationalTeamEntity(teamName, leagueName, logoUrl);
+  }, [isNationalTeam, teamName, leagueName, logoUrl]);
+
   useEffect(() => {
     setFailedStage(0);
-  }, [logoUrl, teamName]);
+  }, [logoUrl, teamName, leagueName, isNational]);
 
   const candidateLogos = useMemo(() => {
     const list: string[] = [];
+    if (isNational) {
+      const nationalFlag = resolveNationalTeamFlag(teamName);
+      if (nationalFlag) {
+        list.push(nationalFlag);
+      }
+    }
+
     const catalogLogo = resolveTeamLogo(teamName);
-    if (catalogLogo && !catalogLogo.includes('ui-avatars.com')) {
+    if (catalogLogo && !catalogLogo.includes('ui-avatars.com') && !list.includes(catalogLogo)) {
       list.push(catalogLogo);
     }
+
     if (
       logoUrl &&
       (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) &&
@@ -54,8 +77,18 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
     ) {
       list.push(logoUrl);
     }
+
+    if (isNational) {
+      const fallbackFlag =
+        resolveNationalTeamFallbackFlag(teamName) ||
+        resolveNationalTeamFallbackFlag(logoUrl);
+      if (fallbackFlag && !list.includes(fallbackFlag)) {
+        list.push(fallbackFlag);
+      }
+    }
+
     return list;
-  }, [logoUrl, teamName]);
+  }, [logoUrl, teamName, isNational]);
 
   const activeLogo = failedStage < candidateLogos.length ? candidateLogos[failedStage] : null;
 
@@ -90,15 +123,23 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
       ]}
     >
       {activeLogo ? (
-        <Image
-          source={{ uri: activeLogo }}
-          style={{
-            width: size,
-            height: size,
-          }}
-          resizeMode="contain"
-          onError={() => setFailedStage((prev) => prev + 1)}
-        />
+        isNational ? (
+          <NationalTeamLogo3D
+            source={{ uri: activeLogo }}
+            size={size}
+            onError={() => setFailedStage((prev) => prev + 1)}
+          />
+        ) : (
+          <Image
+            source={{ uri: activeLogo }}
+            style={{
+              width: size,
+              height: size,
+            }}
+            resizeMode="contain"
+            onError={() => setFailedStage((prev) => prev + 1)}
+          />
+        )
       ) : (
         <Svg width={size} height={size} viewBox="0 0 36 36">
           <Defs>

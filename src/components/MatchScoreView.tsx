@@ -3,6 +3,9 @@ import { View, Text, Image, StyleSheet, ImageSourcePropType } from 'react-native
 import Svg, { Path, Rect, Circle, ClipPath, Defs, G } from 'react-native-svg';
 import { Typography } from '../theme/theme';
 import { useResponsive } from '../utils/responsive';
+import { TeamLogo } from './common/TeamLogo';
+import { NationalTeamLogo3D } from './common/NationalTeamLogo3D';
+import { isNationalTeamEntity, resolveNationalTeamFlag } from '../data/nationalTeams';
 
 export interface MatchScoreProps {
   homeTeamName: string;
@@ -13,6 +16,7 @@ export interface MatchScoreProps {
   detailedScore?: string; // Ex: "1:0 (0:0,1:0)" ou "3:1 (3:1)"
   textColor?: string;
   detailedScoreColor?: string;
+  leagueName?: string;
 }
 
 /**
@@ -142,19 +146,42 @@ const TeamLogoRenderer: React.FC<{
   logo?: string | ImageSourcePropType;
   teamName: string;
   size: number;
-}> = ({ logo, size }) => {
+  leagueName?: string;
+}> = ({ logo, teamName, size, leagueName }) => {
   const [imgError, setImgError] = useState(false);
 
   if (typeof logo === 'string') {
     if (logo.startsWith('jersey:')) {
       return <JerseyWithFlagIcon descriptor={logo} size={size} />;
     }
-    if (logo === 'generic-player' || logo.includes('ui-avatars.com') || imgError) {
+    const isNational = isNationalTeamEntity(teamName, leagueName, logo);
+    if (logo === 'generic-player' && !isNational && !resolveNationalTeamFlag(teamName)) {
       return <GenericPlayerCrest size={size} />;
     }
     return (
+      <TeamLogo
+        teamName={teamName}
+        logoUrl={logo}
+        leagueName={leagueName}
+        size={size}
+        isNationalTeam={isNational ? true : undefined}
+      />
+    );
+  }
+
+  if (logo && !imgError) {
+    if (isNationalTeamEntity(teamName, leagueName)) {
+      return (
+        <NationalTeamLogo3D
+          source={logo}
+          size={size}
+          onError={() => setImgError(true)}
+        />
+      );
+    }
+    return (
       <Image
-        source={{ uri: logo }}
+        source={logo}
         style={{ width: size, height: size }}
         resizeMode="contain"
         onError={() => setImgError(true)}
@@ -162,13 +189,13 @@ const TeamLogoRenderer: React.FC<{
     );
   }
 
-  if (logo && !imgError) {
+  if (isNationalTeamEntity(teamName, leagueName) && resolveNationalTeamFlag(teamName)) {
     return (
-      <Image
-        source={logo}
-        style={{ width: size, height: size }}
-        resizeMode="contain"
-        onError={() => setImgError(true)}
+      <TeamLogo
+        teamName={teamName}
+        leagueName={leagueName}
+        size={size}
+        isNationalTeam
       />
     );
   }
@@ -185,6 +212,7 @@ export const MatchScoreView: React.FC<MatchScoreProps> = ({
   detailedScore,
   textColor,
   detailedScoreColor,
+  leagueName,
 }) => {
   const { isSmallDevice, font, moderateScale } = useResponsive();
 
@@ -224,7 +252,7 @@ export const MatchScoreView: React.FC<MatchScoreProps> = ({
           >
             {homeTeamName}
           </Text>
-          <TeamLogoRenderer logo={homeTeamLogo} teamName={homeTeamName} size={logoSize} />
+          <TeamLogoRenderer logo={homeTeamLogo} teamName={homeTeamName} size={logoSize} leagueName={leagueName} />
         </View>
 
         {/* Score Principal Centré (Entre les 2 logos) */}
@@ -250,7 +278,7 @@ export const MatchScoreView: React.FC<MatchScoreProps> = ({
 
         {/* Équipe Extérieure */}
         <View style={styles.awayTeamGroup}>
-          <TeamLogoRenderer logo={awayTeamLogo} teamName={awayTeamName} size={logoSize} />
+          <TeamLogoRenderer logo={awayTeamLogo} teamName={awayTeamName} size={logoSize} leagueName={leagueName} />
           <Text
             numberOfLines={2}
             adjustsFontSizeToFit

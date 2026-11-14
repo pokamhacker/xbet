@@ -777,6 +777,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
                         <TeamLogo
                           teamName={item.team.name}
                           logoUrl={teamBadgeUri}
+                          leagueName={item.comp?.name}
                           size={34}
                         />
                       </View>

@@ -629,6 +629,7 @@ export const MatchMarketsScreen: React.FC<{ route?: any; navigation?: any }> = (
                 <TeamLogo
                   teamName={marketsData.homeTeam.name}
                   logoUrl={marketsData.homeTeam.logo}
+                  leagueName={marketsData.competitionTitle}
                   size={crestSize}
                 />
                 <TouchableOpacity
@@ -672,6 +673,7 @@ export const MatchMarketsScreen: React.FC<{ route?: any; navigation?: any }> = (
                 <TeamLogo
                   teamName={marketsData.awayTeam.name}
                   logoUrl={marketsData.awayTeam.logo}
+                  leagueName={marketsData.competitionTitle}
                   size={crestSize}
                 />
                 <TouchableOpacity

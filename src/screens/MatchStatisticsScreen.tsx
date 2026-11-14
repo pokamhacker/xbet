@@ -58,11 +58,12 @@ const MatchStatsBarIcon: React.FC<{ color: string; size?: number }> = React.memo
 interface TeamCrestProps {
   uri: string;
   teamName?: string;
+  leagueName?: string;
   size: number;
 }
 
-const TeamCrest: React.FC<TeamCrestProps> = ({ uri, teamName, size }) => (
-  <TeamLogo teamName={teamName || 'Équipe'} logoUrl={uri} size={size} />
+const TeamCrest: React.FC<TeamCrestProps> = ({ uri, teamName, leagueName, size }) => (
+  <TeamLogo teamName={teamName || 'Équipe'} logoUrl={uri} leagueName={leagueName} size={size} />
 );
 
 interface StatRowProps {
@@ -252,7 +253,12 @@ export const MatchStatisticsScreen: React.FC<{ route?: any; navigation?: any }> 
           {/* Zone d'affrontement : Logo au-dessus du nom de chaque équipe + Score final au centre */}
           <View style={styles.teamsScoreRow}>
             <View style={styles.teamColumn}>
-              <TeamCrest uri={statsData.homeTeam.logo} teamName={statsData.homeTeam.name} size={crestSize} />
+              <TeamCrest
+                uri={statsData.homeTeam.logo}
+                teamName={statsData.homeTeam.name}
+                leagueName={statsData.sportHeader}
+                size={crestSize}
+              />
               <Text
                 style={[styles.teamNameText, { fontSize: font(13.5) }]}
                 numberOfLines={2}
@@ -268,7 +274,12 @@ export const MatchStatisticsScreen: React.FC<{ route?: any; navigation?: any }> 
             </View>
 
             <View style={styles.teamColumn}>
-              <TeamCrest uri={statsData.awayTeam.logo} teamName={statsData.awayTeam.name} size={crestSize} />
+              <TeamCrest
+                uri={statsData.awayTeam.logo}
+                teamName={statsData.awayTeam.name}
+                leagueName={statsData.sportHeader}
+                size={crestSize}
+              />
               <Text
                 style={[styles.teamNameText, { fontSize: font(13.5) }]}
                 numberOfLines={2}
@@ -516,10 +527,11 @@ export const MatchStatisticsScreen: React.FC<{ route?: any; navigation?: any }> 
                   ]}
                 >
                   <View style={styles.scoreTeamIdentity}>
-                    <Image
-                      source={{ uri: row.teamLogo }}
-                      style={styles.scoreTeamMiniLogo}
-                      resizeMode="contain"
+                    <TeamLogo
+                      teamName={row.teamName}
+                      logoUrl={row.teamLogo}
+                      leagueName={statsData.sportHeader}
+                      size={24}
                     />
                     <Text
                       numberOfLines={1}
