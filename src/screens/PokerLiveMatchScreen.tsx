@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { useCouponStore } from '../store/couponStore';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { MatchEvent } from '../types/bet';
 import { Typography } from '../theme/theme';
 import { formatCleanOdds } from '../utils/oddsFormatter';
@@ -256,7 +257,9 @@ const TvBetPokerLivePlayer: React.FC<{
 // ============================================================================
 export default function PokerLiveMatchScreen({ route, navigation }: any) {
   const { currentTheme, isDark, brandChoice } = useThemeStore();
-  const { width: screenWidth, isTablet, isDesktop, contentContainerStyle } = useResponsive();
+  const { width: screenWidth, isTablet, isDesktop, contentContainerStyle, insets } = useResponsive();
+  const topInset = getTopSafeInset(insets.top);
+  useSystemTopBar('#000000', 'light-content');
   const { addEvent } = useCouponStore();
 
   const brandAccentColor =
@@ -389,12 +392,16 @@ export default function PokerLiveMatchScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar
+        animated
+        barStyle="light-content"
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
+      />
 
       {/* =====================================================================
           1. EN-TÊTE SUPÉRIEUR NOIR (EXACTEMENT COMME SUR LA CAPTURE)
           ===================================================================== */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: topInset, height: 52 + topInset }]}>
         {/* Bouton Retour */}
         <TouchableOpacity
           style={styles.headerBtn}

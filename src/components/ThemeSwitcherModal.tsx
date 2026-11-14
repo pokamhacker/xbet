@@ -13,12 +13,16 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BackArrowIcon } from './common/BackArrowIcon';
 import { useThemeStore } from '../stores/themeStore';
+import { useResponsive } from '../utils/responsive';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import {
   BrandChoice,
   ModeChoice,
   DispositionType,
   SaveModalStyleType,
   getAppTheme,
+  getHeaderBgColor,
+  getStatusBarStyleForTheme,
 } from '../theme/themes';
 
 export interface ThemeSwitcherModalProps {
@@ -66,6 +70,11 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
   const textPrimary = isDark ? '#F8FAFC' : '#1E293B';
   const sectionTitleColor = isDark ? '#94A3B8' : '#5A738E';
   const screenBg = isDark ? currentTheme?.background || '#0F172A' : '#F8FAFC';
+  const headerBg = getHeaderBgColor(currentTheme);
+  const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
+  const { insets } = useResponsive();
+  const topInset = getTopSafeInset(insets.top);
+  useSystemTopBar(headerBg, statusBarStyle, visible);
 
   // Helper pour les 3 capsules d'échantillons de couleur
   const renderSwatches = (c1: string, c2: string, c3: string) => (
@@ -93,13 +102,25 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
       onRequestClose={onClose}
       statusBarTranslucent={true}
     >
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: screenBg }]}>
+      <View style={[styles.safeArea, { backgroundColor: screenBg }]}>
         <StatusBar
-          barStyle={isDark ? 'light-content' : 'dark-content'}
+          animated
+          barStyle={statusBarStyle}
+          {...({ translucent: true, backgroundColor: 'transparent' } as any)}
         />
 
         {/* Barre Supérieure / Header */}
-        <View style={[styles.headerBar, { borderBottomColor: inactiveBorderColor }]}>
+        <View
+          style={[
+            styles.headerBar,
+            {
+              backgroundColor: headerBg,
+              borderBottomColor: inactiveBorderColor,
+              paddingTop: topInset,
+              height: 54 + topInset,
+            },
+          ]}
+        >
           <TouchableOpacity
             onPress={onClose}
             style={styles.backButton}
@@ -374,7 +395,7 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
             );
           })}
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
@@ -392,7 +413,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    marginTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   backButton: {
     width: 40,

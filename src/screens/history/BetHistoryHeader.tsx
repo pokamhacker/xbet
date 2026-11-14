@@ -11,6 +11,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getTopSafeInset } from '../../utils/systemTopBar';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 
@@ -149,10 +150,7 @@ export const BetHistoryTopBar: React.FC<BetHistoryTopBarProps> = ({
 }) => {
   const { currentTheme } = useThemeStore();
   const insets = useSafeAreaInsets();
-  const statusBarHeight =
-    Platform.OS === 'android'
-      ? StatusBar.currentHeight || insets.top || 0
-      : insets.top;
+  const statusBarHeight = getTopSafeInset(insets.top);
 
   const headerBg = currentTheme.headerBackground || '#FFFFFF';
   const titleColor = currentTheme.isDark ? currentTheme.textPrimary : '#577089';

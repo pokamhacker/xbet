@@ -17,6 +17,7 @@ import {
   getStatusBarStyleForTheme,
 } from '../theme/themes';
 import { useResponsive } from '../utils/responsive';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { BrandLogo } from '../components/common/BrandLogo';
 import {
   createAppRefreshControl,
@@ -30,6 +31,8 @@ export default function FavoritesScreen({ navigation }: any) {
   const headerBg = getHeaderBgColor(currentTheme);
   const screenBg = getScreenBgColor(currentTheme);
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
+  const topInset = getTopSafeInset(insets.top);
+  useSystemTopBar(headerBg, statusBarStyle);
 
   return (
     <View style={[styles.container, { backgroundColor: screenBg }]}>
@@ -44,7 +47,7 @@ export default function FavoritesScreen({ navigation }: any) {
           {
             backgroundColor: headerBg,
             borderBottomColor: currentTheme.border,
-            paddingTop: 14 + insets.top,
+            paddingTop: 14 + topInset,
           },
         ]}
       >

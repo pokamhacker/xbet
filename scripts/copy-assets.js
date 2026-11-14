@@ -124,12 +124,15 @@ if (fs.existsSync(indexHtmlPath)) {
   // Mettre à jour le titre
   html = html.replace(/<title>.*?<\/title>/i, '<title>1xBet</title>');
 
+  // Supprimer les anciens méta-tags Apple / theme-color générés par Expo pour éviter les doublons
+  html = html.replace(/<meta\s+name="(?:theme-color|apple-mobile-web-app-[^"]+|mobile-web-app-capable)"[^>]*>\s*/gi, '');
+
   // Balises PWA Apple et Web App Standalone
   const pwaMetaTags = `
-    <!-- iOS PWA Standalone Meta Tags (Supprime la barre Safari et lance en vraie application native) -->
+    <!-- iOS PWA Standalone Meta Tags (Plein écran bord à bord sans bande blanche/grise en haut) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="1xBet" />
     <meta name="application-name" content="1xBet" />
     <meta name="theme-color" content="#FFFFFF" />
@@ -140,12 +143,29 @@ if (fs.existsSync(indexHtmlPath)) {
     <link rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png" />
     <style id="native-touch-feel">
       html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
         overscroll-behavior: none;
         -webkit-overflow-scrolling: touch;
         -webkit-user-select: none;
         user-select: none;
         -webkit-touch-callout: none;
         -webkit-tap-highlight-color: transparent;
+      }
+      #root {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
       }
       input, textarea {
         -webkit-user-select: text !important;

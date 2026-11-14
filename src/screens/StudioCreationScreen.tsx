@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
 import { Colors } from '../theme/theme';
 import { useThemeStore } from '../stores/themeStore';
@@ -223,7 +224,9 @@ export default function StudioCreationScreen({ navigation }: any) {
   const headerBg = getHeaderBgColor(currentTheme);
   const screenBg = getScreenBgColor(currentTheme);
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
+  const topInset = getTopSafeInset(insets.top);
   const hasAccess = useAuthStore((s) => s.hasAccessToFeature('studio_match'));
+  useSystemTopBar(headerBg, statusBarStyle, hasAccess);
 
   useEffect(() => {
     if (!hasAccess) {
@@ -1211,7 +1214,7 @@ export default function StudioCreationScreen({ navigation }: any) {
           {
             backgroundColor: headerBg,
             borderBottomColor: currentTheme.border,
-            paddingTop: 10 + insets.top,
+            paddingTop: 10 + topInset,
           },
         ]}
       >

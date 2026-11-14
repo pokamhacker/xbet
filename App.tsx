@@ -17,6 +17,7 @@ import {
   getScreenBgColor,
   getStatusBarStyleForTheme,
 } from './src/theme/themes';
+import { useSystemUiStore } from './src/utils/systemTopBar';
 
 setupCleanLogging();
 
@@ -79,9 +80,13 @@ class AppErrorBoundary extends React.Component<
 
 export default function App() {
   const { currentTheme } = useThemeStore();
+  const topBarEntries = useSystemUiStore((state) => state.entries);
+  const activeEntry = topBarEntries.length > 0 ? topBarEntries[topBarEntries.length - 1] : null;
   const headerBg = getHeaderBgColor(currentTheme);
   const screenBg = getScreenBgColor(currentTheme);
   const barStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
+  const activeTopBg = activeEntry?.color || headerBg;
+  const activeBarStyle = activeEntry?.barStyle || barStyle;
 
   const [fontsLoaded] = useFonts({
     ...Ionicons.font,
@@ -93,22 +98,26 @@ export default function App() {
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      let metaTheme = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
-      if (!metaTheme) {
-        metaTheme = document.createElement('meta');
+      const metaThemes = document.querySelectorAll('meta[name="theme-color"]');
+      if (metaThemes.length === 0) {
+        const metaTheme = document.createElement('meta');
         metaTheme.name = 'theme-color';
+        metaTheme.content = activeTopBg;
         document.head.appendChild(metaTheme);
+      } else {
+        metaThemes.forEach((node) => {
+          (node as HTMLMetaElement).content = activeTopBg;
+        });
       }
-      metaTheme.content = headerBg;
 
-      document.documentElement.style.backgroundColor = headerBg;
-      document.body.style.backgroundColor = screenBg;
+      document.documentElement.style.backgroundColor = activeTopBg;
+      document.body.style.backgroundColor = activeTopBg;
       const rootEl = document.getElementById('root');
       if (rootEl) {
-        rootEl.style.backgroundColor = screenBg;
+        rootEl.style.backgroundColor = activeTopBg;
       }
     }
-  }, [headerBg, screenBg]);
+  }, [activeTopBg]);
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -176,7 +185,19 @@ export default function App() {
         const style = document.createElement('style');
         style.id = styleId;
         style.innerHTML = `
-          html, body, #root {
+          html, body {
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+          }
+          #root {
+            position: fixed !important;
+            top: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
             width: 100% !important;
             height: 100% !important;
             margin: 0 !important;
@@ -285,10 +306,10 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider style={{ flex: 1, width: '100%', height: '100%', backgroundColor: screenBg }}>
+    <SafeAreaProvider style={{ flex: 1, width: '100%', height: '100%', backgroundColor: activeTopBg }}>
       <StatusBar
         animated
-        barStyle={barStyle}
+        barStyle={activeBarStyle}
         {...({ translucent: true, backgroundColor: 'transparent' } as any)}
       />
       <AppErrorBoundary>

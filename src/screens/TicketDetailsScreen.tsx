@@ -17,6 +17,7 @@ import {
   getScreenBgColor,
   getStatusBarStyleForTheme,
 } from '../theme/themes';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
@@ -1019,7 +1020,8 @@ export default function TicketDetailsScreen({
     : primaryActionColor;
 
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
-  const topInset = insets.top;
+  const topInset = getTopSafeInset(insets.top);
+  useSystemTopBar(headerBg, statusBarStyle);
 
   return (
     <View

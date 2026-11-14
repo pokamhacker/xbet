@@ -16,12 +16,18 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../stores/themeStore';
+import { useResponsive } from '../utils/responsive';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { Colors } from '../theme/theme';
 import { BrandLogo } from '../components/common/BrandLogo';
 
 export default function LoginScreen() {
   const { login, localDeviceId, sessionAlertMessage, clearSessionAlert } = useAuthStore();
   const { currentTheme } = useThemeStore();
+  const { insets } = useResponsive();
+  const topInset = getTopSafeInset(insets.top);
+  const loginBg = currentTheme?.isDark ? currentTheme?.background || '#0F172A' : '#0F172A';
+  useSystemTopBar(loginBg, 'light-content');
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -59,8 +65,12 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: currentTheme?.isDark ? currentTheme?.background : '#0F172A' }]}>
-      <StatusBar barStyle="light-content" />
+    <View style={[styles.safeArea, { backgroundColor: loginBg, paddingTop: topInset }]}>
+      <StatusBar
+        animated
+        barStyle="light-content"
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
@@ -193,7 +203,7 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -201,7 +211,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#0F172A',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   keyboardView: {
     flex: 1,

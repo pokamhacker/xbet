@@ -19,6 +19,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useIsFocused } from '@react-navigation/native';
 import { useResponsive } from '../utils/responsive';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { useThemeStore } from '../store/themeStore';
 import {
   getHeaderBgColor,
@@ -362,6 +363,7 @@ export default function CouponScreen({ navigation }: any) {
   const screenBg = isMelbet && isDark ? '#21262C' : rawScreenBg;
   const headerBg = isMelbet && isDark ? '#21262C' : hasSelections && isDark ? screenBg : rawHeaderBg;
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
+  useSystemTopBar(headerBg, statusBarStyle);
 
   const textPrimary = currentTheme.textPrimary || (isDark ? '#FFFFFF' : '#00325E');
   const textSecondary = currentTheme.textSecondary || (isDark ? '#8FA2B6' : '#6E849B');
@@ -385,12 +387,7 @@ export default function CouponScreen({ navigation }: any) {
         ? 'Pari simple'
         : ticketType;
 
-  const topSafeInset =
-    (insets?.top ?? 0) > 0
-      ? insets.top
-      : Platform.OS === 'android'
-        ? StatusBar.currentHeight || 0
-        : 0;
+  const topSafeInset = getTopSafeInset(insets?.top);
 
   const androidBottomPad = Platform.OS === 'android' ? 12 : 0;
   const bottomSafeInset =

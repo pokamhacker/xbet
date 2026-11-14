@@ -19,6 +19,7 @@ import { TeamLogo } from '../components/common/TeamLogo';
 import * as Haptics from 'expo-haptics';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
+import { getHeaderMatchSafePad, useSystemTopBar } from '../utils/systemTopBar';
 import { SkeletonLoader } from '../components/SkeletonLoader';
 import { formatFrenchEventDate } from '../utils/dateFormatter';
 import {
@@ -197,7 +198,8 @@ export const MatchStatisticsScreen: React.FC<{ route?: any; navigation?: any }> 
       ? 20
       : androidBottomPad;
   const bottomBarHeight = 56 + bottomInset;
-  const topSafePad = insets.top > 0 ? insets.top : Platform.OS === 'android' ? 28 : 16;
+  const topSafePad = getHeaderMatchSafePad(insets.top);
+  useSystemTopBar('#0E351A', 'light-content');
 
   const activeStatsList = statsData.periods[selectedPeriod] || statsData.periods.match;
   const crestSize = isSmallDevice ? 44 : isTablet ? 54 : 50;

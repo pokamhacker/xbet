@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useThemeStore } from '../stores/themeStore';
 import { useCouponStore } from '../store/couponStore';
 import { useResponsive } from '../utils/responsive';
+import { getHeaderMatchSafePad, useSystemTopBar } from '../utils/systemTopBar';
 import { SkeletonLoader } from '../components/SkeletonLoader';
 import { formatFootballHeader } from '../utils/dateFormatter';
 import { formatBetSelectionLabel } from '../utils/scoreAdapter';
@@ -525,7 +526,8 @@ export const MatchMarketsScreen: React.FC<{ route?: any; navigation?: any }> = (
       ? 20
       : androidBottomPad;
   const bottomBarHeight = 56 + bottomInset;
-  const topSafePad = insets.top > 0 ? insets.top : Platform.OS === 'android' ? 28 : 16;
+  const topSafePad = getHeaderMatchSafePad(insets.top);
+  useSystemTopBar('#0E351A', 'light-content');
   const crestSize = isSmallDevice ? 46 : 52;
 
   const formattedHeaderTitle = useMemo(
