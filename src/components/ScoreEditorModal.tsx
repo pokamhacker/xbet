@@ -848,7 +848,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                   </Text>
                 </View>
 
-                {/* Statut individuel de l'événement (Accepté / Perdu / Gain) */}
+                {/* Statut individuel de l'événement (Accepté / Perdu / Gain) adapté au thème */}
                 <View style={styles.statusPillsBox}>
                   <Text style={[styles.inputLabel, { color: currentTheme.textSecondary }]}>
                     Statut de l'événement (individuel) :
@@ -859,8 +859,8 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                         styles.statusPill,
                         { borderColor: currentTheme.border, backgroundColor: inputBg },
                         current.status === 'Accepté' && {
-                          backgroundColor: currentTheme.primary || '#CC841E',
-                          borderColor: currentTheme.primary || '#CC841E',
+                          backgroundColor: currentTheme.status?.accepte || currentTheme.primary || '#CC841E',
+                          borderColor: currentTheme.status?.accepte || currentTheme.primary || '#CC841E',
                         },
                       ]}
                       onPress={() => handleStatusChange(evKey, 'Accepté')}
@@ -883,7 +883,10 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                       style={[
                         styles.statusPill,
                         { borderColor: currentTheme.border, backgroundColor: inputBg },
-                        current.status === 'Perdu' && styles.statusPillLoss,
+                        current.status === 'Perdu' && {
+                          backgroundColor: currentTheme.status?.perdu || currentTheme.colors?.accentRed || '#EF4444',
+                          borderColor: currentTheme.status?.perdu || currentTheme.colors?.accentRed || '#EF4444',
+                        },
                       ]}
                       onPress={() => handleStatusChange(evKey, 'Perdu')}
                     >
@@ -903,8 +906,8 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                         styles.statusPill,
                         { borderColor: currentTheme.border, backgroundColor: inputBg },
                         current.status === 'Gain' && {
-                          backgroundColor: payeGreen,
-                          borderColor: payeGreen,
+                          backgroundColor: currentTheme.status?.paye || currentTheme.colors?.accentGreen || payeGreen,
+                          borderColor: currentTheme.status?.paye || currentTheme.colors?.accentGreen || payeGreen,
                         },
                       ]}
                       onPress={() => handleStatusChange(evKey, 'Gain')}

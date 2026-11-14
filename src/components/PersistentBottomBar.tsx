@@ -173,9 +173,14 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
   const barBg = getBottomBarBgColor(theme);
   const barBorder = theme?.bottomBar?.barBorder || theme?.barBorder || Colors.border;
   const centerBg = isMelbet
-    ? '#D89228'
-    : theme?.bottomBar?.centerBg || theme?.centerBg || Colors.primary;
-  const centerTint = theme?.bottomBar?.centerTint || theme?.centerTint || (theme?.name?.startsWith('melbet') && theme?.isDark ? '#000000' : '#FFFFFF');
+    ? (isDark ? '#CC841E' : '#E7B12C')
+    : (theme?.bottomBar?.centerBg || theme?.centerBg || theme?.primary || Colors.primary);
+  const centerTint = theme?.bottomBar?.centerTint || theme?.centerTint || '#FFFFFF';
+  const couponBadgeBg = isMegaPari
+    ? '#FFA827'
+    : isMelbet
+    ? '#F83B37'
+    : (theme?.colors?.accentRed || '#E54D42');
 
   // Insets dynamiques pour adaptation parfaite mobile (notches, barres de gestes Android/iOS) et desktop
   const androidBottomPad = Platform.OS === 'android' ? 12 : 0;
@@ -278,8 +283,7 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
               {
                 backgroundColor: centerBg,
                 shadowColor: centerBg,
-                borderWidth: 2,
-                borderColor: '#FFFFFF',
+                borderWidth: 0,
               },
             ]}
           >
@@ -298,9 +302,18 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
               />
             )}
 
-            {/* Badge numérique orange réactif si événements actifs dans le coupon */}
+            {/* Badge numérique adaptatif selon le thème si événements actifs dans le coupon */}
             {couponCount > 0 && (
-              <View style={styles.orangeBadge}>
+              <View
+                style={[
+                  styles.orangeBadge,
+                  {
+                    backgroundColor: couponBadgeBg,
+                    borderWidth: 1.5,
+                    borderColor: barBg,
+                  },
+                ]}
+              >
                 <Text style={styles.orangeBadgeText}>{couponCount}</Text>
               </View>
             )}

@@ -255,18 +255,60 @@ export default function TicketDetailsScreen({
   const isLost = rawStatus === 'Perdu' || rawStatus.toLowerCase() === 'lost';
   const isAccepted = !isPaid && !isLost;
 
-  const isMelbet = String(currentTheme?.name || '').toLowerCase().includes('melbet');
+  const themeNameLower = String(currentTheme?.name || currentTheme?.key || '').toLowerCase();
+  const isMelbet = themeNameLower.includes('melbet');
+  const isBlack = themeNameLower.includes('black');
 
-  // Couleurs dynamiques selon le thème actif (Calibration exacte Capture D2)
-  const SUCCESS_GREEN = '#4EBA6F';
+  // Couleurs dynamiques des statuts et badges adaptées à chaque thème
   const primaryActionColor = isDark
-    ? '#98A0A3'
+    ? (currentTheme?.textSecondary || '#98A0A3')
     : (currentTheme?.activeIcon || currentTheme?.primary || '#557089');
-  const payeColor = SUCCESS_GREEN;
+  const payeColor =
+    currentTheme?.status?.paye ||
+    currentTheme?.colors?.accentGreen ||
+    '#4EBA6F';
   const accepteColor = isMelbet
-    ? '#CC8A1E'
-    : (currentTheme?.status?.accepte || '#4A83C4');
-  const perduColor = currentTheme?.status?.perdu || '#E74C3C';
+    ? (isDark ? '#CC8A1E' : '#E7B12C')
+    : (currentTheme?.status?.accepte ||
+       currentTheme?.colors?.accentStatusAccepted ||
+       currentTheme?.primary ||
+       '#4A83C4');
+  const perduColor =
+    currentTheme?.status?.perdu ||
+    currentTheme?.colors?.accentRed ||
+    '#E74C3C';
+
+  // Couleurs des badges adaptées à chaque thème (Pastille statut, En direct, Ligue, Avatar)
+  const statusBadgeBg = isPaid
+    ? payeColor
+    : isLost
+    ? perduColor
+    : isMelbet && isDark
+    ? '#D58412'
+    : accepteColor;
+  const liveBadgeBg = isMelbet
+    ? (isDark ? '#F83B37' : '#EF4444')
+    : (currentTheme?.colors?.accentRed || currentTheme?.status?.perdu || '#E53935');
+  const leagueBadgeBg = isMelbet
+    ? '#527BFF'
+    : (currentTheme?.primary || '#4A84C4');
+  const avatarCircleBg = isDark
+    ? isMelbet
+      ? isBlack
+        ? '#181A20'
+        : '#2C3437'
+      : (currentTheme?.primarySoft || currentTheme?.background || '#1E2838')
+    : (currentTheme?.primarySoft || '#E9EFF6');
+  const avatarContentColor = isDark
+    ? isMelbet
+      ? '#8C9497'
+      : (currentTheme?.textSecondary || '#818B9B')
+    : (currentTheme?.primary || currentTheme?.textSecondary || '#4A84C4');
+  const avatarFifaTextColor = isDark
+    ? isMelbet
+      ? '#788083'
+      : (currentTheme?.textSecondary || '#818B9B')
+    : (currentTheme?.primary || currentTheme?.textSecondary || '#4A84C4');
 
   // Détection Poker pour le coupon global
   const isPokerCoupon =
@@ -946,28 +988,28 @@ export default function TicketDetailsScreen({
 
   const rawHeaderBg = getHeaderBgColor(currentTheme);
   const rawScreenBg = getScreenBgColor(currentTheme);
-  const headerBg = isDark && isMelbet ? '#373F42' : rawHeaderBg;
-  const screenBg = isDark && isMelbet ? '#283033' : rawScreenBg;
+  const headerBg = isDark && isMelbet && !isBlack ? '#373F42' : rawHeaderBg;
+  const screenBg = isDark && isMelbet && !isBlack ? '#283033' : rawScreenBg;
   const cardSurfaceBg = isDark
-    ? isMelbet
+    ? isMelbet && !isBlack
       ? '#373F42'
       : currentTheme.cardBackground
     : currentTheme.cardBackground;
   const dividerColor = isDark
-    ? isMelbet
+    ? isMelbet && !isBlack
       ? '#454E53'
-      : '#323840'
+      : (currentTheme.divider || currentTheme.border || '#323840')
     : (currentTheme.divider || currentTheme.border || '#F0F4F8');
   const labelGrayColor = isDark
-    ? isMelbet
+    ? isMelbet && !isBlack
       ? '#98A0A3'
-      : '#8A949E'
+      : (currentTheme.textSecondary || '#8A949E')
     : currentTheme.textSecondary;
-  const valueWhiteColor = isDark ? '#F4FBFF' : currentTheme.textPrimary;
+  const valueWhiteColor = isDark ? (currentTheme.textPrimary || '#F4FBFF') : currentTheme.textPrimary;
   const headerRightIconColor = isDark
-    ? isMelbet
+    ? isMelbet && !isBlack
       ? '#98A0A3'
-      : '#8A949E'
+      : (currentTheme.textSecondary || '#8A949E')
     : primaryActionColor;
 
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
@@ -1171,16 +1213,12 @@ export default function TicketDetailsScreen({
                 style={[
                   styles.avatarCircle,
                   {
-                    backgroundColor: isDark
-                      ? isMelbet
-                        ? '#2C3437'
-                        : '#1E2328'
-                      : '#E9EFF6',
+                    backgroundColor: avatarCircleBg,
                   },
                 ]}
               >
                 {isFifaCoupon && !isCombine ? (
-                  <Text style={styles.fifaAvatarText}>FIFA</Text>
+                  <Text style={[styles.fifaAvatarText, { color: avatarFifaTextColor }]}>FIFA</Text>
                 ) : (
                   <Image
                     source={
@@ -1201,7 +1239,7 @@ export default function TicketDetailsScreen({
                         ? styles.avatarIconFifa
                         : styles.avatarIcon,
                       {
-                        tintColor: '#8C9497',
+                        tintColor: avatarContentColor,
                       },
                     ]}
                     resizeMode="contain"
@@ -1209,16 +1247,12 @@ export default function TicketDetailsScreen({
                 )}
               </View>
 
-              {/* Badge circulaire (18x18, borderRadius: 9, borderWidth: 1.5, borderColor: #373F42) */}
+              {/* Badge circulaire adapté au thème actif */}
               <View
                 style={[
                   styles.statusMiniDot,
                   {
-                    backgroundColor: isPaid
-                      ? '#52B76E'
-                      : isLost
-                      ? perduColor
-                      : '#D58412',
+                    backgroundColor: statusBadgeBg,
                     borderColor: cardSurfaceBg || '#373F42',
                     borderWidth: 1.5,
                   },
@@ -1282,12 +1316,12 @@ export default function TicketDetailsScreen({
               );
               return (!evSettled && (evFifa || evPoker || prog.isLive)) || prog.isLive;
             })) ? (
-              <View style={styles.liveRedBadge}>
+              <View style={[styles.liveRedBadge, { backgroundColor: liveBadgeBg }]}>
                 <View style={styles.liveRedBadgeDot} />
                 <Text style={styles.liveRedBadgeText}>En direct</Text>
               </View>
             ) : currentCoupon?.badge === 'Serie A' ? (
-              <View style={styles.leagueBadge}>
+              <View style={[styles.leagueBadge, { backgroundColor: leagueBadgeBg }]}>
                 <Text style={styles.leagueBadgeText}>Serie A</Text>
               </View>
             ) : null}
@@ -1496,14 +1530,14 @@ export default function TicketDetailsScreen({
               delayLongPress={260}
               style={[styles.eventCard, { backgroundColor: cardSurfaceBg }]}
             >
-              {/* Badge • En direct positionné en absolu à l'angle supérieur droit (top: 4, right: 4 comme sur Capture D2) */}
+              {/* Badge • En direct positionné en absolu à l'angle supérieur droit (adapté au thème) */}
               {showEventLiveBadge ? (
-                <View style={styles.cardCornerLiveBadge}>
+                <View style={[styles.cardCornerLiveBadge, { backgroundColor: liveBadgeBg }]}>
                   <View style={styles.liveRedBadgeDot} />
                   <Text style={styles.liveRedBadgeText}>En direct</Text>
                 </View>
               ) : ev.badge === 'Serie A' ? (
-                <View style={[styles.leagueBadge, { position: 'absolute', top: 6, right: 6, zIndex: 5 }]}>
+                <View style={[styles.leagueBadge, { backgroundColor: leagueBadgeBg, position: 'absolute', top: 6, right: 6, zIndex: 5 }]}>
                   <Text style={styles.leagueBadgeText}>Serie A</Text>
                 </View>
               ) : null}
@@ -1511,7 +1545,7 @@ export default function TicketDetailsScreen({
               {/* En-tête de la compétition */}
               <View style={styles.eventCardHeader}>
                 {isFifaEvent ? (
-                  <Text style={styles.eventFifaLeftLabel}>FIFA</Text>
+                  <Text style={[styles.eventFifaLeftLabel, { color: labelGrayColor }]}>FIFA</Text>
                 ) : (
                   <View style={styles.eventSportIconWrap}>
                     <Image
@@ -1767,15 +1801,20 @@ export default function TicketDetailsScreen({
               style={[
                 styles.sellFooterBtn,
                 {
-                  backgroundColor: isMelbet
-                    ? '#CC841E'
-                    : (currentTheme.cashoutButton?.bg || currentTheme.primary || '#4A8AE8'),
+                  backgroundColor:
+                    currentTheme?.cashoutButton?.bg ||
+                    (isMelbet ? '#CC841E' : currentTheme?.primary || '#4A8AE8'),
                 },
               ]}
               activeOpacity={0.85}
               onPress={handleCashout}
             >
-              <Text style={styles.sellFooterBtnText}>
+              <Text
+                style={[
+                  styles.sellFooterBtnText,
+                  { color: currentTheme?.cashoutButton?.text || '#FFFFFF' },
+                ]}
+              >
                 Vendre pour {sellPriceFormatted} ₣
               </Text>
             </TouchableOpacity>
@@ -1785,11 +1824,11 @@ export default function TicketDetailsScreen({
             style={[
               styles.duplicateFooterBtn,
               {
-                backgroundColor: isDark
-                  ? isMelbet
+                backgroundColor:
+                  isMelbet && isDark && !isBlack
                     ? '#283033'
-                    : '#1A222C'
-                  : '#EEF2F6',
+                    : (currentTheme?.duplicateButton?.bg ||
+                       (isDark ? '#1A222C' : '#EEF2F6')),
               },
             ]}
             activeOpacity={0.85}
@@ -1799,9 +1838,12 @@ export default function TicketDetailsScreen({
               style={[
                 styles.duplicateFooterBtnText,
                 {
-                  color: isMelbet
-                    ? '#CC8A1E'
-                    : (currentTheme.primary || '#4A8AE8'),
+                  color:
+                    isMelbet && isDark
+                      ? '#CC8A1E'
+                      : (currentTheme?.duplicateButton?.text ||
+                         currentTheme?.primary ||
+                         '#4A8AE8'),
                 },
               ]}
             >

@@ -34,15 +34,15 @@ export const HistoryTabIcon: React.FC<HistoryTabIconProps> = ({
     currentTheme.textSecondary ||
     (isDark ? '#7C8B99' : '#6E849B');
 
-  // Disque plein de 22x22 en couleur active (#4A84C4) ou inactive (#6E849B)
+  // Disque plein de 22x22 en couleur active ou inactive selon le thème
   const discBgColor = focused ? activeColor : inactiveColor;
 
-  // Couleur des aiguilles au centre : blanc (#FFFFFF) ou centerTint du thème
-  const rawCenterTint = currentTheme.bottomBar?.centerTint;
-  const needleColor =
-    rawCenterTint && rawCenterTint.length >= 4 && rawCenterTint !== '#FFFFF'
-      ? rawCenterTint
-      : '#FFFFFF';
+  // Couleur des aiguilles au centre : sombre sur Melbet Dark (Capture D2), blanc sinon
+  const themeName = String(currentTheme.name || '').toLowerCase();
+  const isMelbet = themeName.includes('melbet');
+  const needleColor = isMelbet && isDark
+    ? (currentTheme.background || '#283033')
+    : '#FFFFFF';
 
   const discSize = size;
 
