@@ -247,12 +247,18 @@ export default function TicketDetailsScreen({
 
   // Statuts normalisés
   const rawStatus = String(currentCoupon?.status || 'Accepté');
+  const normalizedCouponStatus = rawStatus.trim().toLowerCase();
   const isPaid =
-    rawStatus === 'Payé' ||
-    rawStatus === 'Gagné' ||
-    rawStatus === 'Gain' ||
-    rawStatus.toLowerCase() === 'paid';
-  const isLost = rawStatus === 'Perdu' || rawStatus.toLowerCase() === 'lost';
+    normalizedCouponStatus === 'payé' ||
+    normalizedCouponStatus === 'paye' ||
+    normalizedCouponStatus === 'gagné' ||
+    normalizedCouponStatus === 'gagne' ||
+    normalizedCouponStatus === 'gain' ||
+    normalizedCouponStatus === 'paid';
+  const isLost =
+    normalizedCouponStatus === 'perdu' ||
+    normalizedCouponStatus === 'perte' ||
+    normalizedCouponStatus === 'lost';
   const isAccepted = !isPaid && !isLost;
 
   const themeNameLower = String(currentTheme?.name || currentTheme?.key || '').toLowerCase();
@@ -709,8 +715,8 @@ export default function TicketDetailsScreen({
     return Math.max(0, Math.min(0.98, combinedProb));
   }, [nonBonusEvents, isPaid, isLost, currentTime]);
 
-  // La barre "Dupliquer le coupon de pari" est TOUJOURS disponible
-  const showDuplicateFooter = true;
+  // La barre "Dupliquer le coupon de pari" reste disponible sauf lorsque le statut du coupon est Payé
+  const showDuplicateFooter = !isPaid;
 
   // Le bouton "Vendre pour XXX ₣" s'affiche en fonction de la probabilité de réussite du coupon
   // (et reste pilotable manuellement via isForSale si défini explicitement)
@@ -1175,7 +1181,7 @@ export default function TicketDetailsScreen({
           styles.scrollContent,
           {
             paddingBottom:
-              bottomBarHeight + (showSellButton ? 132 : 82),
+              bottomBarHeight + (showDuplicateFooter ? (showSellButton ? 132 : 82) : 28),
           },
         ]}
         keyboardShouldPersistTaps="always"
@@ -1798,7 +1804,7 @@ export default function TicketDetailsScreen({
       </Animated.ScrollView>
 
       {/* ================================================================== */}
-      {/* 6. BARRE D'ACTION INFÉRIEURE (VENDRE SELON PROBABILITÉ + DUPLIQUER TOUJOURS DISPONIBLE) */}
+      {/* 6. BARRE D'ACTION INFÉRIEURE (VENDRE SELON PROBABILITÉ + DUPLIQUER SI NON PAYÉ) */}
       {/* ================================================================== */}
       {showDuplicateFooter && (
         <View
