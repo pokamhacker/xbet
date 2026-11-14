@@ -6,14 +6,23 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   Alert,
   Platform,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from '../theme/themes';
 import { useThemeStore } from '../stores/themeStore';
+import {
+  getTopSafeInset,
+  useSystemTopBar,
+} from '../utils/systemTopBar';
 import { useBetStore } from '../store/useBetStore';
 import { useAuthStore } from '../store/authStore';
 import { generateCouponId, generateShareCode } from '../utils/pokerEngine';
@@ -44,7 +53,13 @@ const FIGHTERS = [
 export default function StudioMortalKombatScreen({ navigation }: any) {
   const { currentTheme } = useThemeStore();
   const isDark = Boolean(currentTheme?.isDark);
+  const insets = useSafeAreaInsets();
+  const topInset = getTopSafeInset(insets.top);
+  const headerBg = getHeaderBgColor(currentTheme);
+  const screenBg = getScreenBgColor(currentTheme);
+  const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
   const hasAccess = useAuthStore((s) => s.hasAccessToFeature('studio_mk'));
+  useSystemTopBar(hasAccess ? headerBg : '#1A0B0E', hasAccess ? statusBarStyle : 'light-content');
 
   useEffect(() => {
     if (!hasAccess) {
@@ -172,7 +187,8 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
 
   if (!hasAccess) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#1A0B0E', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <View style={{ flex: 1, backgroundColor: '#1A0B0E', justifyContent: 'center', alignItems: 'center', padding: 24, paddingTop: 24 + topInset }}>
+        <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
         <Ionicons name="lock-closed" size={56} color="#EF4444" />
         <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
           Accès restreint
@@ -187,20 +203,21 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
         >
           <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Retour</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <View style={[styles.container, { backgroundColor: screenBg }]}>
+      <StatusBar barStyle={statusBarStyle} {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
       {/* Header */}
       <View
         style={[
           styles.header,
           {
-            backgroundColor: currentTheme.headerBackground || currentTheme.cardBackground,
+            backgroundColor: headerBg,
             borderBottomColor: currentTheme.border,
+            paddingTop: 12 + topInset,
           },
         ]}
       >
@@ -430,7 +447,7 @@ export default function StudioMortalKombatScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -438,7 +455,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   header: {
     flexDirection: 'row',

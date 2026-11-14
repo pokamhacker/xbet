@@ -4,16 +4,17 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   Alert,
   TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useBetStore } from '../store/useBetStore';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { CRASH_COLORS } from '../games/crash/constants';
 import {
   GameMode,
@@ -45,6 +46,8 @@ export default function CrashGameScreen({ navigation }: any) {
   const hasAccess = useAuthStore((s) => s.hasAccessToFeature('game_crash'));
   const { currentTheme, brandChoice, modeChoice } = useThemeStore();
   const { width, isTablet, contentContainerStyle } = useResponsive();
+  const insets = useSafeAreaInsets();
+  const topInset = getTopSafeInset(insets.top);
 
   useEffect(() => {
     if (!hasAccess) {
@@ -60,6 +63,7 @@ export default function CrashGameScreen({ navigation }: any) {
 
   // Navigation interne entre les 3 écrans
   const [currentScreen, setCurrentScreen] = useState<'selection' | 'loading' | 'game'>('selection');
+  useSystemTopBar(!hasAccess ? '#0D1B2A' : '#0D1A29', 'light-content', !hasAccess || currentScreen === 'game');
   const [selectedMode, setSelectedMode] = useState<GameMode>('always_win');
 
   // Modales
@@ -454,7 +458,8 @@ export default function CrashGameScreen({ navigation }: any) {
 
   if (!hasAccess) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0D1B2A', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <View style={{ flex: 1, backgroundColor: '#0D1B2A', justifyContent: 'center', alignItems: 'center', padding: 24, paddingTop: 24 + topInset }}>
+        <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
         <Ionicons name="lock-closed" size={56} color="#EF4444" />
         <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
           Accès restreint
@@ -469,7 +474,7 @@ export default function CrashGameScreen({ navigation }: any) {
         >
           <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Retour</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -498,8 +503,9 @@ export default function CrashGameScreen({ navigation }: any) {
 
   // Écran 3 : Écran Principal du Jeu (Scrollable verticalement)
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme?.background || CRASH_COLORS.bgGame }]}>
-      <StatusBar barStyle="light-content" />
+    <View style={[styles.container, { backgroundColor: currentTheme?.background || CRASH_COLORS.bgGame }]}>
+      <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
+      <View style={{ width: '100%', height: topInset, backgroundColor: '#0D1A29' }} />
 
       <View style={[{ flex: 1, width: '100%' }, contentContainerStyle]}>
         {/* A. Barre Supérieure Fixe (Header) */}
@@ -614,7 +620,7 @@ export default function CrashGameScreen({ navigation }: any) {
           onClose={() => setAutoModalPanel(null)}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

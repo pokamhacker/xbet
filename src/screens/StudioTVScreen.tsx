@@ -6,17 +6,25 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   Alert,
   Platform,
   StatusBar,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../theme/theme';
+import {
+  getHeaderBgColor,
+  getScreenBgColor,
+  getStatusBarStyleForTheme,
+} from '../theme/themes';
 import { useBetStore } from '../store/useBetStore';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { useResponsive } from '../utils/responsive';
+import {
+  getTopSafeInset,
+  useSystemTopBar,
+} from '../utils/systemTopBar';
 import { generateCouponId, generateRoundCode, generateShareCode, generateRealisticPokerDraw } from '../utils/pokerEngine';
 import { BetSlip, MatchEvent } from '../types/bet';
 import { PokerScheduleModal } from '../components/modals/PokerScheduleModal';
@@ -81,7 +89,12 @@ export default function StudioTVScreen({ navigation }: any) {
   const { currentTheme, theme: baseTheme } = useThemeStore();
   const theme = currentTheme || baseTheme;
   const isDark = theme.isDark;
-  const { contentContainerStyle } = useResponsive();
+  const { insets, contentContainerStyle } = useResponsive();
+  const topInset = getTopSafeInset(insets.top);
+  const headerBg = getHeaderBgColor(theme);
+  const screenBg = getScreenBgColor(theme);
+  const statusBarStyle = getStatusBarStyleForTheme(theme, headerBg);
+  useSystemTopBar(hasAccess ? headerBg : '#0B132B', hasAccess ? statusBarStyle : 'light-content');
 
   // Configuration de Programmation (Date, Heure, Intervalle)
   const [placedDate, setPlacedDate] = useState(getCurrentDateString());
@@ -330,7 +343,8 @@ export default function StudioTVScreen({ navigation }: any) {
 
   if (!hasAccess) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0B132B', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <View style={{ flex: 1, backgroundColor: '#0B132B', justifyContent: 'center', alignItems: 'center', padding: 24, paddingTop: 24 + topInset }}>
+        <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
         <Ionicons name="lock-closed" size={56} color="#EF4444" />
         <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
           Accès restreint
@@ -345,13 +359,14 @@ export default function StudioTVScreen({ navigation }: any) {
         >
           <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Retour</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+    <View style={[styles.container, { backgroundColor: screenBg }]}>
+      <StatusBar barStyle={statusBarStyle} {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
+      <View style={{ width: '100%', height: topInset, backgroundColor: headerBg }} />
       {/* Header */}
       <View
         style={[
@@ -360,7 +375,7 @@ export default function StudioTVScreen({ navigation }: any) {
             alignSelf: 'center',
             maxWidth: 600,
             width: '100%',
-            backgroundColor: theme.headerBackground || theme.cardBackground,
+            backgroundColor: headerBg,
             borderBottomColor: theme.border,
           },
         ]}
@@ -616,7 +631,7 @@ export default function StudioTVScreen({ navigation }: any) {
           onSave={handleUpdateSingleRound}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -624,7 +639,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   header: {
     flexDirection: 'row',

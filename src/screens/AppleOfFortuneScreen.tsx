@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   StatusBar,
   ImageBackground,
   Image,
@@ -14,6 +13,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
@@ -21,6 +21,7 @@ import { useBetStore } from '../store/useBetStore';
 import { useAuthStore } from '../store/authStore';
 import { useResponsive } from '../utils/responsive';
 import { useThemeStore } from '../stores/themeStore';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 
 // Assets visuels officiels extraits du jeu
 const APPLE_BG = require('../../assets/games/apple/apple_bg.jpg');
@@ -57,6 +58,9 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
   const hasAccess = useAuthStore((s) => s.hasAccessToFeature('game_apple'));
   const { balance, deposit, withdraw } = useBetStore();
   const { width, height, font, isTablet, contentContainerStyle } = useResponsive();
+  const insets = useSafeAreaInsets();
+  const topInset = getTopSafeInset(insets.top);
+  useSystemTopBar('#041009', 'light-content');
   const { currentTheme, brandChoice, modeChoice } = useThemeStore();
   const brandAccentColor = currentTheme.primary || '#EAA824';
   const brandTextColor = currentTheme.colors?.primaryText || currentTheme.textWhite || '#FFFFFF';
@@ -281,8 +285,8 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
-      <StatusBar barStyle="light-content" />
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
 
       {/* Arrière-plan forêt tropicale féerique immersif */}
       <ImageBackground source={APPLE_BG} style={StyleSheet.absoluteFill} resizeMode="cover">
@@ -293,7 +297,15 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
         {/* ----------------------------------------------------------------- */}
         {/* 1. EN-TÊTE SUPÉRIEUR (← | Solde + | BONUS+ | (i))                 */}
         {/* ----------------------------------------------------------------- */}
-        <View style={styles.topHeader}>
+        <View
+          style={[
+            styles.topHeader,
+            {
+              paddingTop: (Platform.OS === 'android' ? 6 : 4) + topInset,
+              height: 48 + topInset,
+            },
+          ]}
+        >
           {/* Bouton retour */}
           <TouchableOpacity
             style={styles.headerIconButton}
@@ -857,7 +869,7 @@ export default function AppleOfFortuneScreen({ navigation }: any) {
           </View>
         </Modal>
       </ImageBackground>
-    </SafeAreaView>
+    </View>
   );
 }
 

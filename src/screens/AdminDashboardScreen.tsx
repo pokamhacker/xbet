@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   TextInput,
   Modal,
@@ -16,11 +15,13 @@ import {
   Switch,
   Animated,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore, UserAccount } from '../store/authStore';
 import { Colors } from '../theme/theme';
 import { useThemeStore } from '../stores/themeStore';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { BrandLogo } from '../components/common/BrandLogo';
 import { RefreshArrowBadge } from '../components/common/AppRefreshControl';
 import {
@@ -34,6 +35,12 @@ type SortOption = 'recent' | 'balance_desc' | 'name_asc';
 
 export default function AdminDashboardScreen() {
   const { currentTheme } = useThemeStore();
+  const insets = useSafeAreaInsets();
+  const topInset = getTopSafeInset(insets.top);
+  const isAdminBlack = (currentTheme?.name || '').toLowerCase().includes('black');
+  const adminScreenBg = isAdminBlack ? '#000000' : '#090D16';
+  const adminHeaderBg = isAdminBlack ? '#000000' : '#111827';
+  useSystemTopBar(adminHeaderBg, 'light-content');
   const {
     accounts,
     currentUser,
@@ -521,8 +528,9 @@ export default function AdminDashboardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+    <View style={[styles.safeArea, { backgroundColor: adminScreenBg }]}>
+      <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
+      <View style={{ width: '100%', height: topInset, backgroundColor: adminHeaderBg }} />
 
       {/* Floating In-App Toast */}
       {toastMessage && (
@@ -551,7 +559,7 @@ export default function AdminDashboardScreen() {
       )}
 
       {/* Top Admin Header Bar */}
-      <View style={styles.headerBar}>
+      <View style={[styles.headerBar, isAdminBlack && { backgroundColor: '#000000' }]}>
         <View style={styles.headerLeft}>
           <View style={styles.adminBadgeRow}>
             <View style={styles.pulseLiveDot} />
@@ -1834,7 +1842,7 @@ export default function AdminDashboardScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -1842,7 +1850,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#090D16',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
   },
   // Floating In-App Toast
   toastContainer: {

@@ -7,7 +7,6 @@ import {
   TextInput,
   TouchableOpacity,
   Switch,
-  SafeAreaView,
   Alert,
   Image,
   Platform,
@@ -1180,7 +1179,17 @@ export default function StudioCreationScreen({ navigation }: any) {
 
   if (!hasAccess) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: '#0F172A',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 24,
+          paddingTop: 24 + topInset,
+        }}
+      >
+        <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
         <Ionicons name="lock-closed" size={56} color="#EF4444" />
         <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
           Accès restreint
@@ -1195,7 +1204,7 @@ export default function StudioCreationScreen({ navigation }: any) {
         >
           <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Retour</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -2449,7 +2458,7 @@ export default function StudioCreationScreen({ navigation }: any) {
         animationType="slide"
         onRequestClose={() => setCreateLeagueModalVisible(false)}
       >
-        <SafeAreaView style={styles.modalOverlay}>
+        <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Créer un Championnat</Text>
@@ -2493,7 +2502,7 @@ export default function StudioCreationScreen({ navigation }: any) {
               <Text style={styles.modalSubmitBtnText}>Créer et Sélectionner</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
       )}
 
@@ -2505,7 +2514,7 @@ export default function StudioCreationScreen({ navigation }: any) {
         animationType="slide"
         onRequestClose={() => setCreateTeamModalVisible(false)}
       >
-        <SafeAreaView style={styles.modalOverlay}>
+        <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Ajouter une Équipe</Text>
@@ -2549,7 +2558,7 @@ export default function StudioCreationScreen({ navigation }: any) {
               <Text style={styles.modalSubmitBtnText}>Ajouter l'Équipe au Championnat</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
       )}
     </View>

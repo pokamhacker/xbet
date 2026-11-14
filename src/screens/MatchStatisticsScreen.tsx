@@ -199,7 +199,7 @@ export const MatchStatisticsScreen: React.FC<{ route?: any; navigation?: any }> 
       : androidBottomPad;
   const bottomBarHeight = 56 + bottomInset;
   const topSafePad = getHeaderMatchSafePad(insets.top);
-  useSystemTopBar('#0E351A', 'light-content');
+  useSystemTopBar('#03323C', 'light-content');
 
   const activeStatsList = statsData.periods[selectedPeriod] || statsData.periods.match;
   const crestSize = isSmallDevice ? 44 : isTablet ? 54 : 50;
@@ -773,7 +773,7 @@ const styles = StyleSheet.create({
   stadiumHeaderBg: {
     width: '100%',
     paddingBottom: 24,
-    backgroundColor: '#0E351A',
+    backgroundColor: '#03323C',
   },
   appBar: {
     height: 44,

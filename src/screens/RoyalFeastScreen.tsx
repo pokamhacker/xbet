@@ -7,10 +7,11 @@ import {
   StatusBar,
   Alert,
   TouchableOpacity,
-  SafeAreaView,
   useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { Asset } from 'expo-asset';
 import { GameStatus, DishType } from '../games/royal_feast/types/game';
 import {
@@ -34,6 +35,9 @@ import { useCloches } from '../games/royal_feast/cloches';
 
 export default function RoyalFeastScreen({ navigation }: any) {
   const hasAccess = useAuthStore((s) => s.hasAccessToFeature('game_royal_feast'));
+  const insets = useSafeAreaInsets();
+  const topInset = getTopSafeInset(insets.top);
+  useSystemTopBar(hasAccess ? '#FFFFFF' : '#1A0E2E', hasAccess ? 'dark-content' : 'light-content');
 
   useEffect(() => {
     if (!hasAccess) {
@@ -244,7 +248,8 @@ export default function RoyalFeastScreen({ navigation }: any) {
 
   if (!hasAccess) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#1A0E2E', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <View style={{ flex: 1, backgroundColor: '#1A0E2E', justifyContent: 'center', alignItems: 'center', padding: 24, paddingTop: 24 + topInset }}>
+        <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
         <Ionicons name="lock-closed" size={56} color="#EF4444" />
         <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
           Accès restreint
@@ -259,13 +264,13 @@ export default function RoyalFeastScreen({ navigation }: any) {
         >
           <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Retour</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
 
       {/* Image de fond s'étendant à 100% de l'écran (plein écran sans aucune bande noire) */}
       <ImageBackground

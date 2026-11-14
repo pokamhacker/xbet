@@ -96,7 +96,10 @@ export default function App() {
     ...Feather.font,
   });
 
-  useEffect(() => {
+  const useIsomorphicLayoutEffect =
+    typeof window !== 'undefined' ? React.useLayoutEffect : useEffect;
+
+  useIsomorphicLayoutEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       const metaThemes = document.querySelectorAll('meta[name="theme-color"]');
       if (metaThemes.length === 0) {

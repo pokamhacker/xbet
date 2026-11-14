@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  SafeAreaView,
   Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -153,7 +152,7 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <SafeAreaView style={styles.modalOverlay}>
+      <View style={styles.modalOverlay}>
         <View style={[styles.container, { backgroundColor: theme.cardBackground }]}>
           {/* Header */}
           <View style={styles.header}>
@@ -522,7 +521,7 @@ export const PokerScheduleModal: React.FC<PokerScheduleModalProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };

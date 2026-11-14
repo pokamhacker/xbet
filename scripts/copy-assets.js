@@ -102,8 +102,7 @@ const manifestConfig = {
     }
   ],
   start_url: "/",
-  background_color: "#FFFFFF",
-  theme_color: "#FFFFFF",
+  background_color: "#000000",
   display: "standalone",
   orientation: "portrait"
 };

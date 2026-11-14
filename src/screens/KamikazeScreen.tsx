@@ -8,11 +8,11 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   type LayoutChangeEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
 import { usePreventRemove } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker/400Regular';
@@ -63,6 +63,7 @@ export default function KamikazeScreen({ navigation }: any) {
   }, [hasAccess, navigation]);
 
   const insets = useSafeAreaInsets();
+  const topInset = getTopSafeInset(insets.top);
   const fieldRef = useRef<PlayFieldHandle>(null);
   const game = useKamikaze(fieldRef);
   const [fontsLoaded, fontError] = useFonts({
@@ -107,7 +108,14 @@ export default function KamikazeScreen({ navigation }: any) {
     setBetOpen(true);
   };
 
-  const statusBar = <StatusBar barStyle="dark-content" />;
+  useSystemTopBar(
+    hasAccess ? COLORS.topbar : '#0B111A',
+    hasAccess ? 'dark-content' : 'light-content'
+  );
+
+  const statusBar = (
+    <StatusBar barStyle="dark-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
+  );
 
   // En cas d'échec de chargement des polices, on affiche quand même le jeu (polices système).
   if (!fontsLoaded && !fontError) {
@@ -124,7 +132,8 @@ export default function KamikazeScreen({ navigation }: any) {
 
   if (!hasAccess) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0B111A', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <View style={{ flex: 1, backgroundColor: '#0B111A', justifyContent: 'center', alignItems: 'center', padding: 24, paddingTop: 24 + topInset }}>
+        <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
         <Ionicons name="lock-closed" size={56} color="#EF4444" />
         <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
           Accès restreint
@@ -139,7 +148,7 @@ export default function KamikazeScreen({ navigation }: any) {
         >
           <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Retour</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -149,7 +158,7 @@ export default function KamikazeScreen({ navigation }: any) {
       <Scene />
       <View style={[styles.column, { paddingBottom: insets.bottom }]}>
         {/* zone de la barre d'état : blanche, dans le prolongement de la barre du haut */}
-        <View style={{ height: insets.top, backgroundColor: COLORS.topbar }} />
+        <View style={{ height: topInset, backgroundColor: COLORS.topbar }} />
         <TopBar
           balance={game.balance}
           locked={game.phase === 'select'}

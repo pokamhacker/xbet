@@ -4,10 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { getTopSafeInset, useSystemTopBar } from '../../../utils/systemTopBar';
 import { CRASH_COLORS } from '../constants';
 import { GameMode } from '../types';
 
@@ -24,9 +25,13 @@ export const CrashModeSelection: React.FC<CrashModeSelectionProps> = ({
   onConfirmPlay,
   onBack,
 }) => {
+  const insets = useSafeAreaInsets();
+  const topInset = getTopSafeInset(insets.top);
+  useSystemTopBar('#09101A', 'light-content');
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <View style={[styles.container, { paddingTop: topInset, paddingBottom: insets.bottom }]}>
+      <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
 
       {/* Top bar avec flèche retour à gauche (Screenshot 1) */}
       <View style={styles.topBar}>
@@ -103,7 +108,7 @@ export const CrashModeSelection: React.FC<CrashModeSelectionProps> = ({
           <Text style={styles.playButtonText}>JOUER</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -6,7 +6,6 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   Platform,
   StatusBar,
 } from 'react-native';

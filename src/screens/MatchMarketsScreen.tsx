@@ -527,7 +527,7 @@ export const MatchMarketsScreen: React.FC<{ route?: any; navigation?: any }> = (
       : androidBottomPad;
   const bottomBarHeight = 56 + bottomInset;
   const topSafePad = getHeaderMatchSafePad(insets.top);
-  useSystemTopBar('#0E351A', 'light-content');
+  useSystemTopBar('#03323C', 'light-content');
   const crestSize = isSmallDevice ? 46 : 52;
 
   const formattedHeaderTitle = useMemo(
@@ -887,7 +887,7 @@ const styles = StyleSheet.create({
   },
   stadiumHeaderBg: {
     width: '100%',
-    backgroundColor: '#0E351A',
+    backgroundColor: '#03323C',
   },
   appBarRow: {
     minHeight: 44,

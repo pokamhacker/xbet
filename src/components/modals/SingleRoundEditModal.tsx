@@ -6,7 +6,6 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -83,7 +82,7 @@ export const SingleRoundEditModal: React.FC<SingleRoundEditModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <SafeAreaView style={styles.modalOverlay}>
+      <View style={styles.modalOverlay}>
         <View style={[styles.container, { backgroundColor: theme.cardBackground }]}>
           {/* Header */}
           <View style={styles.header}>
@@ -205,7 +204,7 @@ export const SingleRoundEditModal: React.FC<SingleRoundEditModalProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };

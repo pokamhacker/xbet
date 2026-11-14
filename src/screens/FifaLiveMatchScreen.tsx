@@ -925,6 +925,15 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
   const starBadgeColor = isMelbet ? '#D4A238' : '#4A8FD6';
 
   const isLight = modeChoice === 'clair' || !currentTheme?.isDark;
+  const isBlack =
+    modeChoice === 'noir' || (currentTheme?.name || '').toLowerCase().includes('black');
+  const rootArenaBg = isBlack ? '#000000' : '#13171B';
+  const statsCardOverride = isBlack
+    ? { backgroundColor: '#0A0B0E', borderColor: '#1C1F26' }
+    : undefined;
+  const statsBoxBg = isBlack ? '#0B0C10' : '#1B1E23';
+  const statsHalfCardBg = isBlack ? '#13151B' : '#252930';
+  const statsScoreBoxBg = isBlack ? '#07080B' : '#14171C';
   const sheetBg = isLight ? '#FFFFFF' : (currentTheme?.cardBackground || '#1A232E');
   const sheetTextColor = isLight ? '#00325E' : (currentTheme?.textPrimary || '#FFFFFF');
   const sheetSubTextColor = isLight ? '#5C7690' : (currentTheme?.textSecondary || '#94A3B8');
@@ -1391,7 +1400,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
 
   const streamUrl = passedEvent?.streamUrl;
   const topSafePad = getHeaderMatchSafePad(insets.top);
-  useSystemTopBar('#0A1D0F', 'light-content');
+  useSystemTopBar('#1B3A26', 'light-content');
 
   const renderTeamStatsBlock = (inHeaderPreMatch: boolean = false) => (
     <View style={[styles.statsSection, inHeaderPreMatch && styles.statsSectionPreMatch]}>
@@ -1458,7 +1467,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
       </ScrollView>
 
       {selectedStatsTab === 'standings' ? (
-        <View style={styles.statsCard}>
+        <View style={[styles.statsCard, statsCardOverride]}>
           {[
             { rank: 1, name: homeTeamName, pts: 13, gd: '50-41' },
             { rank: 2, name: awayTeamName, pts: 10, gd: '42-45' },
@@ -1480,7 +1489,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
           ))}
         </View>
       ) : (
-        <View style={styles.statsCard}>
+        <View style={[styles.statsCard, statsCardOverride]}>
           <View style={styles.statsUpperRow}>
             <TeamStatsDonutChart
               total={activeStats.totalGames}
@@ -1532,13 +1541,17 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
   );
 
   const renderExpandedMarketsContent = () => {
-    const containerBg = isLight ? '#EBEEF3' : '#181A1E';
-    const cardBg = isLight ? '#FFFFFF' : '#24272C';
-    const inactivePillBg = isLight ? '#FFFFFF' : '#2C3036';
-    const searchBarBg = isLight ? '#FFFFFF' : '#26292E';
-    const oddCellBg = isLight ? '#EEF2F6' : '#1A1D21';
-    const circleBtnBg = isLight ? '#EAEFF5' : '#2E3238';
-    const activePeriodPillBg = isLight && !isMelbet ? '#4A8FD6' : '#D98218';
+    const containerBg = isLight ? '#EBEEF3' : isBlack ? '#000000' : '#181A1E';
+    const cardBg = isLight
+      ? '#FFFFFF'
+      : isBlack
+      ? currentTheme?.cardBackground || '#0D0E12'
+      : '#24272C';
+    const inactivePillBg = isLight ? '#FFFFFF' : isBlack ? '#14161B' : '#2C3036';
+    const searchBarBg = isLight ? '#FFFFFF' : isBlack ? '#12141A' : '#26292E';
+    const oddCellBg = isLight ? '#EEF2F6' : isBlack ? '#090B0E' : '#1A1D21';
+    const circleBtnBg = isLight ? '#EAEFF5' : isBlack ? '#1A1D24' : '#2E3238';
+    const activePeriodPillBg = isMelbet ? '#D98218' : currentTheme?.primary || '#4A8FD6';
 
     return (
       <View style={[styles.expandedMarketsWrap, { backgroundColor: containerBg }]}>
@@ -1794,7 +1807,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: rootArenaBg }]}>
       <StatusBar
         animated
         barStyle="light-content"
@@ -2000,9 +2013,9 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
               <View style={styles.matchStatsSection}>
                 <Text style={styles.sectionTitle}>Statistiques de match</Text>
 
-                <View style={styles.matchStatsOuterBox}>
+                <View style={[styles.matchStatsOuterBox, isBlack && { backgroundColor: statsBoxBg }]}>
                   {/* Carte Mi-temps 1 */}
-                  <View style={styles.matchStatsHalfCard}>
+                  <View style={[styles.matchStatsHalfCard, isBlack && { backgroundColor: statsHalfCardBg }]}>
                     <View style={styles.matchStatsLeftPeriod}>
                       <Text style={styles.matchStatsPeriodLabel}>Mi-temps 1</Text>
                     </View>
@@ -2019,7 +2032,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
                             {homeTeamName}
                           </Text>
                         </View>
-                        <View style={styles.matchStatsScoreBox}>
+                        <View style={[styles.matchStatsScoreBox, isBlack && { backgroundColor: statsScoreBoxBg }]}>
                           <Text style={styles.matchStatsScoreVal}>{p1HomeScore}</Text>
                         </View>
                       </View>
@@ -2035,7 +2048,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
                             {awayTeamName}
                           </Text>
                         </View>
-                        <View style={styles.matchStatsScoreBox}>
+                        <View style={[styles.matchStatsScoreBox, isBlack && { backgroundColor: statsScoreBoxBg }]}>
                           <Text style={styles.matchStatsScoreVal}>{p1AwayScore}</Text>
                         </View>
                       </View>
@@ -2044,7 +2057,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
 
                   {/* Carte Mi-temps 2 (affichée lorsque le match est terminé ou en 2ème mi-temps) */}
                   {(isMatchFinished || activeElapsedSeconds >= 183) && (
-                    <View style={styles.matchStatsHalfCard}>
+                    <View style={[styles.matchStatsHalfCard, isBlack && { backgroundColor: statsHalfCardBg }]}>
                       <View style={styles.matchStatsLeftPeriod}>
                         <Text style={styles.matchStatsPeriodLabel}>Mi-temps 2</Text>
                       </View>
@@ -2061,7 +2074,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
                               {homeTeamName}
                             </Text>
                           </View>
-                          <View style={styles.matchStatsScoreBox}>
+                          <View style={[styles.matchStatsScoreBox, isBlack && { backgroundColor: statsScoreBoxBg }]}>
                             <Text style={styles.matchStatsScoreVal}>{p2HomeScore}</Text>
                           </View>
                         </View>
@@ -2077,7 +2090,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
                               {awayTeamName}
                             </Text>
                           </View>
-                          <View style={styles.matchStatsScoreBox}>
+                          <View style={[styles.matchStatsScoreBox, isBlack && { backgroundColor: statsScoreBoxBg }]}>
                             <Text style={styles.matchStatsScoreVal}>{p2AwayScore}</Text>
                           </View>
                         </View>
@@ -2251,6 +2264,7 @@ const styles = StyleSheet.create({
   },
   headerBg: {
     width: '100%',
+    backgroundColor: '#1B3A26',
     paddingBottom: 8,
     zIndex: 10,
   },

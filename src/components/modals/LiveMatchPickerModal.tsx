@@ -9,7 +9,6 @@ import {
   FlatList,
   Image,
   ActivityIndicator,
-  SafeAreaView,
   Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -172,7 +171,7 @@ export const LiveMatchPickerModal: React.FC<LiveMatchPickerModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <SafeAreaView style={styles.modalOverlay}>
+      <View style={styles.modalOverlay}>
         <View style={[styles.container, { backgroundColor: theme.cardBackground }]}>
           {/* Header */}
           <View style={styles.header}>
@@ -521,7 +520,7 @@ export const LiveMatchPickerModal: React.FC<LiveMatchPickerModalProps> = ({
             />
           )}
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };

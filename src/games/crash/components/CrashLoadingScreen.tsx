@@ -3,13 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Animated,
   Easing,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { CRASH_COLORS } from '../constants';
+import { getTopSafeInset, useSystemTopBar } from '../../../utils/systemTopBar';
 import { CrashHeader } from './CrashHeader';
 
 interface CrashLoadingScreenProps {
@@ -88,16 +89,22 @@ export const CrashLoadingScreen: React.FC<CrashLoadingScreenProps> = ({
     return <Path key={index} d={pathData} fill={fillColor} />;
   });
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+  const insets = useSafeAreaInsets();
+  const topInset = getTopSafeInset(insets.top);
+  useSystemTopBar('#0D1A29', 'light-content');
 
-      {/* Barre Supérieure Fixe (Header) */}
-      <CrashHeader
-        balance={balance}
-        onBack={onBack}
-        onOpenRecharge={() => {}}
-      />
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" {...({ translucent: true, backgroundColor: 'transparent' } as any)} />
+
+      {/* Barre Supérieure Fixe (Header) étendue sous la StatusBar */}
+      <View style={{ backgroundColor: '#0D1A29', paddingTop: topInset }}>
+        <CrashHeader
+          balance={balance}
+          onBack={onBack}
+          onOpenRecharge={() => {}}
+        />
+      </View>
 
       {/* Centre : Fond #1C3B57 et Anneau tournant */}
       <View style={styles.centerContainer}>
@@ -117,7 +124,7 @@ export const CrashLoadingScreen: React.FC<CrashLoadingScreenProps> = ({
 
         <Text style={styles.loadingHint}>Chargement du radar de vol...</Text>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

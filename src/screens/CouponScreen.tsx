@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Modal,
   TextInput,
   Alert,
@@ -360,8 +359,9 @@ export default function CouponScreen({ navigation }: any) {
 
   const rawScreenBg = getScreenBgColor(currentTheme);
   const rawHeaderBg = getHeaderBgColor(currentTheme);
-  const screenBg = isMelbet && isDark ? '#21262C' : rawScreenBg;
-  const headerBg = isMelbet && isDark ? '#21262C' : hasSelections && isDark ? screenBg : rawHeaderBg;
+  const screenBg = isMelbet && isDark && !isBlack ? '#21262C' : rawScreenBg;
+  const headerBg =
+    isMelbet && isDark && !isBlack ? '#21262C' : hasSelections && isDark ? screenBg : rawHeaderBg;
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
   useSystemTopBar(headerBg, statusBarStyle);
 
@@ -569,7 +569,11 @@ export default function CouponScreen({ navigation }: any) {
                   style={[
                     styles.boosterCard,
                     {
-                      backgroundColor: isDark ? '#262C33' : '#FFFFFF',
+                      backgroundColor: isBlack
+                        ? currentTheme.cardBackground || '#0D0E12'
+                        : isDark
+                        ? '#262C33'
+                        : '#FFFFFF',
                       borderColor: boosterAccentColor,
                     },
                   ]}

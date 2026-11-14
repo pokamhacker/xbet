@@ -8,7 +8,6 @@ import {
   TextInput,
   FlatList,
   Image,
-  SafeAreaView,
   Platform,
   ActivityIndicator,
 } from 'react-native';
@@ -494,7 +493,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.modalOverlay}>
+      <View style={styles.modalOverlay}>
         <View
           style={[
             styles.sheetContainer,
@@ -827,7 +826,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
             )
           )}
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };

@@ -3,13 +3,14 @@ import {
   StyleSheet,
   Dimensions,
   StatusBar,
-  SafeAreaView,
   View,
   ScrollView,
   ViewStyle,
   StyleProp,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../store/themeStore';
+import { getTopSafeInset, useSystemTopBar } from '../../utils/systemTopBar';
 
 const { width, height } = Dimensions.get('window');
 
@@ -35,13 +36,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   paddingHorizontal,
 }) => {
   const { currentTheme } = useThemeStore();
+  const insets = useSafeAreaInsets();
   const isDark = currentTheme?.isDark;
   const bg = backgroundColor || currentTheme?.background || '#F8FAFC';
+  const topInset = getTopSafeInset(insets.top);
+  const barStyle = isDark ? 'light-content' : 'dark-content';
+  useSystemTopBar(bg, barStyle);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: bg }]}>
+    <View style={[styles.safeArea, { backgroundColor: bg, paddingTop: topInset }]}>
       <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
+        barStyle={barStyle}
+        {...({ translucent: true, backgroundColor: 'transparent' } as any)}
       />
       <View
         style={[
@@ -64,7 +70,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         )}
         {footer}
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
