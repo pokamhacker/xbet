@@ -18,7 +18,7 @@ import {
   getStatusBarStyleForTheme,
 } from '../theme/themes';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import { BackArrowIcon } from '../components/common/BackArrowIcon';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -59,7 +59,7 @@ import { ScoreEditorModal } from '../components/ScoreEditorModal';
 // ============================================================================
 // Types
 // ============================================================================
-// Helper de formatage de devise (symbole ₣ sans décimales ni virgules sur Mise et Gains potentiels)
+// Helper de formatage de devise (symbole ₣ en conservant la décimale utile si présente, ex: 777.6 ₣, 90 ₣)
 const formatCurrency = (val: number | string | undefined): string => {
   if (val === undefined || val === null) return '0 ₣';
   const num =
@@ -67,9 +67,14 @@ const formatCurrency = (val: number | string | undefined): string => {
       ? val
       : parseFloat(String(val).replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.-]+/g, ''));
   if (isNaN(num)) return `${val} ₣`;
-  const rounded = Math.round(num);
-  const formatted = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return `${formatted} ₣`;
+  const rounded = Math.round(num * 100) / 100;
+  const [intPart, decPart] = rounded.toFixed(2).split('.');
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  if (!decPart || decPart === '00') {
+    return `${formattedInt} ₣`;
+  }
+  const trimmedDec = decPart.replace(/0+$/, '');
+  return `${formattedInt}.${trimmedDec} ₣`;
 };
 
 // Helper de formatage de date spécifique Poker (ex: 30 oct. 2026 (22:30))
@@ -248,13 +253,17 @@ export default function TicketDetailsScreen({
   const isLost = rawStatus === 'Perdu' || rawStatus.toLowerCase() === 'lost';
   const isAccepted = !isPaid && !isLost;
 
+  const isMelbet = String(currentTheme?.name || '').toLowerCase().includes('melbet');
+
   // Couleurs dynamiques selon le thème actif (Correction 2 : Unification de SUCCESS_GREEN = '#4EBA6F')
   const SUCCESS_GREEN = '#4EBA6F';
   const primaryActionColor = isDark
-    ? '#FFFFFF'
+    ? '#9BA3AE'
     : (currentTheme?.activeIcon || currentTheme?.primary || '#557089');
   const payeColor = SUCCESS_GREEN;
-  const accepteColor = currentTheme?.status?.accepte || '#4A83C4';
+  const accepteColor = isMelbet
+    ? '#D89228'
+    : (currentTheme?.status?.accepte || '#4A83C4');
   const perduColor = currentTheme?.status?.perdu || '#E74C3C';
 
   // Détection Poker pour le coupon global
@@ -802,8 +811,22 @@ export default function TicketDetailsScreen({
     extrapolate: 'clamp',
   });
 
-  const headerBg = getHeaderBgColor(currentTheme);
-  const screenBg = getScreenBgColor(currentTheme);
+  const rawHeaderBg = getHeaderBgColor(currentTheme);
+  const rawScreenBg = getScreenBgColor(currentTheme);
+  const headerBg = isDark && isMelbet ? '#262B31' : rawHeaderBg;
+  const screenBg = isDark && isMelbet ? '#1E2328' : rawScreenBg;
+  const cardSurfaceBg = isDark
+    ? isMelbet
+      ? '#262B31'
+      : currentTheme.cardBackground
+    : currentTheme.cardBackground;
+  const dividerColor = isDark
+    ? '#323840'
+    : (currentTheme.divider || currentTheme.border || '#F0F4F8');
+  const labelGrayColor = isDark ? '#8A949E' : currentTheme.textSecondary;
+  const valueWhiteColor = isDark ? '#FFFFFF' : currentTheme.textPrimary;
+  const headerRightIconColor = isDark ? '#8A949E' : primaryActionColor;
+
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
   const topInset = insets.top;
 
@@ -839,11 +862,24 @@ export default function TicketDetailsScreen({
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityLabel="Retour"
         >
-          <BackArrowIcon size={26} color={primaryActionColor} />
+          <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+            <Path
+              d="M15 19L8 12L15 5"
+              stroke={isDark ? '#9BA3AE' : primaryActionColor}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
         </TouchableOpacity>
 
         <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, { color: currentTheme.textPrimary }]}>
+          <Text
+            style={[
+              styles.headerTitle,
+              { color: isDark ? '#9BA3AE' : currentTheme.textPrimary },
+            ]}
+          >
             Informations sur le pari
           </Text>
         </View>
@@ -854,7 +890,22 @@ export default function TicketDetailsScreen({
               style={styles.headerActionBtn}
               onPress={() => Alert.alert('Notifications', 'Notifications activées pour ce pari.')}
             >
-              <OfficialBellIcon size={21} color={primaryActionColor} />
+              <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"
+                  stroke={headerRightIconColor}
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <Path
+                  d="M13.73 21a2 2 0 0 1-3.46 0"
+                  stroke={headerRightIconColor}
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
             </TouchableOpacity>
           )}
 
@@ -863,7 +914,11 @@ export default function TicketDetailsScreen({
             onPress={handleMore}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <OfficialThreeDotsIcon size={19} color={primaryActionColor} />
+            <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+              <Circle cx="3.5" cy="10" r="2" fill={headerRightIconColor} />
+              <Circle cx="10" cy="10" r="2" fill={headerRightIconColor} />
+              <Circle cx="16.5" cy="10" r="2" fill={headerRightIconColor} />
+            </Svg>
           </TouchableOpacity>
         </View>
       </View>
@@ -878,32 +933,32 @@ export default function TicketDetailsScreen({
           {
             top: 52 + topInset,
             opacity: stickyBarOpacity,
-            backgroundColor: currentTheme.colors?.cardBackground || currentTheme.cardBackground,
+            backgroundColor: cardSurfaceBg,
           },
         ]}
       >
         <View style={styles.financialRow}>
-          <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Cotes:</Text>
-          <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>
+          <Text style={[styles.financialLabel, { color: labelGrayColor }]}>Cotes:</Text>
+          <Text style={[styles.financialValueBold, { color: valueWhiteColor }]}>
             {formatCleanOdds(currentCoupon?.totalOdds || 1.921)}
           </Text>
         </View>
 
         <View style={styles.financialRow}>
-          <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Mise:</Text>
-          <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>{stakeFormatted}</Text>
+          <Text style={[styles.financialLabel, { color: labelGrayColor }]}>Mise:</Text>
+          <Text style={[styles.financialValueBold, { color: valueWhiteColor }]}>{stakeFormatted}</Text>
         </View>
 
         {isAccepted && (
           <View style={styles.financialRow}>
-            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Gains potentiels:</Text>
-            <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>{potentialPayoutFormatted}</Text>
+            <Text style={[styles.financialLabel, { color: labelGrayColor }]}>Gains potentiels:</Text>
+            <Text style={[styles.financialValueBold, { color: valueWhiteColor }]}>{potentialPayoutFormatted}</Text>
           </View>
         )}
 
         {isPaid && (
           <View style={styles.financialRow}>
-            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Gains:</Text>
+            <Text style={[styles.financialLabel, { color: labelGrayColor }]}>Gains:</Text>
             <Text style={[styles.financialValueBold, { color: payeColor }]}>
               {actualPayoutFormatted}
             </Text>
@@ -912,7 +967,7 @@ export default function TicketDetailsScreen({
 
         {isLost && (
           <View style={styles.financialRow}>
-            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Statut:</Text>
+            <Text style={[styles.financialLabel, { color: labelGrayColor }]}>Statut:</Text>
             <Text style={[styles.financialValueBold, { color: perduColor }]}>
               Perdu
             </Text>
@@ -924,12 +979,12 @@ export default function TicketDetailsScreen({
       {/* 2. CONTENU DÉFILANT                                               */}
       {/* ================================================================== */}
       <Animated.ScrollView
-        style={[styles.scrollView, { backgroundColor: currentTheme.background }]}
+        style={[styles.scrollView, { backgroundColor: screenBg }]}
         contentContainerStyle={[
           styles.scrollContent,
           {
             paddingBottom:
-              bottomBarHeight + (showDuplicateFooter ? (showSellButton ? 140 : 88) : 28),
+              bottomBarHeight + (showDuplicateFooter ? 88 : 28),
           },
         ]}
         keyboardShouldPersistTaps="always"
@@ -952,56 +1007,56 @@ export default function TicketDetailsScreen({
         scrollEventThrottle={16}
       >
         {/* ================================================================ */}
-        {/* BLOC RÉSUMÉ SUPÉRIEUR (FOND BLANC DYNAMIQUE THÈME)                */}
+        {/* BLOC RÉSUMÉ SUPÉRIEUR                                            */}
         {/* ================================================================ */}
         <View
           style={[
             styles.summaryCard,
-            { backgroundColor: currentTheme.cardBackground, overflow: 'hidden' },
+            { backgroundColor: cardSurfaceBg, overflow: 'hidden' },
           ]}
         >
-          {/* En-tête du ticket : Avatar + Type + Date + Badge ligue */}
+          {/* En-tête du ticket : Avatar (44x44) + Colonne centrale + Badge • En direct */}
           <View style={styles.summaryHeaderRow}>
             <View style={styles.avatarWrap}>
               <View
                 style={[
                   styles.avatarCircle,
                   {
-                    backgroundColor:
-                      (currentTheme as any).surfaceSecondary ||
-                      (isDark ? 'rgba(255,255,255,0.08)' : '#E9EFF6'),
+                    backgroundColor: isDark ? '#1E2328' : '#E9EFF6',
                   },
                 ]}
               >
-                <Image
-                  source={
-                    isPokerCoupon
-                      ? ASSET_ICONS.poker
-                      : isCombine
-                      ? ASSET_ICONS.combine
-                      : isFifaCoupon
-                      ? ASSET_ICONS.fifa
-                      : ASSET_ICONS.football
-                  }
-                  style={[
-                    isPokerCoupon
-                      ? styles.avatarIconPoker
-                      : isCombine
-                      ? styles.avatarIconCombine
-                      : isFifaCoupon
-                      ? styles.avatarIconFifa
-                      : styles.avatarIcon,
-                    {
-                      tintColor: isPokerCoupon
-                        ? (currentTheme as any).iconSlate || (isDark ? '#8A9DB0' : '#5C7690')
-                        : currentTheme.textSecondary || (isDark ? '#8A9DB0' : '#6E849B'),
-                    },
-                  ]}
-                  resizeMode="contain"
-                />
+                {isFifaCoupon && !isCombine ? (
+                  <Text style={styles.fifaAvatarText}>FIFA</Text>
+                ) : (
+                  <Image
+                    source={
+                      isPokerCoupon
+                        ? ASSET_ICONS.poker
+                        : isCombine
+                        ? ASSET_ICONS.combine
+                        : isFifaCoupon
+                        ? ASSET_ICONS.fifa
+                        : ASSET_ICONS.football
+                    }
+                    style={[
+                      isPokerCoupon
+                        ? styles.avatarIconPoker
+                        : isCombine
+                        ? styles.avatarIconCombine
+                        : isFifaCoupon
+                        ? styles.avatarIconFifa
+                        : styles.avatarIcon,
+                      {
+                        tintColor: '#8A949E',
+                      },
+                    ]}
+                    resizeMode="contain"
+                  />
+                )}
               </View>
 
-              {/* Badge de vérification superposé en bas à droite (adapté à tous les thèmes) */}
+              {/* Badge circulaire (16x16, borderRadius: 8, borderWidth: 1.5, borderColor: #262B31) */}
               <View
                 style={[
                   styles.statusMiniDot,
@@ -1009,9 +1064,9 @@ export default function TicketDetailsScreen({
                     backgroundColor: isPaid
                       ? '#52B76E'
                       : isLost
-                      ? (currentTheme.status?.perdu || '#E74C3C')
-                      : (currentTheme.status?.accepte || currentTheme.primary || '#4A8FE7'),
-                    borderColor: currentTheme.cardBackground || '#FFFFFF',
+                      ? perduColor
+                      : accepteColor,
+                    borderColor: cardSurfaceBg || '#262B31',
                     borderWidth: 1.5,
                   },
                 ]}
@@ -1036,18 +1091,23 @@ export default function TicketDetailsScreen({
             </View>
 
             <View style={styles.summaryMetaCol}>
-              <Text style={[styles.summaryDateText, { color: currentTheme.textSecondary }]}>
+              <Text style={[styles.summaryDateText, { color: labelGrayColor }]}>
                 {ticketDate}
               </Text>
-              <Text style={[styles.summaryTypeText, { color: currentTheme.textPrimary }]}>
+              <Text style={[styles.summaryTypeText, { color: valueWhiteColor }]}>
                 {typeLabel}
               </Text>
-              <Text style={[styles.summaryNumberText, { color: currentTheme.textPrimary || '#002B49' }]}>
+              <Text
+                style={[
+                  styles.summaryNumberText,
+                  { color: isDark ? '#B8C0C8' : '#557089' },
+                ]}
+              >
                 № {ticketNumber}
               </Text>
             </View>
 
-            {/* Badge • En direct rouge (sur événements FIFA ou Poker quand Accepté/Live, ou tout événement en direct) */}
+            {/* Badge • En direct (#F04438, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2.5) */}
             {(events.some((e) => {
               if (e.isBonus) return false;
               const prog = getEventLiveProgress(e, currentTime);
@@ -1069,10 +1129,9 @@ export default function TicketDetailsScreen({
                   String(e.sport || '').toUpperCase().includes('POKER') ||
                   String(e.sport || '').toUpperCase().includes('TVBET')
               );
-              // Le badge live apparaît sur les événements FIFA et Poker quand le statut est accepté, ou sur tout événement live
               return (!evSettled && (evFifa || evPoker || prog.isLive)) || prog.isLive;
             })) ? (
-              <View style={[styles.liveRedBadge, { backgroundColor: (currentTheme as any).liveBadgeBg || '#D94343' }]}>
+              <View style={styles.liveRedBadge}>
                 <View style={styles.liveRedBadgeDot} />
                 <Text style={styles.liveRedBadgeText}>En direct</Text>
               </View>
@@ -1083,81 +1142,84 @@ export default function TicketDetailsScreen({
             ) : null}
           </View>
 
-          {/* Séparateur fin */}
+          {/* Séparateur horizontal supérieur (height: 1, #323840, marginHorizontal: 16, marginTop: 12, marginBottom: 8) */}
           <View
             style={[
               styles.thinDivider,
-              { backgroundColor: currentTheme.divider || currentTheme.border },
+              { backgroundColor: dividerColor },
             ]}
           />
 
-          {/* Ligne Événements si Combiné (Pixel-Perfect selon capture de référence) */}
-          {(isCombine || totalEventsCount > 1) && (
-            <View style={styles.eventsRowContainer}>
-              <View style={styles.eventsLeftGroup}>
-                <View style={{ marginRight: 8 }}>
-                  <OfficialLayersIcon
-                    size={16}
-                    color={currentTheme.textSecondary || (isDark ? '#8A9DB0' : '#5C7690')}
-                  />
+          {/* Conteneur des lignes financières (paddingHorizontal: 16, paddingBottom: 12) */}
+          <View style={styles.financialBlockContainer}>
+            {/* Ligne Événements si Combiné */}
+            {(isCombine || totalEventsCount > 1) && (
+              <View style={styles.eventsRowContainer}>
+                <View style={styles.eventsLeftGroup}>
+                  <View style={{ marginRight: 8 }}>
+                    <OfficialLayersIcon
+                      size={16}
+                      color={labelGrayColor}
+                    />
+                  </View>
+                  <Text style={[styles.eventsCountText, { color: valueWhiteColor }]}>
+                    Événements : {totalEventsCount}
+                  </Text>
                 </View>
-                <Text style={[styles.eventsCountText, { color: currentTheme.textPrimary }]}>
-                  Événements : {totalEventsCount}
+                <Text style={[styles.eventsFinishedText, { color: valueWhiteColor }]}>
+                  {completedEventsCount} sur {matchEventsTotal} terminés
                 </Text>
               </View>
-              <Text style={[styles.eventsFinishedText, { color: currentTheme.textPrimary }]}>
-                {completedEventsCount} sur {matchEventsTotal} terminés
-              </Text>
-            </View>
-          )}
+            )}
 
-          {/* Lignes Financières */}
-          <View style={styles.financialRow}>
-            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Cotes:</Text>
-            <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>
-              {formatCleanOdds(currentCoupon?.totalOdds || 1.921)}
-            </Text>
-          </View>
-
-          <View style={styles.financialRow}>
-            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Mise:</Text>
-            <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>
-              {stakeFormatted}
-            </Text>
-          </View>
-
-          {/* Ligne Gains potentiels (si Accepté) ou Gains (si Payé) */}
-          {isAccepted && (
+            {/* Lignes Financières */}
             <View style={styles.financialRow}>
-              <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>
-                Gains potentiels:
-              </Text>
-              <Text style={[styles.financialValueBold, { color: currentTheme.textPrimary }]}>
-                {potentialPayoutFormatted}
+              <Text style={[styles.financialLabel, { color: labelGrayColor }]}>Cotes:</Text>
+              <Text style={[styles.financialValueBold, { color: valueWhiteColor }]}>
+                {formatCleanOdds(currentCoupon?.totalOdds || 1.921)}
               </Text>
             </View>
-          )}
 
-          {isPaid && (
             <View style={styles.financialRow}>
-              <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Gains:</Text>
-              <Text style={[styles.financialValueBold, { color: payeColor, fontWeight: '600' }]}>
-                {actualPayoutFormatted}
+              <Text style={[styles.financialLabel, { color: labelGrayColor }]}>Mise:</Text>
+              <Text style={[styles.financialValueBold, { color: valueWhiteColor }]}>
+                {stakeFormatted}
               </Text>
             </View>
-          )}
 
-          {/* Ligne Statut parfaitement alignée (sans boîte verte décalée) */}
-          <View style={styles.financialRow}>
-            <Text style={[styles.financialLabel, { color: currentTheme.textSecondary }]}>Statut:</Text>
-            <Text
-              style={[
-                styles.financialValueStatus,
-                { color: statusColor, fontWeight: isPaid ? '600' : '500' },
-              ]}
-            >
-              {statusLabel}
-            </Text>
+            {/* Ligne Gains potentiels (si Accepté) ou Gains (si Payé) */}
+            {isAccepted && (
+              <View style={styles.financialRow}>
+                <Text style={[styles.financialLabel, { color: labelGrayColor }]}>
+                  Gains potentiels:
+                </Text>
+                <Text style={[styles.financialValueBold, { color: valueWhiteColor }]}>
+                  {potentialPayoutFormatted}
+                </Text>
+              </View>
+            )}
+
+            {isPaid && (
+              <View style={styles.financialRow}>
+                <Text style={[styles.financialLabel, { color: labelGrayColor }]}>Gains:</Text>
+                <Text style={[styles.financialValueBold, { color: payeColor, fontWeight: '600' }]}>
+                  {actualPayoutFormatted}
+                </Text>
+              </View>
+            )}
+
+            {/* Ligne Statut */}
+            <View style={styles.financialRow}>
+              <Text style={[styles.financialLabel, { color: labelGrayColor }]}>Statut:</Text>
+              <Text
+                style={[
+                  styles.financialValueStatus,
+                  { color: statusColor },
+                ]}
+              >
+                {statusLabel}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -1171,7 +1233,6 @@ export default function TicketDetailsScreen({
           const eventStatusLabel = isEventGain ? 'Gain' : isEventPerte ? 'Perte' : 'Accepté';
           const eventStatusColor = isEventGain ? payeColor : isEventPerte ? perduColor : accepteColor;
 
-          // Machine à États Temporelle en temps réel (PRE_MATCH -> LIVE -> FINISHED) via currentTime (1000ms)
           const liveProgress = getEventLiveProgress(ev, currentTime);
           const isFifaEvent = Boolean(
             ev.isFifa ||
@@ -1180,37 +1241,21 @@ export default function TicketDetailsScreen({
               String(ev.league || '').toUpperCase().startsWith('FIFA')
           );
 
-          // État C : Terminé ou coupon résolu (Gain / Payé / Perte)
           const isEventFinished = isEventSettled || liveProgress.isFinished;
-          // État B : En direct uniquement lorsque l'heure de début est atteinte (now >= startTime et now < startTime + durationSeconds, non terminé)
           const isEventLive = !isEventFinished && liveProgress.isLive;
-          // État A : Avant le début de l'événement (now < startTime et non terminé)
           const isPreMatch = !isEventFinished && !isEventLive;
-
           const hasEventStarted = !isPreMatch;
-          const showElapsedRow = isEventLive;
-          const elapsedSec = liveProgress.elapsedSeconds;
 
-          const displayDate = isEventLive || (isFifaEvent && hasEventStarted)
-            ? ev.matchDate && ev.matchTime
+          // Date numérique exacte sur les cartes d'événements (ex: 14.11.2026 (14:40))
+          const displayDate =
+            ev.matchDate && ev.matchTime
               ? `${ev.matchDate} (${ev.matchTime})`
-              : formatBetDate(ev.rawDate || ev.date)
-            : formatFrenchEventDate(ev.rawDate || ev.date);
+              : formatBetDate(ev.rawDate || ev.date);
 
           const isStandardMatch = !ev.isPoker && !ev.isBonus && !ev.isOutright;
 
-          const liveAdaptiveScore =
-            isStandardMatch && isEventLive
-              ? computeAdaptiveLiveScore({
-                  marketLabel: ev.market,
-                  elapsedSeconds: elapsedSec,
-                  durationSeconds: liveProgress.durationSeconds,
-                  isFifa: isFifaEvent,
-                })
-              : null;
-
           const finishedFormattedScore =
-            isStandardMatch && isEventFinished
+            isStandardMatch && isEventSettled
               ? ensureTwoHalvesScoreFormat({
                   event: ev,
                   rawScoreFinal: ev.scoreFinal,
@@ -1219,52 +1264,53 @@ export default function TicketDetailsScreen({
                 })
               : null;
 
-          const effectiveScoreFinal = isPreMatch
-            ? undefined
-            : isEventLive
-            ? liveAdaptiveScore?.mainScore || '0:0'
-            : finishedFormattedScore?.scoreFinal || ev.scoreFinal;
+          // Sur l'état Accepté (!isEventSettled), on affiche toujours VS sans score ni sous-score
+          const effectiveScoreFinal = isEventSettled
+            ? finishedFormattedScore?.scoreFinal || ev.scoreFinal
+            : undefined;
 
-          const effectiveScoreDetail = isPreMatch
-            ? undefined
-            : isEventLive
-            ? liveAdaptiveScore?.detailedScore || '0:0 (0:0)'
-            : finishedFormattedScore?.scoreDetail || ev.scoreDetail;
+          const effectiveScoreDetail = isEventSettled
+            ? finishedFormattedScore?.scoreDetail || ev.scoreDetail
+            : undefined;
 
-          // Rendu dédié pour la carte Bonus (identique à video_gagnant.mp4 et WhatsApp_Video)
+          const showEventLiveBadge =
+            (!isEventSettled && (isFifaEvent || ev.isPoker || isEventLive)) ||
+            (isFifaEvent && hasEventStarted && !isEventSettled);
+
+          // Rendu dédié pour la carte Bonus
           if (ev.isBonus) {
             return (
               <View
                 key={ev.id || index}
-                style={[styles.eventCard, { backgroundColor: currentTheme.cardBackground }]}
+                style={[styles.eventCard, { backgroundColor: cardSurfaceBg }]}
               >
                 <View style={styles.bonusCardHeader}>
                   <View style={styles.eventSportIconWrap}>
-                    <BonusGiftIcon size={24} color={currentTheme.textSecondary} />
+                    <BonusGiftIcon size={24} color={labelGrayColor} />
                   </View>
-                  <Text style={[styles.bonusHeaderTitle, { color: currentTheme.textSecondary }]}>
+                  <Text style={[styles.bonusHeaderTitle, { color: labelGrayColor }]}>
                     Bonus
                   </Text>
                 </View>
 
                 <View style={styles.bonusCenterBox}>
-                  <Text style={[styles.bonusCenterTitle, { color: currentTheme.textPrimary }]}>
+                  <Text style={[styles.bonusCenterTitle, { color: valueWhiteColor }]}>
                     {ev.market || 'Bonus, Bonus pari combiné'}
                   </Text>
                 </View>
 
                 <View
                   style={[
-                    styles.thinDividerNoMargin,
-                    { backgroundColor: currentTheme.divider || currentTheme.border },
+                    styles.eventInternalDivider,
+                    { backgroundColor: dividerColor },
                   ]}
                 />
 
                 <View style={styles.bonusFooterBox}>
-                  <Text style={[styles.eventMarketName, { color: currentTheme.textPrimary }]}>
+                  <Text style={[styles.eventMarketName, { color: valueWhiteColor }]}>
                     Bonus
                   </Text>
-                  <Text style={[styles.eventOddText, { color: currentTheme.textPrimary }]}>
+                  <Text style={[styles.eventOddText, { color: valueWhiteColor }]}>
                     {ev.odd}
                   </Text>
                 </View>
@@ -1277,54 +1323,55 @@ export default function TicketDetailsScreen({
               key={ev.id || index}
               activeOpacity={0.88}
               onPress={() => handlePressEvent(ev)}
-              style={[styles.eventCard, { backgroundColor: currentTheme.cardBackground }]}
+              style={[styles.eventCard, { backgroundColor: cardSurfaceBg }]}
             >
-              {/* En-tête de carte d'événement */}
-              <View style={styles.eventCardHeader}>
-                <View style={styles.eventSportIconWrap}>
-                  <Image
-                    source={
-                      ev.isPoker
-                        ? ASSET_ICONS.poker
-                        : ev.sport === 'FIFA' || ev.isFifa
-                        ? ASSET_ICONS.fifa
-                        : ASSET_ICONS.football
-                    }
-                    style={[
-                      ev.isPoker ? styles.eventPokerIcon : styles.eventSportIcon,
-                      { tintColor: currentTheme.textSecondary || '#6E849B' },
-                    ]}
-                    resizeMode="contain"
-                  />
+              {/* Badge • En direct positionné en absolu tout à l'angle supérieur droit (top: 8, right: 8) */}
+              {showEventLiveBadge ? (
+                <View style={styles.cardCornerLiveBadge}>
+                  <View style={styles.liveRedBadgeDot} />
+                  <Text style={styles.liveRedBadgeText}>En direct</Text>
                 </View>
+              ) : ev.badge === 'Serie A' ? (
+                <View style={[styles.leagueBadge, { position: 'absolute', top: 8, right: 8, zIndex: 5 }]}>
+                  <Text style={styles.leagueBadgeText}>Serie A</Text>
+                </View>
+              ) : null}
+
+              {/* En-tête de la compétition */}
+              <View style={styles.eventCardHeader}>
+                {isFifaEvent ? (
+                  <Text style={styles.eventFifaLeftLabel}>FIFA</Text>
+                ) : (
+                  <View style={styles.eventSportIconWrap}>
+                    <Image
+                      source={
+                        ev.isPoker
+                          ? ASSET_ICONS.poker
+                          : ASSET_ICONS.football
+                      }
+                      style={[
+                        ev.isPoker ? styles.eventPokerIcon : styles.eventSportIcon,
+                        { tintColor: labelGrayColor },
+                      ]}
+                      resizeMode="contain"
+                    />
+                  </View>
+                )}
 
                 <View style={styles.eventLeagueInfoCol}>
                   <Text
-                    style={[styles.eventLeagueText, { color: currentTheme.textSecondary || '#6E849B' }]}
-                    numberOfLines={1}
+                    style={[styles.eventLeagueText, { color: labelGrayColor }]}
                   >
                     {ev.isPoker
                       ? (ev.league || 'TvBet. POKER')
-                      : ev.isFifa
+                      : isFifaEvent
                       ? (ev.league?.startsWith('FIFA') ? ev.league : `FIFA. ${ev.league || '5x5 Rush. Superligue'}`)
                       : formatFootballHeader(ev.sport, ev.league)}
                   </Text>
-                  <Text style={[styles.eventDateText, { color: currentTheme.textSecondary || '#6E849B' }]}>
+                  <Text style={[styles.eventDateText, { color: labelGrayColor }]}>
                     {displayDate}
                   </Text>
                 </View>
-
-                {/* Badge • En direct rouge (sur les événements FIFA ou Poker quand statut Accepté/Live, ou tout événement en direct) ou Serie A */}
-                {((!isEventFinished && (isFifaEvent || ev.isPoker)) || (isFifaEvent && hasEventStarted) || isEventLive) ? (
-                  <View style={[styles.liveRedBadge, { backgroundColor: (currentTheme as any).liveBadgeBg || '#D94343' }]}>
-                    <View style={styles.liveRedBadgeDot} />
-                    <Text style={styles.liveRedBadgeText}>En direct</Text>
-                  </View>
-                ) : ev.badge === 'Serie A' ? (
-                  <View style={styles.leagueBadge}>
-                    <Text style={styles.leagueBadgeText}>Serie A</Text>
-                  </View>
-                ) : null}
               </View>
 
               {/* Zone d'affrontement centrale */}
@@ -1332,12 +1379,12 @@ export default function TicketDetailsScreen({
                 // Bloc Poker
                 <View style={styles.eventPokerContainer}>
                   {isAccepted ? (
-                    <Text style={[styles.eventPokerTitleLive, { color: currentTheme.textPrimary }]}>
+                    <Text style={[styles.eventPokerTitleLive, { color: valueWhiteColor }]}>
                       POKER
                     </Text>
                   ) : (
                     <>
-                      <Text style={[styles.eventPokerTitle, { color: currentTheme.textPrimary }]}>
+                      <Text style={[styles.eventPokerTitle, { color: valueWhiteColor }]}>
                         POKER
                       </Text>
                       {Boolean(ev.pokerDraw) && (
@@ -1374,66 +1421,71 @@ export default function TicketDetailsScreen({
               ) : ev.isOutright ? (
                 // Pari long terme / vainqueur (centré)
                 <View style={styles.eventOutrightContainer}>
-                  <Text style={[styles.eventOutrightText, { color: currentTheme.textPrimary }]}>
+                  <Text style={[styles.eventOutrightText, { color: valueWhiteColor }]}>
                     {ev.outrightTitle || ev.homeTeam}
                   </Text>
                 </View>
               ) : (
-                // Match avec 2 équipes et VS / Score + détail mi-temps centré en dessous
+                // Match avec 2 équipes sur 1 seule ligne et VS au centre
                 <View style={styles.eventMatchBlock}>
                   <View style={styles.eventFaceoffContainer}>
-                    {/* Équipe 1 (Gauche) */}
+                    {/* Équipe 1 (Gauche) : Texte aligné à droite (1 ligne) + Logo 36x36 */}
                     <View style={styles.teamLeftContainer}>
-                      <Text
-                        style={[styles.teamNameLeft, { color: currentTheme.textPrimary }]}
-                        numberOfLines={2}
-                      >
-                        {ev.homeTeam}
-                      </Text>
+                      <View style={styles.teamLeftTextWrap}>
+                        <Text
+                          style={[styles.teamNameLeft, { color: valueWhiteColor }]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.82}
+                        >
+                          {ev.homeTeam}
+                        </Text>
+                      </View>
                       <TeamLogo
                         teamName={ev.homeTeam}
                         logoUrl={ev.homeLogo}
                         leagueName={ev.league}
-                        size={34}
+                        size={36}
                       />
                     </View>
 
-                    {/* Centre : VS ou Score (0:0 en direct ou score final) */}
-                    <View style={styles.centerScoreContainer}>
-                      {effectiveScoreFinal && hasEventStarted ? (
-                        <Text style={[styles.mainScoreText, { color: currentTheme.textPrimary }]}>
-                          {effectiveScoreFinal}
-                        </Text>
-                      ) : (
-                        <Text style={[styles.vsText, { color: currentTheme.textPrimary }]}>
-                          VS
-                        </Text>
-                      )}
-                    </View>
+                    {/* Centre : VS (ou score final uniquement si événement terminé/résolu) */}
+                    {effectiveScoreFinal ? (
+                      <Text style={[styles.mainScoreText, { color: valueWhiteColor }]}>
+                        {effectiveScoreFinal}
+                      </Text>
+                    ) : (
+                      <Text style={[styles.vsText, { color: valueWhiteColor }]}>
+                        VS
+                      </Text>
+                    )}
 
-                    {/* Équipe 2 (Droite) */}
+                    {/* Équipe 2 (Droite) : Logo 36x36 + Texte aligné à gauche sur 1 seule ligne */}
                     <View style={styles.teamRightContainer}>
                       <TeamLogo
                         teamName={ev.awayTeam}
                         logoUrl={ev.awayLogo}
                         leagueName={ev.league}
-                        size={34}
+                        size={36}
                       />
-                      <Text
-                        style={[styles.teamNameRight, { color: currentTheme.textPrimary }]}
-                        numberOfLines={2}
-                      >
-                        {ev.awayTeam}
-                      </Text>
+                      <View style={styles.teamRightTextWrap}>
+                        <Text
+                          style={[styles.teamNameRight, { color: valueWhiteColor }]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.82}
+                        >
+                          {ev.awayTeam}
+                        </Text>
+                      </View>
                     </View>
                   </View>
 
-                  {/* Détail du score centré sous les logos (ex: 0:0 (0:0), 2:2 (2:2) ou 0:2 (0:0,0:2)) */}
-                  {Boolean(effectiveScoreDetail) && hasEventStarted && (
+                  {Boolean(effectiveScoreDetail) && (
                     <Text
                       style={[
                         styles.detailScoreBelowText,
-                        { color: currentTheme.textSecondary },
+                        { color: labelGrayColor },
                       ]}
                     >
                       {effectiveScoreDetail}
@@ -1442,52 +1494,30 @@ export default function TicketDetailsScreen({
                 </View>
               )}
 
-              {/* Séparateur fin */}
+              {/* Séparateur interne de la carte (height: 1, #323840, marginBottom: 10) */}
               <View
                 style={[
-                  styles.thinDividerNoMargin,
-                  { backgroundColor: currentTheme.divider || currentTheme.border },
+                  styles.eventInternalDivider,
+                  { backgroundColor: dividerColor },
                 ]}
               />
 
-              {/* Pied de carte d'événement */}
+              {/* Pied de la carte : Uniquement 2 lignes (Marché & Cote + Statut) */}
               <View style={styles.eventFooterBox}>
                 <View style={styles.eventMarketRow}>
                   <Text
-                    style={[styles.eventMarketName, { color: currentTheme.textPrimary }]}
+                    style={[styles.eventMarketName, { color: valueWhiteColor }]}
                     numberOfLines={2}
                   >
                     {ev.market}
                   </Text>
-                  <Text style={[styles.eventOddText, { color: currentTheme.textPrimary }]}>
+                  <Text style={[styles.eventOddText, { color: valueWhiteColor }]}>
                     {ev.odd}
                   </Text>
                 </View>
 
-                {/* Ligne EN DIRECT + temps écoulé : s'affiche dès l'heure de début de l'événement */}
-                {showElapsedRow && (
-                  <View style={styles.eventLiveElapsedRow}>
-                    <Text
-                      style={[
-                        styles.eventLiveElapsedLeft,
-                        { color: currentTheme.textSecondary || '#6E849B' },
-                      ]}
-                    >
-                      EN DIRECT
-                    </Text>
-                    <Text
-                      style={[
-                        styles.eventLiveElapsedRight,
-                        { color: currentTheme.textPrimary },
-                      ]}
-                    >
-                      temps écoulé : {formatSecondsToMMSS(elapsedSec)}
-                    </Text>
-                  </View>
-                )}
-
                 <View style={styles.eventStatusRow}>
-                  <Text style={[styles.eventStatusLabel, { color: currentTheme.textSecondary }]}>
+                  <Text style={[styles.eventStatusLabel, { color: labelGrayColor }]}>
                     Statut:
                   </Text>
                   <Text
@@ -1495,7 +1525,6 @@ export default function TicketDetailsScreen({
                       styles.eventStatusValue,
                       {
                         color: eventStatusColor,
-                        fontWeight: isEventGain ? '600' : '500',
                       },
                     ]}
                   >
@@ -1509,20 +1538,20 @@ export default function TicketDetailsScreen({
                 <>
                   <View
                     style={[
-                      styles.thinDividerNoMargin,
-                      { backgroundColor: currentTheme.divider || currentTheme.border },
+                      styles.eventInternalDivider,
+                      { backgroundColor: dividerColor, marginTop: 8 },
                     ]}
                   />
                   <View style={styles.extraInfoBox}>
                     <Text
                       style={[
                         styles.extraInfoTitle,
-                        { color: currentTheme.textSecondary || (isDark ? '#8A9DB0' : '#557089') },
+                        { color: labelGrayColor },
                       ]}
                     >
                       Informations supplémentaires
                     </Text>
-                    <Text style={[styles.extraInfoValue, { color: currentTheme.textPrimary }]}>
+                    <Text style={[styles.extraInfoValue, { color: valueWhiteColor }]}>
                       {ev.roundCode}
                     </Text>
                   </View>
@@ -1534,7 +1563,7 @@ export default function TicketDetailsScreen({
       </Animated.ScrollView>
 
       {/* ================================================================== */}
-      {/* 3. FOOTER FIXE AU-DESSUS DE LA BOTTOM BAR (Vendre / Dupliquer)     */}
+      {/* 6. BARRE D'ACTION INFÉRIEURE (BOUTON UNIQUE COMME SUR LA CAPTURE 2) */}
       {/* ================================================================== */}
       {showDuplicateFooter && (
         <View
@@ -1542,62 +1571,26 @@ export default function TicketDetailsScreen({
             styles.fixedFooter,
             {
               bottom: bottomBarHeight,
-              backgroundColor:
-                currentTheme.cardBackground || (isDark ? '#1A242D' : '#FFFFFF'),
-              borderTopColor:
-                currentTheme.border ||
-                currentTheme.divider ||
-                (isDark ? '#334458' : '#EEF2F6'),
+              backgroundColor: cardSurfaceBg || (isDark ? '#262B31' : '#FFFFFF'),
             },
           ]}
         >
-          {showSellButton && (
-            <TouchableOpacity
-              style={[
-                styles.sellActionBtn,
-                {
-                  backgroundColor:
-                    (currentTheme as any).primaryBlue ||
-                    currentTheme.cashoutButton?.bg ||
-                    '#4A8AE8',
-                },
-              ]}
-              activeOpacity={0.85}
-              onPress={handleCashout}
-            >
-              <Text style={styles.sellActionBtnText}>
-                Vendre pour {sellPriceFormatted} ₣
-              </Text>
-            </TouchableOpacity>
-          )}
-
           <TouchableOpacity
             style={[
-              styles.duplicateBtn,
+              styles.singleFooterBtn,
               {
-                marginTop: showSellButton ? 8 : 0,
-                backgroundColor: isDark
-                  ? ((currentTheme as any).surfaceSecondary ||
-                      currentTheme.duplicateButton?.bg ||
-                      '#253341')
-                  : (currentTheme.duplicateButton?.bg || '#EEF2F6'),
+                backgroundColor: isMelbet
+                  ? '#D88D23'
+                  : (currentTheme.cashoutButton?.bg || currentTheme.primary || '#4A8AE8'),
               },
             ]}
             activeOpacity={0.85}
-            onPress={handleDuplicate}
+            onPress={showSellButton ? handleCashout : handleDuplicate}
           >
-            <Text
-              style={[
-                styles.duplicateBtnText,
-                {
-                  color:
-                    currentTheme.primary ||
-                    currentTheme.duplicateButton?.text ||
-                    '#4A84C4',
-                },
-              ]}
-            >
-              Dupliquer le coupon de pari
+            <Text style={styles.singleFooterBtnText}>
+              {showSellButton
+                ? `Vendre pour ${sellPriceFormatted} ₣`
+                : 'Dupliquer le coupon de pari'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1820,19 +1813,20 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  // 1. Header
+  // 1. Barre d'En-tête Supérieure (Informations sur le pari)
   header: {
     height: 52,
+    backgroundColor: '#262B31',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
   },
   headerBtn: {
-    width: 44,
+    width: 28,
     height: 44,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   headerTitleWrap: {
     flex: 1,
@@ -1840,9 +1834,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 16.5,
-    fontWeight: '600',
-    color: '#557089',
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#9BA3AE',
     textAlign: 'center',
   },
   headerSubtitle: {
@@ -1854,24 +1848,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    width: 70,
-    gap: 14,
+    gap: 18,
   },
   headerActionBtn: {
-    padding: 4,
+    padding: 0,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  headerBellIcon: {
-    width: 21,
-    height: 21,
-    tintColor: '#557089',
-  },
-  headerThreeDotsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#557089',
-    letterSpacing: 1,
   },
 
   // 1B. Barre collante Cotes / Mise / Gains au scroll
@@ -1893,11 +1875,9 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
 
-  // 2. Bloc Résumé Supérieur
+  // 2. Bloc Résumé du Ticket
   summaryCard: {
-    paddingHorizontal: 16,
     paddingTop: 14,
-    paddingBottom: 12,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
     marginBottom: 2,
@@ -1905,38 +1885,44 @@ const styles = StyleSheet.create({
   summaryHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
   },
   avatarWrap: {
     position: 'relative',
-    width: 48,
-    height: 48,
-    marginRight: 12,
+    width: 44,
+    height: 44,
   },
   avatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E9EFF6',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1E2328',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  fifaAvatarText: {
+    color: '#8A949E',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
   avatarIcon: {
-    width: 26,
-    height: 26,
-  },
-  avatarIconPoker: {
-    width: 26,
-    height: 26,
-    tintColor: '#6E849B',
-  },
-  avatarIconFifa: {
-    width: 28,
-    height: 19,
-    tintColor: '#6E849B',
-  },
-  avatarIconCombine: {
     width: 24,
     height: 24,
+  },
+  avatarIconPoker: {
+    width: 24,
+    height: 24,
+    tintColor: '#8A949E',
+  },
+  avatarIconFifa: {
+    width: 26,
+    height: 18,
+    tintColor: '#8A949E',
+  },
+  avatarIconCombine: {
+    width: 22,
+    height: 22,
   },
   statusMiniDot: {
     position: 'absolute',
@@ -1945,37 +1931,32 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#262B31',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  minusDotText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    lineHeight: 12,
-  },
   summaryMetaCol: {
     flex: 1,
+    marginLeft: 12,
     justifyContent: 'center',
   },
   summaryDateText: {
-    fontSize: 12,
-    color: '#6E849B',
+    fontSize: 13,
     fontWeight: '400',
-    marginBottom: 1,
+    color: '#8A949E',
   },
   summaryTypeText: {
-    fontSize: 16.5,
+    fontSize: 17.5,
     fontWeight: '700',
-    color: '#1D2B3A',
-    lineHeight: 20,
-    marginBottom: 1,
+    color: '#FFFFFF',
+    marginTop: 1,
   },
   summaryNumberText: {
-    fontSize: 14.5,
-    fontWeight: '500',
-    letterSpacing: 0.1,
-    marginTop: 2,
+    fontSize: 12.5,
+    fontWeight: '400',
+    color: '#B8C0C8',
+    marginTop: 1,
   },
 
   // Badge Ligue Bleu (Serie A uniquement)
@@ -1992,128 +1973,140 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // 3. Bloc Financier
   thinDivider: {
     height: 1,
-    backgroundColor: '#F0F4F8',
-    marginVertical: 10,
+    backgroundColor: '#323840',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
   },
-  thinDividerNoMargin: {
-    height: 1,
-    backgroundColor: '#F0F4F8',
+  financialBlockContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
-
-  // Lignes financières
   financialRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 3,
+    marginVertical: 5.5,
   },
   financialLabel: {
-    fontSize: 14,
-    color: '#6E849B',
+    fontSize: 15.5,
     fontWeight: '400',
+    color: '#8A949E',
   },
   financialValueBold: {
-    fontSize: 14.5,
-    color: '#1D2B3A',
+    fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
   },
   financialValueStatus: {
-    fontSize: 14.5,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#D89228',
   },
 
   eventsRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 7,
+    marginVertical: 5.5,
   },
   eventsLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  layersIcon: {
-    width: 18,
-    height: 18,
-    marginRight: 9,
-    tintColor: '#557089',
-  },
   eventsCountText: {
-    fontSize: 15,
+    fontSize: 15.5,
     fontWeight: '600',
-    color: '#002B49',
+    color: '#FFFFFF',
   },
   eventsFinishedText: {
-    fontSize: 15,
+    fontSize: 15.5,
     fontWeight: '600',
-    color: '#002B49',
+    color: '#FFFFFF',
   },
 
-  // 3. Cartes d'Événements
+  // 4. Carte d'Événement
   eventCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    marginHorizontal: 10,
+    backgroundColor: '#262B31',
+    borderRadius: 12,
+    marginHorizontal: 8,
     marginTop: 8,
-    overflow: 'hidden',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    position: 'relative',
+  },
+  cardCornerLiveBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#F04438',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 5,
   },
   eventCardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 8,
+    alignItems: 'flex-start',
+  },
+  eventFifaLeftLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8A949E',
+    marginRight: 10,
+    marginTop: 4,
   },
   eventSportIconWrap: {
-    width: 26,
-    height: 26,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   eventSportIcon: {
-    width: 26,
-    height: 26,
-    tintColor: '#6E849B',
-  },
-  eventPokerIcon: {
     width: 22,
     height: 22,
-    tintColor: '#6E849B',
+    tintColor: '#8A949E',
+  },
+  eventPokerIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#8A949E',
   },
   eventLeagueInfoCol: {
     flex: 1,
+    paddingRight: 64,
     justifyContent: 'center',
   },
   eventLeagueText: {
     fontSize: 13,
-    color: '#6E849B',
     fontWeight: '400',
+    color: '#8A949E',
   },
   eventDateText: {
-    fontSize: 12.5,
-    color: '#6E849B',
+    fontSize: 13,
     fontWeight: '400',
+    color: '#8A949E',
     marginTop: 2,
   },
 
-  // Carte Bonus (identique à video_gagnant.mp4 et WhatsApp_Video)
+  // Carte Bonus
   bonusCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingTop: 12,
     paddingBottom: 6,
   },
   bonusHeaderTitle: {
     fontSize: 13,
-    color: '#6E849B',
+    color: '#8A949E',
     fontWeight: '400',
   },
   bonusCenterBox: {
-    paddingHorizontal: 16,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2121,20 +2114,18 @@ const styles = StyleSheet.create({
   bonusCenterTitle: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#1D2B3A',
+    color: '#FFFFFF',
     textAlign: 'center',
   },
   bonusFooterBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingTop: 2,
   },
 
-  // Zone Poker (Pixel-Perfect comme sur les captures)
+  // Zone Poker
   eventPokerContainer: {
-    paddingHorizontal: 16,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2142,74 +2133,32 @@ const styles = StyleSheet.create({
   eventPokerTitleLive: {
     fontSize: 14.5,
     fontWeight: '500',
-    color: '#1D2B3A',
+    color: '#FFFFFF',
     textAlign: 'center',
     paddingVertical: 14,
   },
   eventPokerTitle: {
     fontSize: 14.5,
     fontWeight: '500',
-    color: '#1D2B3A',
+    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 6,
-  },
-  eventPokerRoundText: {
-    fontSize: 12,
-    color: '#7B8794',
-    textAlign: 'center',
-    marginTop: 2,
-    marginBottom: 8,
   },
   eventPokerHandsBox: {
     alignItems: 'center',
     width: '100%',
     marginTop: 2,
   },
-  eventPokerHandLine: {
-    fontSize: 12.5,
-    color: '#557089',
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  eventPokerHandLabel: {
-    fontWeight: '400',
-    color: '#557089',
-  },
-  eventPokerCardText: {
-    fontWeight: '500',
-    color: '#557089',
-  },
-  eventPokerRedCardText: {
-    fontWeight: '600',
-    color: '#DC2626',
-  },
-  eventPokerTableLine: {
-    fontSize: 12.5,
-    fontWeight: '400',
-    color: '#557089',
-    lineHeight: 20,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  eventPokerWinnerLine: {
-    fontSize: 12.5,
-    fontWeight: '400',
-    color: '#557089',
-    marginTop: 2,
-    textAlign: 'center',
-  },
 
-  // Zone d'affrontement (Match standard)
+  // 5. Zone d'Affrontement (VS & Noms d'Équipes sur 1 Ligne) et Pied de Carte
   eventMatchBlock: {
-    paddingBottom: 10,
+    width: '100%',
   },
   eventFaceoffContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 4,
+    justifyContent: 'center',
+    paddingVertical: 18,
   },
   teamLeftContainer: {
     flex: 1,
@@ -2217,13 +2166,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
+  teamLeftTextWrap: {
+    flex: 1,
+    alignItems: 'flex-end',
+    paddingRight: 8,
+  },
   teamNameLeft: {
-    fontSize: 13.5,
-    fontWeight: '500',
-    color: '#1D2B3A',
-    marginRight: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
     textAlign: 'right',
-    flexShrink: 1,
   },
   teamRightContainer: {
     flex: 1,
@@ -2231,42 +2183,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
   },
-  teamNameRight: {
-    fontSize: 13.5,
-    fontWeight: '500',
-    color: '#1D2B3A',
-    marginLeft: 8,
-    textAlign: 'left',
-    flexShrink: 1,
+  teamRightTextWrap: {
+    flex: 1,
+    alignItems: 'flex-start',
+    paddingLeft: 8,
   },
-  centerScoreContainer: {
-    marginHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 38,
+  teamNameRight: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'left',
   },
   vsText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#002B49',
+    fontSize: 19,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginHorizontal: 12,
   },
   mainScoreText: {
-    fontSize: 19.5,
+    fontSize: 19,
     fontWeight: '600',
-    color: '#002B49',
-    letterSpacing: 0.5,
+    color: '#FFFFFF',
+    marginHorizontal: 12,
   },
   detailScoreBelowText: {
     fontSize: 12.5,
-    color: '#6E849B',
+    color: '#8A949E',
     fontWeight: '400',
     textAlign: 'center',
-    marginTop: 8,
+    marginBottom: 10,
   },
 
   // Zone outright / vainqueur
   eventOutrightContainer: {
-    paddingHorizontal: 16,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2274,148 +2223,116 @@ const styles = StyleSheet.create({
   eventOutrightText: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#1D2B3A',
+    color: '#FFFFFF',
     textAlign: 'center',
   },
 
-  // Pied de carte d'événement
+  // Séparateur interne de la carte
+  eventInternalDivider: {
+    height: 1,
+    backgroundColor: '#323840',
+    marginBottom: 10,
+  },
+
+  // Pied de la carte (Uniquement 2 lignes comme sur la Capture 2)
   eventFooterBox: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    width: '100%',
   },
   eventMarketRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 8,
   },
   eventMarketName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#1D2B3A',
+    color: '#FFFFFF',
     flex: 1,
     marginRight: 10,
   },
   eventOddText: {
-    fontSize: 14.5,
+    fontSize: 15.5,
     fontWeight: '600',
-    color: '#1D2B3A',
-  },
-  eventLiveElapsedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  eventLiveElapsedLeft: {
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-  eventLiveElapsedRight: {
-    fontSize: 13.5,
-    fontWeight: '600',
-  },
-  eventLiveElapsedRightBold: {
-    fontWeight: '600',
+    color: '#FFFFFF',
   },
   eventStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 6,
   },
   eventStatusLabel: {
-    fontSize: 13.5,
-    color: '#6E849B',
+    fontSize: 15,
     fontWeight: '400',
+    color: '#8A949E',
   },
   eventStatusValue: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 15.5,
+    fontWeight: '600',
+    color: '#D89228',
   },
 
-  // Badge • En direct rouge (Correction 4 : Style exact de la Capture 3)
+  // Badge • En direct (Résumé & Carte)
   liveRedBadge: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    backgroundColor: '#F04438',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
   },
   liveRedBadgeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2.25,
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 1.75,
     backgroundColor: '#FFFFFF',
-    marginRight: 5,
+    marginRight: 4,
   },
   liveRedBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
   },
 
   // Section Informations supplémentaires (Poker)
   extraInfoBox: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingTop: 2,
   },
   extraInfoTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#557089',
+    color: '#8A949E',
     marginBottom: 2,
   },
   extraInfoValue: {
     fontSize: 14.5,
     fontWeight: '500',
-    color: '#002B49',
+    color: '#FFFFFF',
   },
 
-  // 4. Fixed Footer (Correction 5 : Barre inférieure adaptative multi-thèmes)
+  // 6. Barre d'Action Inférieure (Bouton Unique comme sur la Capture 2)
   fixedFooter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    backgroundColor: '#262B31',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E2E8F0',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 6,
+    paddingVertical: 12,
     zIndex: 100,
   },
-  sellActionBtn: {
-    backgroundColor: '#4A8AE8',
+  singleFooterBtn: {
+    backgroundColor: '#D88D23',
     height: 46,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sellActionBtnText: {
+  singleFooterBtnText: {
     color: '#FFFFFF',
-    fontSize: 15.5,
+    fontSize: 16,
     fontWeight: '500',
-  },
-  duplicateBtn: {
-    backgroundColor: '#EEF2F6',
-    height: 46,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  duplicateBtnText: {
-    color: '#4A84C4',
-    fontSize: 15.5,
-    fontWeight: '600',
   },
 });
