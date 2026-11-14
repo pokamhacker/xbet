@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React from 'react';
 import {
   View,
   Image,
@@ -7,14 +7,7 @@ import {
   StyleProp,
   ViewStyle,
 } from 'react-native';
-import Svg, {
-  Defs,
-  RadialGradient,
-  LinearGradient,
-  Stop,
-  Circle,
-  Ellipse,
-} from 'react-native-svg';
+import Svg, { Circle, Ellipse } from 'react-native-svg';
 
 export interface NationalTeamLogo3DProps {
   source: ImageSourcePropType;
@@ -24,8 +17,9 @@ export interface NationalTeamLogo3DProps {
 }
 
 /**
- * Rendu sphérique 3D glossy avec ombre circulaire blanche pour les drapeaux
- * de sélections nationales (compatible clair/sombre et toute taille).
+ * Rendu sphérique 3D glossy avec reflet supérieur blanc et lueur circulaire blanche
+ * pour les drapeaux de sélections nationales.
+ * Garanti 100 % sans noir (#000000) ni référence url(#id) susceptible d'afficher un fallback SVG noir sur iOS/WebKit.
  */
 export const NationalTeamLogo3D: React.FC<NationalTeamLogo3DProps> = ({
   source,
@@ -33,18 +27,12 @@ export const NationalTeamLogo3D: React.FC<NationalTeamLogo3DProps> = ({
   style,
   onError,
 }) => {
-  const rawUid = useId();
-  const uid = rawUid.replace(/[^a-zA-Z0-9_-]/g, '');
-  const vignetteGradId = `nt-vignette-${uid}`;
-  const topGlossGradId = `nt-top-gloss-${uid}`;
-  const bottomGlowGradId = `nt-bottom-glow-${uid}`;
-
   const radius = size / 2;
 
   return (
     <View
       style={[
-        styles.outerShadow,
+        styles.outerContainer,
         {
           width: size,
           height: size,
@@ -65,7 +53,7 @@ export const NationalTeamLogo3D: React.FC<NationalTeamLogo3DProps> = ({
       >
         <Image
           source={source}
-          style={{ width: size, height: size }}
+          style={{ width: size, height: size, borderRadius: radius }}
           resizeMode="cover"
           onError={onError}
         />
@@ -75,49 +63,85 @@ export const NationalTeamLogo3D: React.FC<NationalTeamLogo3DProps> = ({
             width={size}
             height={size}
             viewBox="0 0 100 100"
+            fill="none"
             style={StyleSheet.absoluteFill}
           >
-            <Defs>
-              {/* 1. Vignettage / Profondeur sphérique */}
-              <RadialGradient id={vignetteGradId} cx="50%" cy="50%" r="50%">
-                <Stop offset="0%" stopColor="#000000" stopOpacity="0" />
-                <Stop offset="68%" stopColor="#000000" stopOpacity="0" />
-                <Stop offset="85%" stopColor="#000000" stopOpacity="0.22" />
-                <Stop offset="100%" stopColor="#000000" stopOpacity="0.55" />
-              </RadialGradient>
+            {/* 1. Dôme de brillance blanc supérieur progressif (Top Glossy Highlight) */}
+            <Ellipse
+              cx="50"
+              cy="25"
+              rx="37"
+              ry="21"
+              fill="rgba(255, 255, 255, 0.12)"
+            />
+            <Ellipse
+              cx="50"
+              cy="22"
+              rx="34"
+              ry="18"
+              fill="rgba(255, 255, 255, 0.15)"
+            />
+            <Ellipse
+              cx="50"
+              cy="19"
+              rx="30"
+              ry="14.5"
+              fill="rgba(255, 255, 255, 0.18)"
+            />
+            <Ellipse
+              cx="50"
+              cy="16"
+              rx="25"
+              ry="11"
+              fill="rgba(255, 255, 255, 0.22)"
+            />
+            <Ellipse
+              cx="50"
+              cy="13"
+              rx="19"
+              ry="7.5"
+              fill="rgba(255, 255, 255, 0.24)"
+            />
 
-              {/* 2. Dôme de brillance blanc supérieur (Top Glossy Highlight) */}
-              <LinearGradient id={topGlossGradId} x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.82" />
-                <Stop offset="55%" stopColor="#FFFFFF" stopOpacity="0.28" />
-                <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.0" />
-              </LinearGradient>
+            {/* 2. Lueur circulaire blanche inférieure progressive (Bottom White Bounce Glow) */}
+            <Ellipse
+              cx="50"
+              cy="84"
+              rx="31"
+              ry="12"
+              fill="rgba(255, 255, 255, 0.14)"
+            />
+            <Ellipse
+              cx="50"
+              cy="87"
+              rx="26"
+              ry="9"
+              fill="rgba(255, 255, 255, 0.18)"
+            />
+            <Ellipse
+              cx="50"
+              cy="90"
+              rx="20"
+              ry="6"
+              fill="rgba(255, 255, 255, 0.24)"
+            />
 
-              {/* 3. Ombre / Lueur circulaire blanche inférieure (Bottom White Bounce Glow) */}
-              <LinearGradient id={bottomGlowGradId} x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.0" />
-                <Stop offset="60%" stopColor="#FFFFFF" stopOpacity="0.35" />
-                <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.65" />
-              </LinearGradient>
-            </Defs>
-
-            {/* Calque 1 : Vignettage sphérique */}
-            <Circle cx="50" cy="50" r="50" fill={`url(#${vignetteGradId})`} />
-
-            {/* Calque 2 : Dôme de brillance supérieur */}
-            <Ellipse cx="50" cy="24" rx="35" ry="20" fill={`url(#${topGlossGradId})`} />
-
-            {/* Calque 3 : Lueur circulaire blanche inférieure */}
-            <Ellipse cx="50" cy="84" rx="30" ry="12" fill={`url(#${bottomGlowGradId})`} />
-
-            {/* Calque 4 : Anneau de finition interne */}
+            {/* 3. Anneau de finition interne blanc vitré (Inner Rim) */}
             <Circle
               cx="50"
               cy="50"
               r="49"
               fill="none"
-              stroke="rgba(255,255,255,0.18)"
-              strokeWidth="1.5"
+              stroke="rgba(255, 255, 255, 0.42)"
+              strokeWidth="1.6"
+            />
+            <Circle
+              cx="50"
+              cy="50"
+              r="47.5"
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.16)"
+              strokeWidth="1"
             />
           </Svg>
         </View>
@@ -127,19 +151,15 @@ export const NationalTeamLogo3D: React.FC<NationalTeamLogo3DProps> = ({
 };
 
 const styles = StyleSheet.create({
-  outerShadow: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.38,
-    shadowRadius: 3,
-    elevation: 5,
+  outerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   innerClip: {
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#1E242B',
+    backgroundColor: 'transparent',
   },
 });
 
