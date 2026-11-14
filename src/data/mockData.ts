@@ -1,5 +1,6 @@
 import { MatchEvent, BetStatus } from '../types/bet';
 import { getTeamById } from './sportsCatalog';
+import { resolveAfricanCountryLogo } from './africanCountries';
 import { getEffectiveEventScore } from '../utils/scoreAdapter';
 
 // ============================================================================
@@ -268,6 +269,10 @@ export function resolveMatchTeamLogo(name: string, existingLogo?: string): strin
   const cleanKey = (name || '').trim().toLowerCase();
   if (KNOWN_TEAM_LOGOS[cleanKey]) {
     return KNOWN_TEAM_LOGOS[cleanKey];
+  }
+  const africanLogo = resolveAfricanCountryLogo(name);
+  if (africanLogo) {
+    return africanLogo;
   }
   const catalogTeam = getTeamById(name || '');
   if (catalogTeam?.logo && !catalogTeam.logo.includes('ui-avatars')) {

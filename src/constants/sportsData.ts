@@ -1,3 +1,5 @@
+import { AFRICAN_COUNTRIES } from '../data/africanCountries';
+
 // ---------------------------------------------------------------------------
 // BASE DE DONNEES ETENDUES - CHAMPIONNATS & CLUBS AVEC LOGOS CDN DISTANTS
 // (15 CHAMPIONNATS PAR CONTINENT × 15+ CLUBS PAR CHAMPIONNAT)
@@ -1859,7 +1861,12 @@ export const EXTENDED_LEAGUES_DATA: LeagueData[] = [
     category: 'International',
     isMajor: true,
     logoUrl: 'https://media.api-sports.io/football/leagues/6.png',
-    clubs: [],
+    clubs: AFRICAN_COUNTRIES.map((c) => ({
+      id: c.id.replace(/^team-/, ''),
+      name: c.name,
+      shortCode: c.shortName,
+      logoUrl: c.logo,
+    })),
   },
   {
     id: 'euro',

@@ -4,6 +4,7 @@
  */
 
 import { EXTENDED_LEAGUES_DATA } from '../constants/sportsData';
+import { AFRICAN_COUNTRIES, findAfricanCountry } from './africanCountries';
 import {
   FIFA_LEAGUES_LIST,
   getFifaLeagueLogo,
@@ -769,41 +770,16 @@ const BASE_SPORTS_CATALOG: Competition[] = [
     category: 'national',
     sport: 'Football',
     country: 'Afrique',
+    continent: 'Afrique',
     logo: 'https://media.api-sports.io/football/leagues/6.png',
-    teams: [
-      {
-        id: 'team-cameroun',
-        name: 'Cameroun',
-        shortName: 'CMR',
-        logo: 'https://media.api-sports.io/football/teams/1504.png',
-        country: 'Cameroun',
-        leagueId: 'caf-can',
-      },
-      {
-        id: 'team-cote-divoire',
-        name: "Côte d'Ivoire",
-        shortName: 'CIV',
-        logo: 'https://media.api-sports.io/football/teams/1501.png',
-        country: "Côte d'Ivoire",
-        leagueId: 'caf-can',
-      },
-      {
-        id: 'team-senegal',
-        name: 'Sénégal',
-        shortName: 'SEN',
-        logo: 'https://media.api-sports.io/football/teams/13.png',
-        country: 'Sénégal',
-        leagueId: 'caf-can',
-      },
-      {
-        id: 'team-maroc',
-        name: 'Maroc',
-        shortName: 'MAR',
-        logo: 'https://media.api-sports.io/football/teams/31.png',
-        country: 'Maroc',
-        leagueId: 'caf-can',
-      },
-    ],
+    teams: AFRICAN_COUNTRIES.map((c) => ({
+      id: c.id,
+      name: c.name,
+      shortName: c.shortName,
+      logo: c.logo,
+      country: c.name,
+      leagueId: 'caf-can',
+    })),
   },
 
   // ==========================================
@@ -1386,6 +1362,19 @@ export function getTeamById(idOrName: string): Team | undefined {
         t.name.toLowerCase() === query
     );
     if (found) return found;
+  }
+
+  // 1b. Résolution directe des 54 pays africains (alias FR/EN, abréviations, sans accents)
+  const africanCountry = findAfricanCountry(idOrName);
+  if (africanCountry) {
+    return {
+      id: africanCountry.id,
+      name: africanCountry.name,
+      shortName: africanCountry.shortName,
+      logo: africanCountry.logo,
+      country: africanCountry.name,
+      leagueId: 'caf-can',
+    };
   }
 
   // 2. Recherche par code court exact (ex: "RMA", "PSG", "BAR") uniquement si <= 4 caractères

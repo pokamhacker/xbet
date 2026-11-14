@@ -36,6 +36,7 @@ import {
   resolveTeamLogo,
   resolveCompetitionLogo,
 } from '../data/sportsCatalog';
+import { resolveAfricanCountryLogo } from '../data/africanCountries';
 import { TeamLogo } from '../components/common/TeamLogo';
 import { HalfDigitInput } from '../components/common/HalfDigitInput';
 import { ScoreNumericKeypad } from '../components/common/ScoreNumericKeypad';
@@ -125,10 +126,16 @@ const AFRICA_AND_REGIONS_LEAGUES = [
     logo: 'https://media.api-sports.io/football/leagues/525.png',
   },
   {
-    id: 'can-coupe-dafrique-des-nations',
+    id: 'caf-can',
     name: "Coupe d'Afrique des Nations (CAN)",
     country: 'Afrique',
     logo: 'https://media.api-sports.io/football/leagues/6.png',
+  },
+  {
+    id: 'cafcl',
+    name: 'CAF Champions League',
+    country: 'Afrique',
+    logo: 'https://media.api-sports.io/football/leagues/12.png',
   },
   {
     id: 'coupe-du-monde',
@@ -828,7 +835,11 @@ export default function StudioCreationScreen({ navigation }: any) {
 
   // Attribution d'une équipe en 1 tap
   const handleAssignTeam = (team: TeamItem) => {
-    const logo = team.logo || resolveTeamLogo(team.name) || makeAvatarLogo(team.name);
+    const logo =
+      team.logo ||
+      resolveTeamLogo(team.name) ||
+      resolveAfricanCountryLogo(team.name) ||
+      makeAvatarLogo(team.name);
     if (activeSlot === 'home') {
       setHomeTeam(team.name);
       setHomeTeamLogo(logo);
@@ -1480,7 +1491,7 @@ export default function StudioCreationScreen({ navigation }: any) {
 
               {leagueCategory === 'regions' &&
                 AFRICA_AND_REGIONS_LEAGUES.map((l) => {
-                  const isSelected = selectedLeague === l.name;
+                  const isSelected = selectedLeague === l.name || selectedLeagueId === l.id;
                   return (
                     <TouchableOpacity
                       key={l.id}

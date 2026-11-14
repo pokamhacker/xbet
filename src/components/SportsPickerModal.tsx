@@ -17,6 +17,7 @@ import { useThemeStore } from '../store/themeStore';
 import { useBetStore } from '../store/useBetStore';
 import { Colors } from '../theme/theme';
 import { SPORTS_CATALOG, Competition, Team } from '../data/sportsCatalog';
+import { isAfricanCountryName, resolveAfricanCountryLogo } from '../data/africanCountries';
 import { TeamLogo } from './common/TeamLogo';
 import {
   fetchAllLeagues,
@@ -80,16 +81,28 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
   // Helper continent pour les catégories
   const getContinentForCountry = (country?: string): 'Europe' | 'Afrique' | 'Amerique' | 'Asie' | 'International' => {
     if (!country) return 'International';
+    if (isAfricanCountryName(country)) return 'Afrique';
     const c = country.toLowerCase();
     const europe = ['england', 'angleterre', 'spain', 'espagne', 'france', 'germany', 'allemagne', 'italy', 'italie', 'portugal', 'netherlands', 'pays-bas', 'belgium', 'belgique', 'turkey', 'turquie', 'scotland', 'ecosse'];
     if (europe.some((e) => c.includes(e))) return 'Europe';
-    const afrique = ['cameroun', 'cameroon', 'nigeria', 'egypt', 'egypte', 'morocco', 'maroc', 'senegal', 'algeria', 'algerie', 'tunisia', 'tunisie', 'ivory coast', "cote d'ivoire", 'ghana'];
-    if (afrique.some((a) => c.includes(a))) return 'Afrique';
     const amerique = ['usa', 'united states', 'etats-unis', 'brazil', 'bresil', 'argentina', 'argentine', 'mexico', 'mexique', 'colombia', 'colombie', 'chile', 'chili'];
     if (amerique.some((am) => c.includes(am))) return 'Amerique';
     const asie = ['saudi arabia', 'arabie saoudite', 'japan', 'japon', 'south korea', 'coree du sud', 'china', 'chine', 'qatar', 'uae'];
     if (asie.some((as) => c.includes(as))) return 'Asie';
     return 'International';
+  };
+
+  const isAfricanCompetition = (comp: Competition | SportsLeague): boolean => {
+    const idLower = (comp.id || '').toLowerCase();
+    const nameLower = (comp.name || '').toLowerCase();
+    return (
+      comp.continent === 'Afrique' ||
+      idLower.includes('caf') ||
+      idLower === 'afcon' ||
+      nameLower.includes('afrique') ||
+      nameLower.includes('caf ') ||
+      isAfricanCountryName(comp.country)
+    );
   };
 
   // Charger les championnats dynamiquement dès l'ouverture (API-Football en priorité)
@@ -284,7 +297,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
 
     // Filtre par Onglet de Catégorie
     if (activeTab === 'Afrique') {
-      list = list.filter((c) => c.continent === 'Afrique' || c.country === 'Cameroun' || c.country === 'Nigeria' || c.country === 'Egypte' || c.country === 'Afrique du Sud' || c.country === 'Maroc' || c.country === 'Tunisie' || c.country === 'Algerie' || c.country === "Cote d'Ivoire" || c.country === 'Senegal' || c.country === 'Ghana' || c.country === 'RD Congo' || c.country === 'Mali' || c.country === 'Guinee' || c.country === 'Kenya' || c.country === 'Tanzanie');
+      list = list.filter(isAfricanCompetition);
     } else if (activeTab === 'Europe') {
       list = list.filter((c) => c.continent === 'Europe' || c.country === 'Angleterre' || c.country === 'Espagne' || c.country === 'Italie' || c.country === 'Allemagne' || c.country === 'France' || c.country === 'Portugal' || c.country === 'Pays-Bas' || c.country === 'Turquie' || c.country === 'Belgique' || c.country === 'Ecosse' || c.country === 'Grece' || c.country === 'Autriche' || c.country === 'Suisse' || c.country === 'Danemark' || c.country === 'Suede');
     } else if (activeTab === 'Amérique') {
@@ -421,7 +434,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
 
     // Filtre par Onglet de Catégorie
     if (activeTab === 'Afrique') {
-      allTeamEntries = allTeamEntries.filter((e) => e.comp.continent === 'Afrique' || e.comp.country === 'Cameroun' || e.comp.country === 'Nigeria' || e.comp.country === 'Egypte' || e.comp.country === 'Afrique du Sud' || e.comp.country === 'Maroc' || e.comp.country === 'Tunisie' || e.comp.country === 'Algerie' || e.comp.country === "Cote d'Ivoire" || e.comp.country === 'Senegal' || e.comp.country === 'Ghana' || e.comp.country === 'RD Congo' || e.comp.country === 'Mali' || e.comp.country === 'Guinee' || e.comp.country === 'Kenya' || e.comp.country === 'Tanzanie');
+      allTeamEntries = allTeamEntries.filter((e) => isAfricanCompetition(e.comp));
     } else if (activeTab === 'Europe') {
       allTeamEntries = allTeamEntries.filter((e) => e.comp.continent === 'Europe' || e.comp.country === 'Angleterre' || e.comp.country === 'Espagne' || e.comp.country === 'Italie' || e.comp.country === 'Allemagne' || e.comp.country === 'France' || e.comp.country === 'Portugal' || e.comp.country === 'Pays-Bas' || e.comp.country === 'Turquie' || e.comp.country === 'Belgique' || e.comp.country === 'Ecosse' || e.comp.country === 'Grece' || e.comp.country === 'Autriche' || e.comp.country === 'Suisse' || e.comp.country === 'Danemark' || e.comp.country === 'Suede');
     } else if (activeTab === 'Amérique') {
@@ -634,6 +647,7 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
                   const isSelected = selectedId === item.id || selectedId === item.name;
                   const isFifaComp = item.category === 'fifa' || item.name.startsWith('FIFA') || item.name.startsWith('FC ');
                   const badgeUri = (item as any).badge || item.logo;
+                  const countryFlag = resolveAfricanCountryLogo(item.country);
                   return (
                     <TouchableOpacity
                       style={[
@@ -688,7 +702,18 @@ export const SportsPickerModal: React.FC<SportsPickerModalProps> = ({
                         </View>
                         <View style={styles.itemMetaRow}>
                           {item.country && (
-                            <Text style={styles.metaCountryText}>🌍 {item.country}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              {countryFlag ? (
+                                <Image
+                                  source={{ uri: countryFlag }}
+                                  style={{ width: 15, height: 11, borderRadius: 2 }}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <Text style={styles.metaCountryText}>🌍</Text>
+                              )}
+                              <Text style={styles.metaCountryText}>{item.country}</Text>
+                            </View>
                           )}
                           <Text style={styles.metaCountText}>
                             · {(item as any).matchesCount ? `${(item as any).matchesCount} matchs` : `${item.teams?.length || 0} équipes`}
