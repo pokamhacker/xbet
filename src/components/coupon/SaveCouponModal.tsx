@@ -35,96 +35,77 @@ export interface ClearCouponConfirmModalProps {
 }
 
 /**
- * Triangle d'attention 3D jaune/ambre incliné avec point d'exclamation (!)
- * Reproduit fidèlement l'icône 3D de la Vidéo 1 à 00:11 (width: 64, height: 64)
+ * Triangle d'attention 3D jaune/ambre chaud droit avec perspective 3D douce vers la gauche
+ * et grand point d'exclamation (!) gris anthracite (#262B31) centré (width: 96, height: 96)
  */
 const WarningTriangle3DIcon: React.FC = () => {
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.65)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
     Animated.spring(scaleAnim, {
       toValue: 1,
-      friction: 5,
+      friction: 6,
       tension: 90,
       useNativeDriver: true,
     }).start();
-
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: -4,
-          duration: 900,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 900,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [floatAnim, scaleAnim]);
+  }, [scaleAnim]);
 
   return (
     <Animated.View
       style={{
-        width: 64,
-        height: 64,
+        width: 96,
+        height: 96,
+        marginBottom: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        transform: [{ scale: scaleAnim }, { translateY: floatAnim }],
+        transform: [{ scale: scaleAnim }],
       }}
     >
-      <Svg width={64} height={64} viewBox="0 0 64 64" fill="none">
-        <Defs>
-          <LinearGradient id="warn3dDepth" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#D97706" />
-            <Stop offset="100%" stopColor="#92400E" />
-          </LinearGradient>
-          <LinearGradient id="warn3dFront" x1="15%" y1="5%" x2="85%" y2="95%">
-            <Stop offset="0%" stopColor="#FDE047" />
-            <Stop offset="45%" stopColor="#FBBF24" />
-            <Stop offset="100%" stopColor="#F59E0B" />
-          </LinearGradient>
-          <LinearGradient id="warn3dGloss" x1="0%" y1="0%" x2="0%" y2="100%">
-            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.65" />
-            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-          </LinearGradient>
-        </Defs>
+      <Svg width={96} height={96} viewBox="0 0 96 96" fill="none">
+        {/* Ombre portée douce sous la base du triangle 3D */}
+        <Path
+          d="M18 84C18 80.5 31 78 48 78C65 78 78 80.5 78 84C78 87.5 65 90 48 90C31 90 18 87.5 18 84Z"
+          fill="#000000"
+          fillOpacity={0.22}
+        />
 
-        <G transform="rotate(-8 32 32)">
-          {/* Tranche 3D arrière / extrusion */}
-          <Path
-            d="M36.5 11C39.2 6.3 45.8 6.3 48.5 11L61.2 33.5C63.9 38.2 60.5 44 55.1 44H22.9C17.5 44 14.1 38.2 16.8 33.5L36.5 11Z"
-            fill="url(#warn3dDepth)"
-            transform="translate(-4, 8)"
-          />
-          {/* Face avant bombée jaune/ambre */}
-          <Path
-            d="M27.2 10.5C30.1 5.4 37.5 5.4 40.4 10.5L56.4 38.5C59.3 43.6 55.6 50 49.8 50H17.8C12 50 8.3 43.6 11.2 38.5L27.2 10.5Z"
-            fill="url(#warn3dFront)"
-          />
-          {/* Reflet supérieur glossy */}
-          <Path
-            d="M28.6 12.2C30.9 8.2 36.7 8.2 39 12.2L49.5 30.5C40 27 26 27 18.2 30.5L28.6 12.2Z"
-            fill="url(#warn3dGloss)"
-          />
-          {/* Point d'exclamation (!) sombre creusé */}
-          <Rect
-            x="31.3"
-            y="20"
-            width="5"
-            height="14.5"
-            rx="2.5"
-            fill="#2B2D38"
-          />
-          <Circle cx="33.8" cy="40.5" r="2.8" fill="#2B2D38" />
-        </G>
+        {/* Tranche 3D inférieure/gauche (#D98218) donnant l'épaisseur en perspective douce */}
+        <Path
+          d="M37.8 17.5C42.6 9.2 54.6 9.2 59.4 17.5L83.2 58.8C88.0 67.1 82.0 77.5 72.4 77.5H24.8C15.2 77.5 9.2 67.1 14.0 58.8L37.8 17.5Z"
+          fill="#D98218"
+          transform="translate(-3.5, 4.5)"
+        />
+
+        {/* Face avant principale ambre chaud (#F5A623) aux coins très arrondis */}
+        <Path
+          d="M39.2 16.0C44.0 7.7 56.0 7.7 60.8 16.0L84.6 57.3C89.4 65.6 83.4 76.0 73.8 76.0H26.2C16.6 76.0 10.6 65.6 15.4 57.3L39.2 16.0Z"
+          fill="#F5A623"
+        />
+
+        {/* Dégradé supérieur jaune doré lumineux (#FFE047) */}
+        <Path
+          d="M40.2 17.2C44.5 9.8 55.5 9.8 59.8 17.2L79.5 51.4C64.0 56.5 36.0 56.5 20.5 51.4L40.2 17.2Z"
+          fill="#FFE047"
+          fillOpacity={0.78}
+        />
+
+        {/* Dôme de brillance supérieur glossy */}
+        <Path
+          d="M42.0 19.0C45.5 13.0 54.5 13.0 58.0 19.0L70.5 40.6C58.0 37.2 42.0 37.2 29.5 40.6L42.0 19.0Z"
+          fill="#FFFFFF"
+          fillOpacity={0.35}
+        />
+
+        {/* Grand point d'exclamation (!) gris anthracite (#262B31) centré */}
+        <Rect
+          x="45.8"
+          y="28.5"
+          width="7.4"
+          height="23.5"
+          rx="3.7"
+          fill="#262B31"
+        />
+        <Circle cx="49.5" cy="61.5" r="4.3" fill="#262B31" />
       </Svg>
     </Animated.View>
   );
@@ -247,20 +228,24 @@ export const SaveCouponModal: React.FC<SaveCouponModalProps> = ({
   }, [visible, couponCode]);
 
   const accentColor = isMelbet
-    ? '#E58E26'
+    ? '#D89228'
     : currentTheme.colors.primary || '#228BE6';
 
   const dialogBg = isMelbet
     ? isDark
-      ? '#2B3037'
+      ? '#353B43'
       : '#FFFFFF'
     : isDark
-      ? currentTheme.colors.cardBackground || '#1E2733'
+      ? '#353B43'
       : '#FFFFFF';
 
-  const buttonBg = isDark ? '#383E47' : '#F1F5F9';
+  const buttonBg = isDark
+    ? isMelbet
+      ? '#48453E'
+      : '#383E47'
+    : '#F1F5F9';
   const titleColor = isDark ? '#FFFFFF' : '#111827';
-  const messageColor = isDark ? '#A0AAB4' : '#64748B';
+  const messageColor = isDark ? '#A5AEB7' : '#64748B';
 
   const handleCopy = async () => {
     if (!couponCode) return;
@@ -286,7 +271,7 @@ export const SaveCouponModal: React.FC<SaveCouponModalProps> = ({
         >
           {step === 'save' ? (
             <>
-              {/* Icône 3D Triangle d'attention jaune/ambre */}
+              {/* Icône 3D Triangle d'attention jaune/ambre (96x96, marginBottom: 20) */}
               <View style={styles.iconWrapper}>
                 <WarningTriangle3DIcon />
               </View>
@@ -296,14 +281,9 @@ export const SaveCouponModal: React.FC<SaveCouponModalProps> = ({
                 Enregistrer
               </Text>
 
-              {/* Message explicatif avec code */}
+              {/* Message explicatif avec code (même police, graisse 400 et couleur #A5AEB7) */}
               <Text style={[styles.message, { color: messageColor }]}>
-                Coupon de pari enregistré avec succès avec le code{' '}
-                <Text style={{ color: titleColor, fontWeight: '700' }}>
-                  {couponCode}
-                </Text>
-                . Vous pouvez charger votre coupon de pari à l'aide de ce code
-                ou le partager avec vos amis afin de jouer ensemble !
+                {`Coupon de pari enregistré avec succès avec le code ${couponCode}. Vous pouvez charger votre coupon de pari à l'aide de ce code ou le partager avec vos amis afin de jouer ensemble !`}
               </Text>
 
               {/* Boutons Annuler et Copier CÔTE À CÔTE */}
@@ -331,7 +311,7 @@ export const SaveCouponModal: React.FC<SaveCouponModalProps> = ({
                   <Text
                     style={[
                       styles.buttonText,
-                      { color: accentColor, fontWeight: '700' },
+                      { color: accentColor, fontWeight: '600' },
                     ]}
                   >
                     Copier
@@ -342,7 +322,7 @@ export const SaveCouponModal: React.FC<SaveCouponModalProps> = ({
           ) : (
             <>
               {/* Icône 3D Coussin bleu-violet avec "i" */}
-              <View style={styles.iconWrapper}>
+              <View style={[styles.iconWrapper, { marginBottom: 16 }]}>
                 <InfoCushion3DIcon />
               </View>
 
@@ -350,7 +330,7 @@ export const SaveCouponModal: React.FC<SaveCouponModalProps> = ({
               <Text style={[styles.title, { color: titleColor }]}>Coupon</Text>
 
               {/* Sous-titre Code copié */}
-              <Text style={[styles.message, { color: messageColor, marginVertical: 10 }]}>
+              <Text style={[styles.message, { color: messageColor }]}>
                 Code copié
               </Text>
 
@@ -363,7 +343,7 @@ export const SaveCouponModal: React.FC<SaveCouponModalProps> = ({
                 <Text
                   style={[
                     styles.buttonText,
-                    { color: accentColor, fontWeight: '700' },
+                    { color: accentColor, fontWeight: '600' },
                   ]}
                 >
                   OK
@@ -390,20 +370,17 @@ export const ClearCouponConfirmModal: React.FC<ClearCouponConfirmModalProps> = (
   const isMelbet = currentTheme.name.toLowerCase().includes('melbet');
 
   const accentColor = isMelbet
-    ? '#E58E26'
+    ? '#D89228'
     : currentTheme.colors.primary || '#228BE6';
 
-  const dialogBg = isMelbet
-    ? isDark
-      ? '#2B3037'
-      : '#FFFFFF'
-    : isDark
-      ? currentTheme.colors.cardBackground || '#1E2733'
-      : '#FFFFFF';
-
-  const buttonBg = isDark ? '#383E47' : '#F1F5F9';
+  const dialogBg = isDark ? '#353B43' : '#FFFFFF';
+  const buttonBg = isDark
+    ? isMelbet
+      ? '#48453E'
+      : '#383E47'
+    : '#F1F5F9';
   const titleColor = isDark ? '#FFFFFF' : '#111827';
-  const messageColor = isDark ? '#A0AAB4' : '#64748B';
+  const messageColor = isDark ? '#A5AEB7' : '#64748B';
 
   return (
     <Modal
@@ -417,7 +394,7 @@ export const ClearCouponConfirmModal: React.FC<ClearCouponConfirmModalProps> = (
           style={[styles.dialogContainer, { backgroundColor: dialogBg }]}
           onPress={(e) => e.stopPropagation()}
         >
-          <View style={styles.iconWrapper}>
+          <View style={[styles.iconWrapper, { marginBottom: 16 }]}>
             <InfoCushion3DIcon />
           </View>
 
@@ -453,7 +430,7 @@ export const ClearCouponConfirmModal: React.FC<ClearCouponConfirmModalProps> = (
               <Text
                 style={[
                   styles.buttonText,
-                  { color: accentColor, fontWeight: '700' },
+                  { color: accentColor, fontWeight: '600' },
                 ]}
               >
                 OK
@@ -472,15 +449,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.62)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 28,
   },
   dialogContainer: {
-    width: '100%',
-    maxWidth: 336,
+    width: '82%',
+    maxWidth: 320,
+    backgroundColor: '#353B43',
     borderRadius: 18,
-    paddingTop: 18,
-    paddingBottom: 16,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    paddingTop: 28,
+    paddingBottom: 18,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -493,27 +470,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 17.5,
     fontWeight: '700',
+    color: '#FFFFFF',
     textAlign: 'center',
-    marginTop: 12,
+    marginBottom: 8,
   },
   message: {
-    fontSize: 13.5,
+    fontSize: 14.5,
+    fontWeight: '400',
+    color: '#A5AEB7',
     textAlign: 'center',
-    lineHeight: 19,
-    marginVertical: 12,
+    lineHeight: 20,
+    marginBottom: 20,
   },
   sideBySideButtons: {
     flexDirection: 'row',
     width: '100%',
-    gap: 10,
-    marginTop: 4,
+    gap: 12,
   },
   halfButton: {
     flex: 1,
     height: 42,
     borderRadius: 10,
+    backgroundColor: '#48453E',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -521,12 +501,13 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 42,
     borderRadius: 10,
+    backgroundColor: '#48453E',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
   },
   buttonText: {
     fontSize: 15,
+    fontWeight: '600',
   },
 });
 

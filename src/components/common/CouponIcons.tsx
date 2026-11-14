@@ -292,35 +292,21 @@ export const CreateCouponActionIcon: React.FC<{
 };
 
 // ============================================================================
-// 8. ICÔNE MENU ACTIONS COUPON (3 points horizontaux centraux + traits haut/bas)
+// 8. ICÔNE MENU ACTIONS COUPON (3 points ronds horizontaux simples ••• sans traits)
 // ============================================================================
 export const CouponMenuDotsIcon: React.FC<IconProps> = ({
   size = 20,
   color,
 }) => {
   const { currentTheme } = useThemeStore();
-  const iconColor = color || '#8A949E' || currentTheme.colors.textSecondary;
+  const iconColor = color || '#7E8791' || currentTheme.colors.textSecondary;
 
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      {/* Petit trait horizontal supérieur */}
-      <Path
-        d="M8.5 5.5H15.5"
-        stroke={iconColor}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-      />
-      {/* 3 points horizontaux centraux */}
-      <Circle cx="5.5" cy="12" r="1.8" fill={iconColor} />
-      <Circle cx="12" cy="12" r="1.8" fill={iconColor} />
-      <Circle cx="18.5" cy="12" r="1.8" fill={iconColor} />
-      {/* Petit trait horizontal inférieur */}
-      <Path
-        d="M8.5 18.5H15.5"
-        stroke={iconColor}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-      />
+    <Svg width={size * (20.5 / 20)} height={size} viewBox="0 0 20.5 20" fill="none">
+      {/* 3 points ronds horizontaux simples : diamètre 4.5px (r=2.25), espacement 3.5px */}
+      <Circle cx="2.25" cy="10" r="2.25" fill={iconColor} />
+      <Circle cx="10.25" cy="10" r="2.25" fill={iconColor} />
+      <Circle cx="18.25" cy="10" r="2.25" fill={iconColor} />
     </Svg>
   );
 };

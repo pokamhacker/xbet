@@ -36,20 +36,21 @@ export interface BetBottomSheetProps {
   theme?: any;
 }
 
-const formatExactBalance = (val: number): string => {
-  if (typeof val !== 'number' || Number.isNaN(val)) return '0';
-  return Number.isInteger(val)
-    ? val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-    : val.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-};
-
-const formatExactPayout = (val: number): string => {
+const formatWithSpacesAndDot = (val: number): string => {
   if (typeof val !== 'number' || Number.isNaN(val)) return '0';
   const rounded = Math.round(val * 100) / 100;
-  return Number.isInteger(rounded)
-    ? rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-    : rounded.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const [intPart, decPart] = rounded.toFixed(2).split('.');
+  const formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  if (!decPart || decPart === '00') {
+    return formattedInt;
+  }
+  const trimmedDec = decPart.replace(/0+$/, '');
+  return `${formattedInt}.${trimmedDec}`;
 };
+
+const formatExactBalance = (val: number): string => formatWithSpacesAndDot(val);
+
+const formatExactPayout = (val: number): string => formatWithSpacesAndDot(val);
 
 export const BetBottomSheet: React.FC<BetBottomSheetProps> = ({
   eventsCount,
@@ -89,39 +90,33 @@ export const BetBottomSheet: React.FC<BetBottomSheetProps> = ({
 
   // Couleurs calibrées dynamiquement (Melbet & 1xBet, Sombre & Clair)
   const accentColor = isMelbet
-    ? '#E58E26'
+    ? '#D89228'
     : currentTheme.colors.primary || '#228BE6';
 
   const pariButtonBg = isMelbet
-    ? '#C87D20'
+    ? '#D88D23'
     : currentTheme.colors.accentGreen || currentTheme.colors.primary || '#54962B';
 
   const sheetBg = isMelbet
     ? isDark
-      ? '#2E343B'
+      ? '#2B3138'
       : '#FFFFFF'
     : isDark
-      ? currentTheme.colors.cardBackground || '#1E2733'
+      ? currentTheme.colors.cardBackground || '#2B3138'
       : '#FFFFFF';
 
   const recessedCardBg = isMelbet
     ? isDark
-      ? '#262B31'
+      ? '#20252B'
       : '#F3F5F8'
     : isDark
-      ? '#161F2C'
+      ? '#20252B'
       : '#F1F5F9';
 
-  const handleColor = isDark ? '#4A5058' : '#CBD5E1';
+  const handleColor = isDark ? '#525A63' : '#CBD5E1';
   const textPrimary = isDark ? '#FFFFFF' : '#111827';
   const textSecondary = isDark ? '#8A949E' : '#64748B';
-  const stepButtonBg = isMelbet
-    ? isDark
-      ? '#323840'
-      : '#E5E7EB'
-    : isDark
-      ? '#243042'
-      : '#E2E8F0';
+  const mutedGray = isDark ? '#7E8791' : '#64748B';
 
   const oddsDisplayColor =
     oddsTrend === 'up'
@@ -174,7 +169,7 @@ export const BetBottomSheet: React.FC<BetBottomSheetProps> = ({
             Événements
           </Text>
           <View style={styles.summaryEventsRight}>
-            <BetLayersIcon size={15} color={accentColor} />
+            <BetLayersIcon size={14} color={accentColor} />
             <Text style={[styles.summaryEventsValue, { color: textPrimary }]}>
               {eventsCount}
             </Text>
@@ -271,7 +266,7 @@ export const BetBottomSheet: React.FC<BetBottomSheetProps> = ({
                       styles.segmentedTabText,
                       {
                         color: active ? '#FFFFFF' : textSecondary,
-                        fontWeight: active ? '700' : '500',
+                        fontWeight: active ? '600' : '500',
                       },
                     ]}
                     numberOfLines={1}
@@ -332,8 +327,8 @@ export const BetBottomSheet: React.FC<BetBottomSheetProps> = ({
 
           {/* 5. Ligne de saisie de Mise (ou Code promo) + Bouton Pari CÔTE À CÔTE */}
           {betTab === 'Mise' ? (
-            <View style={styles.stakeAndPariRow}>
-              <View style={styles.stakeLeftCol}>
+            <View>
+              <View style={styles.stakeAndPariRow}>
                 <View style={[styles.stakeInputContainer, { backgroundColor: recessedCardBg }]}>
                   <TextInput
                     style={[
@@ -353,59 +348,54 @@ export const BetBottomSheet: React.FC<BetBottomSheetProps> = ({
                   <TouchableOpacity
                     activeOpacity={0.75}
                     onPress={() => onStakeChange(Math.max(90, stake - 100))}
-                    style={[styles.stepBtnBox, { backgroundColor: stepButtonBg }]}
+                    style={styles.inlineStepBtn}
                   >
-                    <Text style={[styles.stepMinusSymbol, { color: textSecondary }]}>
+                    <Text style={[styles.inlineStepMinusText, { color: mutedGray }]}>
                       —
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     activeOpacity={0.75}
                     onPress={() => onStakeChange(stake + 100)}
-                    style={[
-                      styles.stepBtnBox,
-                      { backgroundColor: stepButtonBg, marginLeft: 6 },
-                    ]}
+                    style={styles.inlineStepBtn}
                   >
-                    <Text style={[styles.stepPlusSymbol, { color: accentColor }]}>
+                    <Text style={[styles.inlineStepPlusText, { color: accentColor }]}>
                       +
                     </Text>
                   </TouchableOpacity>
                 </View>
 
-                <Text style={[styles.limitsText, { color: textSecondary }]}>
-                  90 F - 1 910 000 F
-                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={onPlaceBet}
+                  style={[styles.sidePariButton, { backgroundColor: pariButtonBg }]}
+                >
+                  <Text style={styles.sidePariButtonText}>Pari</Text>
+                </TouchableOpacity>
               </View>
 
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={onPlaceBet}
-                style={[styles.sidePariButton, { backgroundColor: pariButtonBg }]}
-              >
-                <Text style={styles.sidePariButtonText}>Pari</Text>
-              </TouchableOpacity>
+              <Text style={[styles.limitsText, { color: mutedGray }]}>
+                90 F - 1 910 000 F
+              </Text>
             </View>
           ) : (
             <View style={styles.stakeAndPariRow}>
-              <View style={styles.stakeLeftCol}>
-                <View style={[styles.stakeInputContainer, { backgroundColor: recessedCardBg }]}>
-                  <TextInput
-                    style={[
-                      styles.stakeInput,
-                      { color: textPrimary, fontSize: 14.5 },
-                      Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
-                    ]}
-                    placeholder={
-                      betTab === 'Code promo'
-                        ? 'Saisir le code promo'
-                        : 'Cote de référence'
-                    }
-                    placeholderTextColor={textSecondary}
-                    value={promoCode}
-                    onChangeText={onPromoCodeChange}
-                  />
-                </View>
+              <View style={[styles.stakeInputContainer, { backgroundColor: recessedCardBg }]}>
+                <TextInput
+                  style={[
+                    styles.stakeInput,
+                    { color: textPrimary, fontSize: 14.5 },
+                    Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                  ]}
+                  placeholder={
+                    betTab === 'Code promo'
+                      ? 'Saisir le code promo'
+                      : 'Cote de référence'
+                  }
+                  placeholderTextColor={textSecondary}
+                  value={promoCode}
+                  onChangeText={onPromoCodeChange}
+                />
               </View>
               <TouchableOpacity
                 activeOpacity={0.85}
@@ -478,11 +468,12 @@ export const BetBottomSheet: React.FC<BetBottomSheetProps> = ({
 
 const styles = StyleSheet.create({
   sheetContainer: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 14,
-    paddingBottom: 14,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,
@@ -497,10 +488,10 @@ const styles = StyleSheet.create({
     width: 32,
     height: 4,
     borderRadius: 2,
-    marginVertical: 8,
+    marginBottom: 8,
   },
   summaryBox: {
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 10,
@@ -517,11 +508,11 @@ const styles = StyleSheet.create({
   summaryEventsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
   },
   summaryEventsValue: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
+    marginLeft: 4,
   },
   summaryOddsRight: {
     flexDirection: 'row',
@@ -549,7 +540,7 @@ const styles = StyleSheet.create({
   collapsedPariButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   oddsChangeRow: {
     flexDirection: 'row',
@@ -576,14 +567,15 @@ const styles = StyleSheet.create({
   },
   segmentedTrack: {
     flexDirection: 'row',
-    height: 34,
+    height: 36,
     borderRadius: 8,
+    padding: 2,
     overflow: 'hidden',
   },
   segmentedTab: {
     flex: 1,
-    height: 34,
-    borderRadius: 8,
+    height: '100%',
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
@@ -592,8 +584,8 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
   },
   soldeCard: {
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 10,
+    padding: 10,
     marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -631,58 +623,60 @@ const styles = StyleSheet.create({
   },
   stakeAndPariRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
     marginTop: 10,
   },
-  stakeLeftCol: {
-    flex: 1,
-  },
   stakeInputContainer: {
+    flex: 1,
+    minWidth: 0,
     height: 46,
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 12,
-    paddingRight: 6,
+    paddingHorizontal: 12,
+    overflow: 'hidden',
   },
   stakeInput: {
     flex: 1,
+    minWidth: 0,
+    width: '100%',
     fontSize: 16,
     fontWeight: '700',
     paddingVertical: 0,
   },
-  stepBtnBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 7,
+  inlineStepBtn: {
+    paddingHorizontal: 8,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepMinusSymbol: {
-    fontSize: 15,
-    fontWeight: '700',
+  inlineStepMinusText: {
+    fontSize: 20,
+    fontWeight: '500',
+    lineHeight: 22,
   },
-  stepPlusSymbol: {
-    fontSize: 18,
-    fontWeight: '600',
+  inlineStepPlusText: {
+    fontSize: 20,
+    fontWeight: '500',
+    lineHeight: 22,
   },
   limitsText: {
     fontSize: 11.5,
     marginTop: 4,
-    marginLeft: 4,
+    marginLeft: 2,
   },
   sidePariButton: {
-    width: 115,
+    width: 112,
     height: 46,
     borderRadius: 10,
+    marginLeft: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sidePariButtonText: {
     color: '#FFFFFF',
-    fontSize: 15.5,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
   },
   payoutInfoRow: {
     flexDirection: 'row',

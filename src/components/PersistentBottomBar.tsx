@@ -172,7 +172,9 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
   const inactiveColor = theme?.bottomBar?.inactive || theme?.inactive || Colors.textSecondary;
   const barBg = getBottomBarBgColor(theme);
   const barBorder = theme?.bottomBar?.barBorder || theme?.barBorder || Colors.border;
-  const centerBg = theme?.bottomBar?.centerBg || theme?.centerBg || Colors.primary;
+  const centerBg = isMelbet
+    ? '#D89228'
+    : theme?.bottomBar?.centerBg || theme?.centerBg || Colors.primary;
   const centerTint = theme?.bottomBar?.centerTint || theme?.centerTint || (theme?.name?.startsWith('melbet') && theme?.isDark ? '#000000' : '#FFFFFF');
 
   // Insets dynamiques pour adaptation parfaite mobile (notches, barres de gestes Android/iOS) et desktop
@@ -276,7 +278,8 @@ export const PersistentBottomBar: React.FC<PersistentBottomBarProps> = ({
               {
                 backgroundColor: centerBg,
                 shadowColor: centerBg,
-                borderColor: barBg,
+                borderWidth: 2,
+                borderColor: '#FFFFFF',
               },
             ]}
           >
@@ -417,15 +420,15 @@ const styles = StyleSheet.create({
   centerCircle: {
     position: 'absolute',
     top: -16,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#243DB5',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#D89228',
     borderWidth: 2,
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#243DB5',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -438,12 +441,10 @@ const styles = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#E54D42',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
   },
   orangeBadgeText: {
     color: '#FFFFFF',

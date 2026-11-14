@@ -16,6 +16,7 @@ import {
   Share,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { useIsFocused } from '@react-navigation/native';
 import { useResponsive } from '../utils/responsive';
 import { useThemeStore } from '../store/themeStore';
@@ -269,8 +270,9 @@ export default function CouponScreen({ navigation }: any) {
     const code = saveCouponCode();
     if (code) {
       setSavedCouponCode(code);
-      // 2. Fermer le Bottom Sheet d'options s'il est ouvert
+      // 2. Fermer le Bottom Sheet d'options s'il est ouvert et replier le tiroir de mise
       setShow3DotsMenu(false);
+      setIsExpanded(false);
       // 3. Afficher UNIQUEMENT la nouvelle SaveCouponModal
       setIsSaveModalVisible(true);
     } else {
@@ -355,33 +357,26 @@ export default function CouponScreen({ navigation }: any) {
   const isMelbet = themeName.includes('melbet');
   const isBlack = themeName.includes('black');
 
-  const screenBg = getScreenBgColor(currentTheme);
-  const headerBg = getHeaderBgColor(currentTheme);
+  const rawScreenBg = getScreenBgColor(currentTheme);
+  const rawHeaderBg = getHeaderBgColor(currentTheme);
+  const screenBg = isMelbet && isDark ? '#21262C' : rawScreenBg;
+  const headerBg = isMelbet && isDark ? '#21262C' : hasSelections && isDark ? screenBg : rawHeaderBg;
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
 
   const textPrimary = currentTheme.textPrimary || (isDark ? '#FFFFFF' : '#00325E');
   const textSecondary = currentTheme.textSecondary || (isDark ? '#8FA2B6' : '#6E849B');
 
-  // Couleur unifiée pour le sélecteur "Pari simple ⌄" / "Combiné ⌄", la Corbeille et les 3 points
-  const headerIconAndTextColor = isParipesa
-    ? isDark
-      ? '#9BA1AF'
-      : '#48658D'
-    : isMegaPari
-      ? isDark
-        ? '#8C92A2'
-        : '#586474'
-      : isMelbet
-        ? isDark
-          ? '#9CA3AF'
-          : '#557089'
-        : isDark
-          ? '#94A1B4'
-          : '#557089';
+  // Couleur pour le sélecteur "Combiné ⌄" (#9BA3AE) et les icônes Corbeille / Menu (#7E8791)
+  const headerSelectorColor = isDark ? '#9BA3AE' : '#557089';
+  const headerIconsColor = isDark ? '#7E8791' : '#557089';
+  const boosterAccentColor = isMelbet
+    ? '#D89228'
+    : (currentTheme as any).accent || currentTheme.primary || '#D89228';
 
-  const headerSelectorColor = headerIconAndTextColor;
-  const trashIconColor = headerIconAndTextColor;
-  const dotsIconColor = headerIconAndTextColor;
+  const eligibleBoosterCount = currentSelections.filter(
+    (ev) => (Number(ev.odd) || 0) >= 1.2
+  ).length;
+  const neededForBoosterBonus = Math.max(0, 4 - eligibleBoosterCount);
 
   const effectiveTicketLabel =
     currentSelections.length > 1 && ticketType === 'Simple'
@@ -397,6 +392,15 @@ export default function CouponScreen({ navigation }: any) {
         ? StatusBar.currentHeight || 0
         : 0;
 
+  const androidBottomPad = Platform.OS === 'android' ? 12 : 0;
+  const bottomSafeInset =
+    (insets?.bottom ?? 0) > 0
+      ? Math.max(insets.bottom, androidBottomPad)
+      : Platform.OS === 'ios'
+        ? 20
+        : androidBottomPad;
+  const bottomTabBarHeight = 56 + bottomSafeInset;
+
   return (
     <View
       style={[
@@ -411,16 +415,24 @@ export default function CouponScreen({ navigation }: any) {
         barStyle={statusBarStyle}
         {...({ translucent: true, backgroundColor: 'transparent' } as any)}
       />
-      <View style={[styles.mainContainer, { backgroundColor: screenBg }]}>
+      <View
+        style={[
+          styles.mainContainer,
+          {
+            backgroundColor: screenBg,
+            paddingBottom: bottomTabBarHeight,
+          },
+        ]}
+      >
         {/* ===================================================================== */}
-        {/* 1. BARRE SUPÉRIEURE (HEADER — Edge-to-Edge avec insets.top)           */}
+        {/* 1. BARRE SUPÉRIEURE (HEADER — Fusionné avec le fond #21262C)          */}
         {/* ===================================================================== */}
         <View
           style={[
             styles.header,
             {
               backgroundColor: headerBg,
-              borderBottomColor: currentTheme.divider || currentTheme.border || screenBg,
+              borderBottomWidth: 0,
               paddingTop: topSafeInset,
               height: 52 + topSafeInset,
             },
@@ -428,7 +440,7 @@ export default function CouponScreen({ navigation }: any) {
         >
           {hasSelections ? (
             <>
-              {/* Titre centré : Texte Pari simple / Combiné centré horizontalement avec chevron vers le bas */}
+              {/* Titre centré : Texte Combiné (16.5px, 500, #9BA3AE) avec chevron ⌄ (#9BA3AE) */}
               <View style={[styles.headerCenterTitleWrap, { top: topSafeInset }]} pointerEvents="box-none">
                 <TouchableOpacity
                   style={styles.ticketTypeDropdown}
@@ -444,7 +456,7 @@ export default function CouponScreen({ navigation }: any) {
                     name="chevron-down"
                     size={15}
                     color={headerSelectorColor}
-                    style={{ marginLeft: 6 }}
+                    style={{ marginLeft: 5 }}
                   />
                 </TouchableOpacity>
               </View>
@@ -452,7 +464,7 @@ export default function CouponScreen({ navigation }: any) {
               {/* Espace gauche pour le centrage horizontal strict */}
               <View style={{ width: 44 }} />
 
-              {/* Icônes d'actions (droite) : Corbeille fine (20x20, #8A949E) + Menu actions (20x20, gap: 18) */}
+              {/* Icônes d'actions (droite) : Corbeille (#7E8791, 20x20) + Menu ••• (#7E8791, gap: 18) */}
               <View style={styles.headerRightActions}>
                 <TouchableOpacity
                   onPress={() => setIsClearConfirmVisible(true)}
@@ -462,20 +474,23 @@ export default function CouponScreen({ navigation }: any) {
                 >
                   <TrashBinIcon
                     size={20}
-                    color="#8A949E"
+                    color={headerIconsColor}
                     cutoutColor={headerBg}
                   />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.headerActionBtn}
-                  onPress={() => setShow3DotsMenu(true)}
+                  onPress={() => {
+                    setIsExpanded(false);
+                    setShow3DotsMenu(true);
+                  }}
                   accessibilityLabel="Options du coupon"
                   activeOpacity={0.7}
                 >
                   <CouponMenuDotsIcon
                     size={20}
-                    color="#8A949E"
+                    color={headerIconsColor}
                   />
                 </TouchableOpacity>
               </View>
@@ -549,9 +564,108 @@ export default function CouponScreen({ navigation }: any) {
             </View>
           ) : (
             /* ================================================================= */
-            /* ÉTAT ACTIF : CARTES DES ÉVÉNEMENTS ACTIFS                         */
+            /* ÉTAT ACTIF : BOOSTER DE COMBINÉ + CARTES DES ÉVÉNEMENTS ACTIFS     */
             /* ================================================================= */
             <View style={styles.activeListContainer}>
+              {currentSelections.length > 1 && !isBoosterDismissed && (
+                <View
+                  style={[
+                    styles.boosterCard,
+                    {
+                      backgroundColor: isDark ? '#262C33' : '#FFFFFF',
+                      borderColor: boosterAccentColor,
+                    },
+                  ]}
+                >
+                  {/* Ligne 1 : ⚡ + Booster de Combiné + ⓘ | ✕ */}
+                  <View style={styles.boosterHeaderRow}>
+                    <View style={styles.boosterTitleGroup}>
+                      {/* Icône éclair plein ⚡ (15x15) */}
+                      <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                        <Path
+                          d="M13 2L4.5 13.5H11.5L10.5 22L19.5 10.5H12.5L13 2Z"
+                          fill={boosterAccentColor}
+                          stroke={boosterAccentColor}
+                          strokeWidth={1.2}
+                          strokeLinejoin="round"
+                        />
+                      </Svg>
+                      <Text
+                        style={[
+                          styles.boosterTitleText,
+                          { color: isDark ? '#E2E6EA' : '#1E242B' },
+                        ]}
+                      >
+                        Booster de Combiné
+                      </Text>
+                      {/* Icône info ⓘ (#7E8791, 15x15) */}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() =>
+                          Alert.alert(
+                            'Booster de Combiné',
+                            'Ajoutez au moins 4 sélections avec une cote supérieure ou égale à 1.2 pour recevoir un bonus sur la cote totale de votre combiné.'
+                          )
+                        }
+                        style={{ marginLeft: 6 }}
+                      >
+                        <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                          <Circle
+                            cx="12"
+                            cy="12"
+                            r="9.5"
+                            stroke="#7E8791"
+                            strokeWidth={1.8}
+                          />
+                          <Path
+                            d="M12 11V16.5"
+                            stroke="#7E8791"
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                          />
+                          <Circle cx="12" cy="7.8" r="1.1" fill="#7E8791" />
+                        </Svg>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Bouton croix ✕ en #D89228 (14x14) */}
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setIsBoosterDismissed(true)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                        <Path
+                          d="M5 5L19 19M19 5L5 19"
+                          stroke={boosterAccentColor}
+                          strokeWidth={2.2}
+                          strokeLinecap="round"
+                        />
+                      </Svg>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Ligne 2 : Cas A (Bonus non encore atteint) vs Cas B (Bonus actif) */}
+                  {neededForBoosterBonus > 0 ? (
+                    <Text style={styles.boosterBodyText}>
+                      Ajoutez plus de sélections avec une cote supérieure ou égale à 1.2 pour bénéficier du bonus. Nombre de sélections que vous devez ajouter : {neededForBoosterBonus}
+                    </Text>
+                  ) : (
+                    <View style={styles.boosterActiveOddsRow}>
+                      <Text style={styles.boosterActiveLabel}>Cote</Text>
+                      <Text
+                        style={[
+                          styles.boosterActiveValue,
+                          { color: isDark ? '#FFFFFF' : '#1E242B' },
+                        ]}
+                      >
+                        1.03
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
               {currentSelections.map((event) => {
                 const liveInfo = liveEventOdds[event.id];
                 return (
@@ -842,7 +956,7 @@ const styles = StyleSheet.create({
   contentScrollView: {
     flexGrow: 1,
     width: '100%',
-    paddingBottom: 110,
+    paddingBottom: 24,
   },
   container: {
     flex: 1,
@@ -853,7 +967,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     zIndex: 5,
   },
   headerCenterTitleWrap: {
@@ -872,9 +986,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   ticketTypeDropdownText: {
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.3,
+    fontSize: 16.5,
+    fontWeight: '500',
+    letterSpacing: -0.2,
   },
   headerRightActions: {
     flexDirection: 'row',
@@ -903,26 +1017,26 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   scrollContent: {
-    paddingBottom: 110,
+    paddingBottom: 24,
   },
   activeListContainer: {
-    paddingTop: 2,
+    paddingTop: 4,
   },
   boosterCard: {
-    borderWidth: 1.5,
+    borderWidth: 1.2,
     borderStyle: 'dashed',
-    borderColor: '#E5B022',
+    borderColor: '#D89228',
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
+    backgroundColor: '#262C33',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginHorizontal: 12,
+    marginBottom: 8,
   },
   boosterHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
   },
   boosterTitleGroup: {
     flexDirection: 'row',
@@ -931,16 +1045,33 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   boosterTitleText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1E242B',
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#E2E6EA',
     marginLeft: 6,
   },
   boosterBodyText: {
-    fontSize: 12.5,
-    lineHeight: 17.5,
-    color: '#6E7C8C',
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#7E8791',
     fontWeight: '400',
+    marginTop: 6,
+  },
+  boosterActiveOddsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  boosterActiveLabel: {
+    fontSize: 13.5,
+    color: '#8A949E',
+    fontWeight: '400',
+  },
+  boosterActiveValue: {
+    fontSize: 14.5,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 
   /* Empty State */
