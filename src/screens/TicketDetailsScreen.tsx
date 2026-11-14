@@ -1206,71 +1206,75 @@ export default function TicketDetailsScreen({
             { backgroundColor: cardSurfaceBg, overflow: 'hidden' },
           ]}
         >
-          {/* En-tête du ticket : Avatar (52x52) + Colonne centrale + Badge • En direct */}
+          {/* En-tête du ticket : Avatar + Type + Date + Badge • En direct */}
           <View style={styles.summaryHeaderRow}>
             <View style={styles.avatarWrap}>
               <View
                 style={[
                   styles.avatarCircle,
                   {
-                    backgroundColor: avatarCircleBg,
+                    backgroundColor:
+                      (currentTheme as any).surfaceSecondary ||
+                      (isDark ? 'rgba(255,255,255,0.08)' : '#E9EFF6'),
                   },
                 ]}
               >
-                {isFifaCoupon && !isCombine ? (
-                  <Text style={[styles.fifaAvatarText, { color: avatarFifaTextColor }]}>FIFA</Text>
-                ) : (
-                  <Image
-                    source={
-                      isPokerCoupon
-                        ? ASSET_ICONS.poker
-                        : isCombine
-                        ? ASSET_ICONS.combine
-                        : isFifaCoupon
-                        ? ASSET_ICONS.fifa
-                        : ASSET_ICONS.football
-                    }
-                    style={[
-                      isPokerCoupon
-                        ? styles.avatarIconPoker
-                        : isCombine
-                        ? styles.avatarIconCombine
-                        : isFifaCoupon
-                        ? styles.avatarIconFifa
-                        : styles.avatarIcon,
-                      {
-                        tintColor: avatarContentColor,
-                      },
-                    ]}
-                    resizeMode="contain"
-                  />
-                )}
+                <Image
+                  source={
+                    isPokerCoupon
+                      ? ASSET_ICONS.poker
+                      : isCombine
+                      ? ASSET_ICONS.combine
+                      : isFifaCoupon
+                      ? ASSET_ICONS.fifa
+                      : ASSET_ICONS.football
+                  }
+                  style={[
+                    isPokerCoupon
+                      ? styles.avatarIconPoker
+                      : isCombine
+                      ? styles.avatarIconCombine
+                      : isFifaCoupon
+                      ? styles.avatarIconFifa
+                      : styles.avatarIcon,
+                    {
+                      tintColor: isPokerCoupon
+                        ? (currentTheme as any).iconSlate || (isDark ? '#8A9DB0' : '#5C7690')
+                        : currentTheme.textSecondary || (isDark ? '#8A9DB0' : '#6E849B'),
+                    },
+                  ]}
+                  resizeMode="contain"
+                />
               </View>
 
-              {/* Badge circulaire adapté au thème actif */}
+              {/* Badge de vérification superposé en bas à droite (identique au matin) */}
               <View
                 style={[
                   styles.statusMiniDot,
                   {
-                    backgroundColor: statusBadgeBg,
-                    borderColor: cardSurfaceBg || '#373F42',
+                    backgroundColor: isPaid
+                      ? '#52B76E'
+                      : isLost
+                      ? (currentTheme.status?.perdu || '#E74C3C')
+                      : (currentTheme.status?.accepte || currentTheme.primary || '#4A8FE7'),
+                    borderColor: cardSurfaceBg || currentTheme.cardBackground || '#FFFFFF',
                     borderWidth: 1.5,
                   },
                 ]}
               >
                 {(isAccepted || isPaid) && (
-                  <Svg width={10} height={10} viewBox="0 0 12 12" fill="none" style={{ width: 10, height: 10 }}>
+                  <Svg width={9.5} height={9.5} viewBox="0 0 12 12" fill="none" style={{ width: 9.5, height: 9.5 }}>
                     <Path
                       d="M2.5 6.2L5 8.6L9.6 3.6"
                       stroke="#FFFFFF"
-                      strokeWidth={2.1}
+                      strokeWidth={2}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
                   </Svg>
                 )}
                 {isLost && (
-                  <Svg width={9} height={9} viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}>
+                  <Svg width={8.5} height={8.5} viewBox="0 0 12 12" fill="none" style={{ width: 8.5, height: 8.5 }}>
                     <Rect x="2.5" y="5" width="7" height="2" rx="1" fill="#FFFFFF" />
                   </Svg>
                 )}
@@ -1324,7 +1328,7 @@ export default function TicketDetailsScreen({
                 <Text style={styles.liveRedBadgeText}>En direct</Text>
               </View>
             ) : currentCoupon?.badge === 'Serie A' ? (
-              <View style={[styles.leagueBadge, { backgroundColor: leagueBadgeBg }]}>
+              <View style={styles.leagueBadge}>
                 <Text style={styles.leagueBadgeText}>Serie A</Text>
               </View>
             ) : null}
@@ -1549,31 +1553,29 @@ export default function TicketDetailsScreen({
                   <Text style={styles.liveRedBadgeText}>En direct</Text>
                 </View>
               ) : ev.badge === 'Serie A' ? (
-                <View style={[styles.leagueBadge, { backgroundColor: leagueBadgeBg, position: 'absolute', top: 6, right: 6, zIndex: 5 }]}>
+                <View style={[styles.leagueBadge, { position: 'absolute', top: 6, right: 6, zIndex: 5 }]}>
                   <Text style={styles.leagueBadgeText}>Serie A</Text>
                 </View>
               ) : null}
 
-              {/* En-tête de la compétition */}
+              {/* En-tête de la compétition avec badge depuis assets/icons */}
               <View style={styles.eventCardHeader}>
-                {isFifaEvent ? (
-                  <Text style={[styles.eventFifaLeftLabel, { color: labelGrayColor }]}>FIFA</Text>
-                ) : (
-                  <View style={styles.eventSportIconWrap}>
-                    <Image
-                      source={
-                        ev.isPoker
-                          ? ASSET_ICONS.poker
-                          : ASSET_ICONS.football
-                      }
-                      style={[
-                        ev.isPoker ? styles.eventPokerIcon : styles.eventSportIcon,
-                        { tintColor: labelGrayColor },
-                      ]}
-                      resizeMode="contain"
-                    />
-                  </View>
-                )}
+                <View style={styles.eventSportIconWrap}>
+                  <Image
+                    source={
+                      ev.isPoker
+                        ? ASSET_ICONS.poker
+                        : ev.sport === 'FIFA' || ev.isFifa || isFifaEvent
+                        ? ASSET_ICONS.fifa
+                        : ASSET_ICONS.football
+                    }
+                    style={[
+                      ev.isPoker ? styles.eventPokerIcon : styles.eventSportIcon,
+                      { tintColor: currentTheme.textSecondary || '#6E849B' },
+                    ]}
+                    resizeMode="contain"
+                  />
+                </View>
 
                 <View style={styles.eventLeagueInfoCol}>
                   <Text
@@ -2265,56 +2267,48 @@ const styles = StyleSheet.create({
   },
   avatarWrap: {
     position: 'relative',
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
+    marginRight: 12,
   },
   avatarCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#2C3437',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E9EFF6',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fifaAvatarText: {
-    color: '#788083',
-    fontSize: 11.5,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
   avatarIcon: {
-    width: 24,
-    height: 24,
+    width: 26,
+    height: 26,
   },
   avatarIconPoker: {
-    width: 24,
-    height: 24,
-    tintColor: '#8C9497',
+    width: 26,
+    height: 26,
+    tintColor: '#6E849B',
   },
   avatarIconFifa: {
-    width: 26,
-    height: 18,
-    tintColor: '#8C9497',
+    width: 28,
+    height: 19,
+    tintColor: '#6E849B',
   },
   avatarIconCombine: {
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
   },
   statusMiniDot: {
     position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: '#373F42',
+    bottom: 0,
+    right: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   summaryMetaCol: {
     flex: 1,
-    marginLeft: 10,
     justifyContent: 'center',
   },
   summaryDateText: {
@@ -2337,15 +2331,15 @@ const styles = StyleSheet.create({
 
   // Badge Ligue Bleu (Serie A uniquement)
   leagueBadge: {
-    backgroundColor: '#527BFF',
+    backgroundColor: '#5973E8',
     borderRadius: 5,
-    paddingHorizontal: 6.5,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
     alignSelf: 'flex-start',
   },
   leagueBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '600',
   },
 

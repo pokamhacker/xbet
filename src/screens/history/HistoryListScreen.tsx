@@ -209,10 +209,10 @@ export const HistoryAvatarBadge: React.FC<{
 
   // Couleurs adaptées dynamiquement à tous les thèmes
   const badgeBg = isPaid
-    ? (currentTheme.status?.paye || currentTheme.colors?.accentGreen || '#52B76E')
+    ? '#52B76E'
     : isLost
-    ? (currentTheme.status?.perdu || currentTheme.colors?.accentRed || '#E74C3C')
-    : (currentTheme.status?.accepte || currentTheme.colors?.accentStatusAccepted || currentTheme.primary || '#4A89DC');
+    ? (currentTheme.status?.perdu || '#E74C3C')
+    : (currentTheme.status?.accepte || currentTheme.primary || '#4A89DC');
 
   const badgeBorderColor = currentTheme.cardBackground || '#FFFFFF';
   const iconTint = isPoker
@@ -498,32 +498,13 @@ export const HistoryCard: React.FC<HistoryCardProps> = ({
               )}
 
               {Boolean(pillBadgeText) && (
-                <View
-                  style={[
-                    styles.serieABadge,
-                    {
-                      backgroundColor: String(currentTheme.name || '').toLowerCase().includes('melbet')
-                        ? '#527BFF'
-                        : (currentTheme.primary || '#5973E8'),
-                    },
-                  ]}
-                >
+                <View style={styles.serieABadge}>
                   <Text style={styles.serieABadgeText}>{pillBadgeText}</Text>
                 </View>
               )}
 
               {isLive && !pillBadgeText && (
-                <View
-                  style={[
-                    styles.liveHistoryBadge,
-                    {
-                      backgroundColor:
-                        currentTheme.colors?.accentRed ||
-                        currentTheme.status?.perdu ||
-                        '#D94343',
-                    },
-                  ]}
-                >
+                <View style={styles.liveHistoryBadge}>
                   <View style={styles.liveHistoryDot} />
                   <Text style={styles.liveHistoryText}>En direct</Text>
                 </View>
