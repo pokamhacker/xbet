@@ -626,7 +626,7 @@ export default function TicketDetailsScreen({
       const oddNum = Math.max(1.01, Number(ev.odd) || 1.5);
       const baseProb = Math.min(0.95, 1 / oddNum);
       const liveProg = getEventLiveProgress(ev, currentTime);
-      const isEvLive = Boolean(ev.isFifa || ev.isLive || liveProg.isLive);
+      const isEvLive = Boolean(liveProg.isLive);
 
       if (!isEvLive) {
         combinedProb *= oddNum <= 5 ? Math.max(0.32, baseProb) : baseProb;
@@ -1294,7 +1294,7 @@ export default function TicketDetailsScreen({
               </Text>
             </View>
 
-            {/* Badge • En direct (#F83B37, borderRadius: 5, paddingHorizontal: 6.5, paddingVertical: 2) */}
+            {/* Badge • En direct rouge (sur événements FIFA ou Poker quand Accepté/Live, ou tout événement en direct) */}
             {(events.some((e) => {
               if (e.isBonus) return false;
               const prog = getEventLiveProgress(e, currentTime);
@@ -1302,7 +1302,9 @@ export default function TicketDetailsScreen({
                 e.status === 'Gain' ||
                 e.status === 'gagne' ||
                 e.status === 'Perte' ||
-                e.status === 'perdu';
+                e.status === 'perdu' ||
+                isPaid ||
+                isLost;
               const evFifa = Boolean(
                 e.isFifa ||
                   e.sport === 'FIFA' ||
@@ -1314,6 +1316,7 @@ export default function TicketDetailsScreen({
                   String(e.sport || '').toUpperCase().includes('POKER') ||
                   String(e.sport || '').toUpperCase().includes('TVBET')
               );
+              // Le badge live apparaît sur les événements FIFA et Poker quand le statut est accepté, ou sur tout événement live
               return (!evSettled && (evFifa || evPoker || prog.isLive)) || prog.isLive;
             })) ? (
               <View style={[styles.liveRedBadge, { backgroundColor: liveBadgeBg }]}>
@@ -1419,6 +1422,7 @@ export default function TicketDetailsScreen({
           const eventStatusLabel = isEventGain ? 'Gain' : isEventPerte ? 'Perte' : 'Accepté';
           const eventStatusColor = isEventGain ? payeColor : isEventPerte ? perduColor : accepteColor;
 
+          // Machine à États Temporelle en temps réel (PRE_MATCH -> LIVE -> FINISHED) via currentTime (1000ms)
           const liveProgress = getEventLiveProgress(ev, currentTime);
           const isFifaEvent = Boolean(
             ev.isFifa ||
@@ -1427,21 +1431,37 @@ export default function TicketDetailsScreen({
               String(ev.league || '').toUpperCase().startsWith('FIFA')
           );
 
+          // État C : Terminé ou événement résolu (Gain / Payé / Perte)
           const isEventFinished = isEventSettled || liveProgress.isFinished;
-          const isEventLive = !isEventFinished && (liveProgress.isLive || isFifaEvent || ev.isLive);
+          // État B : En direct uniquement lorsque l'heure de début est atteinte (now >= startTime et now < startTime + durationSeconds, non terminé)
+          const isEventLive = !isEventFinished && liveProgress.isLive;
+          // État A : Avant le début de l'événement (now < startTime et non terminé)
           const isPreMatch = !isEventFinished && !isEventLive;
-          const hasEventStarted = !isPreMatch;
 
-          // Date numérique exacte sur les cartes d'événements (ex: 14.11.2026 (15:50))
-          const displayDate =
-            ev.matchDate && ev.matchTime
+          const hasEventStarted = !isPreMatch;
+          const showElapsedRow = isEventLive;
+          const elapsedSec = liveProgress.elapsedSeconds;
+
+          const displayDate = isEventLive || (isFifaEvent && hasEventStarted)
+            ? ev.matchDate && ev.matchTime
               ? `${ev.matchDate} (${ev.matchTime})`
-              : formatBetDate(ev.rawDate || ev.date);
+              : formatBetDate(ev.rawDate || ev.date)
+            : formatFrenchEventDate(ev.rawDate || ev.date);
 
           const isStandardMatch = !ev.isPoker && !ev.isBonus && !ev.isOutright;
 
+          const liveAdaptiveScore =
+            isStandardMatch && isEventLive
+              ? computeAdaptiveLiveScore({
+                  marketLabel: ev.market,
+                  elapsedSeconds: elapsedSec,
+                  durationSeconds: liveProgress.durationSeconds,
+                  isFifa: isFifaEvent,
+                })
+              : null;
+
           const finishedFormattedScore =
-            isStandardMatch && isEventSettled
+            isStandardMatch && isEventFinished
               ? ensureTwoHalvesScoreFormat({
                   event: ev,
                   rawScoreFinal: ev.scoreFinal,
@@ -1450,32 +1470,24 @@ export default function TicketDetailsScreen({
                 })
               : null;
 
-          const liveComputedScore =
-            isStandardMatch && !isEventSettled && isEventLive
-              ? computeAdaptiveLiveScore({
-                  marketLabel: ev.market || '1X2. V1',
-                  elapsedSeconds: liveProgress.elapsedSeconds,
-                  durationSeconds: liveProgress.durationSeconds,
-                  isFifa: isFifaEvent,
-                })
-              : null;
-
-          // En direct (Capture D2) ou terminé : affiche le score (ex: 3:0) et sous-score (ex: 3:0 (3:0))
-          const effectiveScoreFinal = isEventSettled
-            ? finishedFormattedScore?.scoreFinal || ev.scoreFinal
+          const effectiveScoreFinal = isPreMatch
+            ? undefined
             : isEventLive
-            ? ev.scoreFinal || liveComputedScore?.scoreFinal
-            : ev.scoreFinal;
+            ? ev.scoreFinal || liveAdaptiveScore?.mainScore || '0:0'
+            : finishedFormattedScore?.scoreFinal || ev.scoreFinal;
 
-          const effectiveScoreDetail = isEventSettled
-            ? finishedFormattedScore?.scoreDetail || ev.scoreDetail
+          const effectiveScoreDetail = isPreMatch
+            ? undefined
             : isEventLive
-            ? ev.scoreDetail || liveComputedScore?.scoreDetail
-            : ev.scoreDetail;
+            ? ev.scoreDetail || liveAdaptiveScore?.detailedScore || '0:0 (0:0)'
+            : finishedFormattedScore?.scoreDetail || ev.scoreDetail;
 
+          // Logique d'affichage du badge • En direct identique à avant :
+          // Sur les événements FIFA ou Poker quand statut non terminé, ou FIFA démarré, ou tout événement en direct (startTime <= now < startTime + duration)
           const showEventLiveBadge =
-            (!isEventSettled && (isFifaEvent || ev.isPoker || isEventLive)) ||
-            (isFifaEvent && hasEventStarted && !isEventSettled);
+            (!isEventFinished && (isFifaEvent || ev.isPoker)) ||
+            (isFifaEvent && hasEventStarted) ||
+            isEventLive;
 
           // Rendu dédié pour la carte Bonus
           if (ev.isBonus) {
@@ -1652,8 +1664,8 @@ export default function TicketDetailsScreen({
                       />
                     </View>
 
-                    {/* Centre : Score (ex: 3:0) ou VS si pré-match sans score */}
-                    {effectiveScoreFinal ? (
+                    {/* Centre : VS ou Score (0:0 en direct ou score final) */}
+                    {effectiveScoreFinal && hasEventStarted ? (
                       <Text style={[styles.mainScoreText, { color: valueWhiteColor }]}>
                         {effectiveScoreFinal}
                       </Text>
@@ -1682,7 +1694,7 @@ export default function TicketDetailsScreen({
                     </View>
                   </View>
 
-                  {Boolean(effectiveScoreDetail) ? (
+                  {Boolean(effectiveScoreDetail) && hasEventStarted ? (
                     <Text
                       style={[
                         styles.detailScoreBelowText,
@@ -1719,13 +1731,13 @@ export default function TicketDetailsScreen({
                   </Text>
                 </View>
 
-                {!isEventSettled && isEventLive && !ev.isPoker && (
+                {showElapsedRow && !ev.isPoker && (
                   <View style={styles.eventLiveTimeRow}>
                     <Text style={[styles.eventLiveLabel, { color: labelGrayColor }]}>
                       EN DIRECT
                     </Text>
                     <Text style={[styles.eventLiveTimeValue, { color: valueWhiteColor }]}>
-                      temps écoulé : {formatSecondsToMMSS(liveProgress.elapsedSeconds)}
+                      temps écoulé : {formatSecondsToMMSS(elapsedSec)}
                     </Text>
                   </View>
                 )}
