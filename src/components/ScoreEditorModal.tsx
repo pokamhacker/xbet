@@ -34,6 +34,7 @@ const HALF_FIELD_LABELS: Record<HalfFieldKey, string> = {
 interface ScoreEditorModalProps {
   visible: boolean;
   coupon: BetSlip | null;
+  targetEventId?: string | null;
   onClose: () => void;
 }
 
@@ -45,27 +46,33 @@ interface EventHalfScoreState {
   status: BetStatus;
 }
 
+function resolveInitialEventStatus(e: MatchEvent): BetStatus {
+  const raw = String(e.status || 'Accepté').toLowerCase();
+  if (raw === 'gain' || raw === 'payé' || raw === 'gagné' || raw === 'gagne' || raw === 'paid') {
+    return 'Gain';
+  }
+  if (raw === 'perdu' || raw === 'perte' || raw === 'lost') {
+    return 'Perdu';
+  }
+  return 'Accepté';
+}
+
 function buildInitialEventStates(
-  coupon: BetSlip | null,
-  forceWinDefault: boolean = true
+  coupon: BetSlip | null
 ): { [id: string]: EventHalfScoreState } {
   const map: { [id: string]: EventHalfScoreState } = {};
   if (!coupon || !coupon.events) return map;
 
   coupon.events.forEach((e: MatchEvent, idx: number) => {
     const evKey = e.id || `ev-${idx}`;
-    const isWin =
-      e.status === 'Gain' ||
-      e.status === 'Payé' ||
-      e.status === 'Gagné' ||
-      coupon.status === 'Payé' ||
-      (forceWinDefault && e.status !== 'Perdu');
+    const initialStatus = resolveInitialEventStatus(e);
+    const isWin = initialStatus === 'Gain';
 
     const complete = ensureTwoHalvesScoreFormat({
       event: e,
       rawScoreFinal: (e as any).scoreFinal || e.actualScore,
       rawScoreDetail: (e as any).scoreDetail || e.halftimeScore,
-      isWin,
+      isWin: initialStatus === 'Perdu' ? false : isWin || true,
     });
 
     map[evKey] = {
@@ -73,7 +80,7 @@ function buildInitialEventStates(
       ht1Away: String(complete.ht1Away),
       ht2Home: String(complete.ht2Home),
       ht2Away: String(complete.ht2Away),
-      status: e.status === 'Perdu' ? 'Perdu' : 'Gain',
+      status: initialStatus,
     };
   });
 
@@ -83,6 +90,7 @@ function buildInitialEventStates(
 export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   visible,
   coupon,
+  targetEventId = null,
   onClose,
 }) => {
   const { currentTheme } = useThemeStore();
@@ -91,7 +99,8 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
 
   const [eventStates, setEventStates] = useState<{
     [id: string]: EventHalfScoreState;
-  }>(() => buildInitialEventStates(coupon, true));
+  }>(() => buildInitialEventStates(coupon));
+  const [showAllEvents, setShowAllEvents] = useState<boolean>(!targetEventId);
 
   const [activeField, setActiveField] = useState<{
     eventId: string;
@@ -101,29 +110,42 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
 
   const wasVisibleRef = useRef(false);
   const lastCouponIdRef = useRef<string | null>(null);
+  const lastTargetEventRef = useRef<string | null>(null);
 
   useEffect(() => {
     const currentId = coupon?.id ? String(coupon.id) : null;
     if (visible && coupon) {
-      if (!wasVisibleRef.current || lastCouponIdRef.current !== currentId) {
-        const initStates = buildInitialEventStates(coupon, true);
+      if (
+        !wasVisibleRef.current ||
+        lastCouponIdRef.current !== currentId ||
+        lastTargetEventRef.current !== (targetEventId || null)
+      ) {
+        const initStates = buildInitialEventStates(coupon);
         setEventStates(initStates);
-        const firstNonSpecial = coupon.events.findIndex((ev) => !isBonusOrPokerEvent(ev));
-        if (firstNonSpecial >= 0) {
-          const firstEv = coupon.events[firstNonSpecial];
-          const firstKey = firstEv.id || `ev-${firstNonSpecial}`;
-          setActiveField({ eventId: firstKey, field: 'ht1Home' });
+        setShowAllEvents(!targetEventId);
+
+        if (targetEventId) {
+          setActiveField({ eventId: targetEventId, field: 'ht1Home' });
           replaceNextRef.current = true;
         } else {
-          setActiveField(null);
+          const firstNonSpecial = coupon.events.findIndex((ev) => !isBonusOrPokerEvent(ev));
+          if (firstNonSpecial >= 0) {
+            const firstEv = coupon.events[firstNonSpecial];
+            const firstKey = firstEv.id || `ev-${firstNonSpecial}`;
+            setActiveField({ eventId: firstKey, field: 'ht1Home' });
+            replaceNextRef.current = true;
+          } else {
+            setActiveField(null);
+          }
         }
         lastCouponIdRef.current = currentId;
+        lastTargetEventRef.current = targetEventId || null;
       }
       wasVisibleRef.current = true;
     } else if (!visible) {
       wasVisibleRef.current = false;
     }
-  }, [visible, coupon]);
+  }, [visible, coupon, targetEventId]);
 
   if (!visible || !coupon) return null;
 
@@ -268,16 +290,67 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   };
 
   const handleStatusChange = (eventId: string, newStatus: BetStatus) => {
-    setEventStates((prev) => ({
-      ...prev,
-      [eventId]: { ...prev[eventId], status: newStatus },
-    }));
+    const targetEv = coupon.events.find(
+      (e, idx) => (e.id || `ev-${idx}`) === eventId || e.id === eventId
+    );
+    setEventStates((prev) => {
+      const cur = prev[eventId] || {
+        ht1Home: '1',
+        ht1Away: '0',
+        ht2Home: '1',
+        ht2Away: '0',
+        status: newStatus,
+      };
+      if (targetEv && (newStatus === 'Gain' || newStatus === 'Perdu')) {
+        const isWin = newStatus === 'Gain';
+        const adapted = adaptEventResultToPrediction(targetEv, isWin);
+        const complete = ensureTwoHalvesScoreFormat({
+          event: targetEv,
+          rawScoreFinal: adapted.actualScore,
+          rawScoreDetail: adapted.halftimeScore,
+          isWin,
+        });
+        return {
+          ...prev,
+          [eventId]: {
+            ht1Home: String(complete.ht1Home),
+            ht1Away: String(complete.ht1Away),
+            ht2Home: String(complete.ht2Home),
+            ht2Away: String(complete.ht2Away),
+            status: newStatus,
+          },
+        };
+      }
+      return {
+        ...prev,
+        [eventId]: { ...cur, status: newStatus },
+      };
+    });
+  };
+
+  const handleSaveSingleEvent = (ev: MatchEvent, evKey: string, closeAfter: boolean = true) => {
+    const st = eventStates[evKey] || (ev.id ? eventStates[ev.id] : undefined);
+    if (!st) return;
+    const formatted = computeFormattedFromHalves(st);
+    updateEventScore(
+      coupon.id,
+      ev.id || evKey,
+      formatted.scoreFinal,
+      st.status,
+      formatted.scoreDetail
+    );
+    if (closeAfter) {
+      onClose();
+    }
   };
 
   const handleAutoAdaptScores = (isWin: boolean = true) => {
-    const newStates: { [id: string]: EventHalfScoreState } = {};
+    const newStates: { [id: string]: EventHalfScoreState } = { ...eventStates };
     coupon.events.forEach((e, idx) => {
       const evKey = e.id || `ev-${idx}`;
+      if (targetEventId && !showAllEvents && evKey !== targetEventId && e.id !== targetEventId) {
+        return;
+      }
       const adapted = adaptEventResultToPrediction(e, isWin);
       const complete = ensureTwoHalvesScoreFormat({
         event: e,
@@ -297,6 +370,33 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
   };
 
   const handleValidateCouponWithEnteredHalves = (isWin: boolean) => {
+    if (targetEventId && !showAllEvents) {
+      const idx = coupon.events.findIndex(
+        (ev, i) => (ev.id || `ev-${i}`) === targetEventId || ev.id === targetEventId
+      );
+      if (idx >= 0) {
+        const ev = coupon.events[idx];
+        const evKey = ev.id || `ev-${idx}`;
+        const st = eventStates[evKey] || {
+          ht1Home: '1',
+          ht1Away: '0',
+          ht2Home: '1',
+          ht2Away: '0',
+          status: (isWin ? 'Gain' : 'Perdu') as BetStatus,
+        };
+        const formatted = computeFormattedFromHalves(st);
+        updateEventScore(
+          coupon.id,
+          ev.id || evKey,
+          formatted.scoreFinal,
+          isWin ? 'Gain' : 'Perdu',
+          formatted.scoreDetail
+        );
+        onClose();
+        return;
+      }
+    }
+
     const customScores: {
       [eventId: string]: { scoreFinal: string; halftimeScore: string };
     } = {};
@@ -347,6 +447,9 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
     coupon.events.forEach((ev, idx) => {
       if (isBonusOrPokerEvent(ev)) return;
       const evKey = ev.id || `ev-${idx}`;
+      if (targetEventId && !showAllEvents && evKey !== targetEventId && ev.id !== targetEventId) {
+        return;
+      }
       const st = eventStates[evKey] || (ev.id ? eventStates[ev.id] : undefined);
       if (st) {
         const formatted = computeFormattedFromHalves(st);
@@ -362,8 +465,8 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
     onClose();
     if (Platform.OS !== 'web') {
       Alert.alert(
-        'Scores des 2 mi-temps enregistrés',
-        'Les résultats et le détail des deux mi-temps ont été mis à jour.'
+        'Événement(s) mis à jour',
+        'Le statut (Accepté / Perdu / Gain) et les scores ont été mis à jour individuellement.'
       );
     }
   };
@@ -444,6 +547,32 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
           </TouchableOpacity>
         </View>
 
+        {Boolean(targetEventId && coupon.events.length > 1) && (
+          <TouchableOpacity
+            style={[
+              styles.adaptScoresBtn,
+              {
+                borderColor: currentTheme.primary || '#3B82F6',
+                backgroundColor: isDark ? currentTheme.surface || '#1E293B' : '#EFF6FF',
+                marginBottom: 8,
+              },
+            ]}
+            onPress={() => setShowAllEvents((prev) => !prev)}
+          >
+            <Ionicons
+              name={showAllEvents ? 'filter-outline' : 'list-outline'}
+              size={moderateScale(14)}
+              color={currentTheme.primary}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[styles.adaptScoresBtnText, { color: currentTheme.primary, fontSize: font(12) }]}>
+              {showAllEvents
+                ? 'Modifier uniquement l’événement sélectionné'
+                : `Voir tous les événements du coupon (${coupon.events.filter((e) => !isBonusOrPokerEvent(e)).length})`}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={[
             styles.adaptScoresBtn,
@@ -476,12 +605,15 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
               return null;
             }
             const evKey = ev.id || `ev-${index}`;
+            if (targetEventId && !showAllEvents && evKey !== targetEventId && ev.id !== targetEventId) {
+              return null;
+            }
             const current = eventStates[evKey] || {
               ht1Home: '1',
               ht1Away: '0',
               ht2Home: '1',
               ht2Away: '0',
-              status: 'Gain' as BetStatus,
+              status: resolveInitialEventStatus(ev),
             };
             const computed = computeFormattedFromHalves(current);
             const homeName =
@@ -716,31 +848,34 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                   </Text>
                 </View>
 
-                {/* Statut de l'événement */}
+                {/* Statut individuel de l'événement (Accepté / Perdu / Gain) */}
                 <View style={styles.statusPillsBox}>
                   <Text style={[styles.inputLabel, { color: currentTheme.textSecondary }]}>
-                    Statut de l'événement :
+                    Statut de l'événement (individuel) :
                   </Text>
                   <View style={styles.pillsRow}>
                     <TouchableOpacity
                       style={[
                         styles.statusPill,
                         { borderColor: currentTheme.border, backgroundColor: inputBg },
-                        current.status === 'Gain' && {
-                          backgroundColor: payeGreen,
-                          borderColor: payeGreen,
+                        current.status === 'Accepté' && {
+                          backgroundColor: currentTheme.primary || '#CC841E',
+                          borderColor: currentTheme.primary || '#CC841E',
                         },
                       ]}
-                      onPress={() => handleStatusChange(evKey, 'Gain')}
+                      onPress={() => handleStatusChange(evKey, 'Accepté')}
                     >
                       <Text
                         style={[
                           styles.statusPillText,
                           { color: currentTheme.textSecondary },
-                          current.status === 'Gain' && styles.statusPillTextActive,
+                          current.status === 'Accepté' && {
+                            color: '#FFFFFF',
+                            fontWeight: '700',
+                          },
                         ]}
                       >
-                        Gain
+                        Accepté
                       </Text>
                     </TouchableOpacity>
 
@@ -767,27 +902,43 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
                       style={[
                         styles.statusPill,
                         { borderColor: currentTheme.border, backgroundColor: inputBg },
-                        current.status === 'Accepté' && {
-                          backgroundColor: currentTheme.primary,
-                          borderColor: currentTheme.primary,
+                        current.status === 'Gain' && {
+                          backgroundColor: payeGreen,
+                          borderColor: payeGreen,
                         },
                       ]}
-                      onPress={() => handleStatusChange(evKey, 'Accepté')}
+                      onPress={() => handleStatusChange(evKey, 'Gain')}
                     >
                       <Text
                         style={[
                           styles.statusPillText,
                           { color: currentTheme.textSecondary },
-                          current.status === 'Accepté' && {
-                            color: currentTheme.colors?.primaryText || '#FFFFFF',
-                            fontWeight: '700',
-                          },
+                          current.status === 'Gain' && styles.statusPillTextActive,
                         ]}
                       >
-                        En cours
+                        Gain
                       </Text>
                     </TouchableOpacity>
                   </View>
+
+                  {coupon.events.filter((e) => !isBonusOrPokerEvent(e)).length > 1 && (
+                    <TouchableOpacity
+                      style={{
+                        marginTop: 8,
+                        paddingVertical: 7,
+                        borderRadius: 7,
+                        backgroundColor: currentTheme.primary || '#CC841E',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      activeOpacity={0.85}
+                      onPress={() => handleSaveSingleEvent(ev, evKey, true)}
+                    >
+                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>
+                        Enregistrer uniquement le Match {index + 1} ({current.status})
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             );
@@ -808,15 +959,17 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
           />
         ) : null}
 
-        {/* Boutons de validation finale avec les scores des 2 mi-temps saisis */}
+        {/* Boutons d'enregistrement individuel ou global */}
         <TouchableOpacity
-          style={[styles.validateMainBtn, { backgroundColor: payeGreen }]}
+          style={[styles.validateMainBtn, { backgroundColor: currentTheme.primary || payeGreen }]}
           activeOpacity={0.85}
-          onPress={() => handleValidateCouponWithEnteredHalves(true)}
+          onPress={handleApplyIndividualScores}
         >
           <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
           <Text style={styles.validateMainBtnText}>
-            Valider le coupon (Gain / Payé)
+            {targetEventId && !showAllEvents
+              ? 'Enregistrer cet événement'
+              : 'Enregistrer les événements (statuts individuels)'}
           </Text>
         </TouchableOpacity>
 
@@ -825,13 +978,13 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
             style={[
               styles.secondaryActionBtn,
               {
-                backgroundColor: currentTheme.primary || '#3B82F6',
+                backgroundColor: payeGreen,
               },
             ]}
             activeOpacity={0.85}
-            onPress={handleApplyIndividualScores}
+            onPress={() => handleValidateCouponWithEnteredHalves(true)}
           >
-            <Text style={styles.secondaryActionBtnText}>Enregistrer les scores</Text>
+            <Text style={styles.secondaryActionBtnText}>Tout valider en Gain</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -844,7 +997,7 @@ export const ScoreEditorModal: React.FC<ScoreEditorModalProps> = ({
             activeOpacity={0.85}
             onPress={() => handleValidateCouponWithEnteredHalves(false)}
           >
-            <Text style={styles.secondaryActionBtnText}>Valider en Perdu</Text>
+            <Text style={styles.secondaryActionBtnText}>Tout valider en Perdu</Text>
           </TouchableOpacity>
         </View>
       </View>

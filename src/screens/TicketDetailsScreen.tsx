@@ -202,6 +202,7 @@ export default function TicketDetailsScreen({
   const {
     coupons,
     executeCashout,
+    toggleCashout,
     duplicateCoupon,
     updateCouponStatus,
     validateCouponWithResult,
@@ -215,6 +216,7 @@ export default function TicketDetailsScreen({
   const couponId = route?.params?.couponId || route?.params?.ticketId || route?.params?.id;
   const passedCoupon = route?.params?.coupon || route?.params?.ticket || propTicket;
   const [isScoreModalVisible, setIsScoreModalVisible] = useState(false);
+  const [selectedEventIdForEdit, setSelectedEventIdForEdit] = useState<string | null>(null);
   const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
 
   // Horloge temps réel pour la progression dynamique des événements EN DIRECT (suspendue quand une modale est ouverte pour ne pas perturber la saisie)
@@ -255,14 +257,14 @@ export default function TicketDetailsScreen({
 
   const isMelbet = String(currentTheme?.name || '').toLowerCase().includes('melbet');
 
-  // Couleurs dynamiques selon le thème actif (Correction 2 : Unification de SUCCESS_GREEN = '#4EBA6F')
+  // Couleurs dynamiques selon le thème actif (Calibration exacte Capture D2)
   const SUCCESS_GREEN = '#4EBA6F';
   const primaryActionColor = isDark
-    ? '#9BA3AE'
+    ? '#98A0A3'
     : (currentTheme?.activeIcon || currentTheme?.primary || '#557089');
   const payeColor = SUCCESS_GREEN;
   const accepteColor = isMelbet
-    ? '#D89228'
+    ? '#CC8A1E'
     : (currentTheme?.status?.accepte || '#4A83C4');
   const perduColor = currentTheme?.status?.perdu || '#E74C3C';
 
@@ -379,13 +381,20 @@ export default function TicketDetailsScreen({
           : undefined) ||
         rawAwayLogo;
 
-      const evStatusRaw = String(ev.status || currentCoupon?.status || 'Accepté');
+      // Chaque événement conserve son propre statut individuel (Accepté / Perdu / Gain)
+      // sans être écrasé par le statut global du coupon
+      const evStatusRaw = String(ev.status || 'Accepté');
       const evPaid =
         evStatusRaw === 'Payé' ||
         evStatusRaw === 'Gagné' ||
         evStatusRaw === 'Gain' ||
-        evStatusRaw.toLowerCase() === 'paid';
-      const evLost = evStatusRaw === 'Perdu' || evStatusRaw.toLowerCase() === 'lost';
+        evStatusRaw.toLowerCase() === 'paid' ||
+        evStatusRaw.toLowerCase() === 'gagne';
+      const evLost =
+        evStatusRaw === 'Perdu' ||
+        evStatusRaw === 'Perte' ||
+        evStatusRaw.toLowerCase() === 'lost' ||
+        evStatusRaw.toLowerCase() === 'perdu';
       const evStatus: BetDetailEvent['status'] = evPaid
         ? 'Gain'
         : evLost
@@ -539,37 +548,163 @@ export default function TicketDetailsScreen({
     });
   }, [currentCoupon, isPaid, isLost]);
 
-  // Nombre d'événements et terminés (ex: Événements : 4 | 3 sur 3 terminés lorsqu'il y a un Bonus)
+  // Nombre d'événements et terminés (s'adapte dynamiquement en fonction des événements terminés Gain / Perte)
   const hasBonusEvent = events.some((e) => e.isBonus);
   const nonBonusEvents = events.filter((e) => !e.isBonus);
   const totalEventsCount = currentCoupon?.eventsCount || events.length;
   const matchEventsTotal = hasBonusEvent
     ? Math.max(1, totalEventsCount - 1)
-    : totalEventsCount;
+    : Math.max(1, nonBonusEvents.length || totalEventsCount);
   const completedEventsCount = Math.min(
     matchEventsTotal,
-    currentCoupon?.completedCount ??
-      nonBonusEvents.filter((e) => e.status === 'Gain' || e.status === 'Perte').length
+    nonBonusEvents.filter((e) => e.status === 'Gain' || e.status === 'Perte').length
   );
 
   // Insets et positionnement dynamique au-dessus de la PersistentBottomBar
   const bottomBarHeight =
     56 + (insets.bottom > 0 ? insets.bottom : Platform.OS === 'ios' ? 20 : 0);
 
-  // Visibilité de la barre fixe "Vendre pour XXX ₣" ou "Dupliquer le coupon de pari"
-  const showDuplicateFooter = isAccepted;
-  const sellPriceNumber =
-    (currentCoupon as any)?.sellPrice ||
-    currentCoupon?.cashoutAmount ||
-    Math.round(Number(currentCoupon?.stake || 500) * 0.94);
-  const sellPriceFormatted = sellPriceNumber.toLocaleString('fr-FR');
+  // Évaluation de la probabilité de réussite de chaque événement et du coupon global
+  const couponWinProbability = useMemo(() => {
+    if (isPaid) return 1;
+    if (isLost) return 0;
+    if (nonBonusEvents.some((e) => e.status === 'Perte')) return 0;
+    if (nonBonusEvents.length === 0) return 0.5;
+
+    let combinedProb = 1;
+    for (const ev of nonBonusEvents) {
+      if (ev.status === 'Gain') {
+        combinedProb *= 1;
+        continue;
+      }
+      if (ev.status === 'Perte') {
+        return 0;
+      }
+
+      const oddNum = Math.max(1.01, Number(ev.odd) || 1.5);
+      const baseProb = Math.min(0.95, 1 / oddNum);
+      const liveProg = getEventLiveProgress(ev, currentTime);
+      const isEvLive = Boolean(ev.isFifa || ev.isLive || liveProg.isLive);
+
+      if (!isEvLive) {
+        combinedProb *= oddNum <= 5 ? Math.max(0.32, baseProb) : baseProb;
+        continue;
+      }
+
+      const liveScoreObj = computeAdaptiveLiveScore({
+        marketLabel: ev.market || '1X2. V1',
+        elapsedSeconds: liveProg.elapsedSeconds,
+        durationSeconds: liveProg.durationSeconds,
+        isFifa: Boolean(ev.isFifa),
+      });
+      const activeScoreStr = ev.scoreFinal || liveScoreObj.scoreFinal || '0:0';
+      const scoreMatch = String(activeScoreStr).match(/(\d+)\s*[:\-]\s*(\d+)/);
+      const h = scoreMatch ? parseInt(scoreMatch[1], 10) : 0;
+      const a = scoreMatch ? parseInt(scoreMatch[2], 10) : 0;
+      const mkt = String(ev.market || '').toLowerCase();
+
+      let evProb = baseProb;
+
+      // 1. Score exact (ex: "Score exact. 2-0" avec score 2:0 -> très forte probabilité)
+      const exactMatch = mkt.match(/score\s*exact[^\d]*(\d+)\s*[:\-]\s*(\d+)/i);
+      if (exactMatch) {
+        const th = parseInt(exactMatch[1], 10);
+        const ta = parseInt(exactMatch[2], 10);
+        if (h > th || a > ta) {
+          evProb = 0; // Score dépassé -> impossible à atteindre
+        } else if (h === th && a === ta) {
+          evProb = 0.88; // Score exact actuellement atteint (ex: Capture D1 2:0 sur 2-0)
+        } else {
+          const remainingGoals = (th - h) + (ta - a);
+          evProb = remainingGoals === 1 ? 0.44 : remainingGoals === 2 ? 0.24 : Math.max(baseProb, 0.14);
+        }
+      } else if (mkt.includes('1x2') || mkt.startsWith('v1') || mkt.startsWith('v2') || mkt === 'x') {
+        // 2. Marché 1X2 (ex: "1X2. X" à cote 18 avec score 3:0 sur Capture D2 -> très faible probabilité)
+        const isDrawPick =
+          mkt.endsWith('. x') ||
+          mkt.endsWith(' x') ||
+          mkt.includes('match nul') ||
+          mkt === 'x';
+        const isAwayPick =
+          mkt.includes('v2') ||
+          (ev.awayTeam && mkt.includes(ev.awayTeam.toLowerCase()));
+
+        if (isDrawPick) {
+          const diff = Math.abs(h - a);
+          evProb = diff === 0 ? Math.max(baseProb, 0.56) : diff === 1 ? Math.min(baseProb, 0.24) : 0.03;
+        } else if (isAwayPick) {
+          const diff = a - h;
+          evProb = diff > 0 ? Math.max(baseProb, 0.76) : diff === 0 ? Math.max(0.26, baseProb) : diff === -1 ? 0.16 : 0.04;
+        } else {
+          const diff = h - a;
+          evProb = diff > 0 ? Math.max(baseProb, 0.76) : diff === 0 ? Math.max(0.26, baseProb) : diff === -1 ? 0.16 : 0.04;
+        }
+      } else if (mkt.includes('double chance')) {
+        if (mkt.includes('1x')) {
+          evProb = h >= a ? 0.86 : a - h === 1 ? 0.34 : 0.08;
+        } else if (mkt.includes('2x') || mkt.includes('x2')) {
+          evProb = a >= h ? 0.86 : h - a === 1 ? 0.34 : 0.08;
+        } else {
+          evProb = h !== a ? 0.86 : 0.48;
+        }
+      } else if (mkt.includes('plus de') || mkt.includes('over')) {
+        const lineMatch = mkt.match(/(\d+(?:[.,]\d+)?)/);
+        const line = lineMatch ? parseFloat(lineMatch[1].replace(',', '.')) : 2.5;
+        const total = h + a;
+        evProb = total > line ? 0.96 : line - total <= 1 ? 0.54 : Math.max(0.22, baseProb);
+      } else if (mkt.includes('moins de') || mkt.includes('under')) {
+        const lineMatch = mkt.match(/(\d+(?:[.,]\d+)?)/);
+        const line = lineMatch ? parseFloat(lineMatch[1].replace(',', '.')) : 2.5;
+        const total = h + a;
+        evProb = total > line ? 0 : line - total < 1 ? 0.42 : 0.78;
+      } else {
+        evProb = oddNum <= 4 ? Math.max(0.35, baseProb) : baseProb;
+      }
+
+      combinedProb *= evProb;
+    }
+
+    return Math.max(0, Math.min(0.98, combinedProb));
+  }, [nonBonusEvents, isPaid, isLost, currentTime]);
+
+  // La barre "Dupliquer le coupon de pari" est TOUJOURS disponible
+  const showDuplicateFooter = true;
+
+  // Le bouton "Vendre pour XXX ₣" s'affiche en fonction de la probabilité de réussite du coupon
+  // (et reste pilotable manuellement via isForSale si défini explicitement)
+  const hasAnyLostEvent = nonBonusEvents.some((e) => e.status === 'Perte');
+  const allEventsCompleted = completedEventsCount >= matchEventsTotal && matchEventsTotal > 0;
   const showSellButton = Boolean(
     isAccepted &&
       !isPokerCoupon &&
-      (currentCoupon?.isForSale ||
-        currentCoupon?.isLive ||
-        events.some((e) => e.isLive || e.isFifa))
+      !hasAnyLostEvent &&
+      !allEventsCompleted &&
+      (currentCoupon?.isForSale === true
+        ? true
+        : currentCoupon?.isForSale === false
+        ? false
+        : couponWinProbability >= 0.2)
   );
+
+  const stakeNum = Number(currentCoupon?.stake || 500);
+  const potentialNum = Number(currentCoupon?.potentialPayout || stakeNum * (currentCoupon?.totalOdds || 2));
+  const computedCashoutAmount = useMemo(() => {
+    const explicitPrice = (currentCoupon as any)?.sellPrice || currentCoupon?.cashoutAmount;
+    if (explicitPrice && Number(explicitPrice) > 0) {
+      return Math.round(Number(explicitPrice));
+    }
+    if (completedEventsCount > 0 && matchEventsTotal > 1) {
+      const progressRatio = completedEventsCount / matchEventsTotal;
+      return Math.max(
+        Math.round(stakeNum * 0.94),
+        Math.round(stakeNum + (potentialNum - stakeNum) * progressRatio * couponWinProbability * 0.85)
+      );
+    }
+    return Math.round(stakeNum * 0.94);
+  }, [currentCoupon, stakeNum, potentialNum, completedEventsCount, matchEventsTotal, couponWinProbability]);
+
+  const sellPriceNumber = computedCashoutAmount;
+  const sellPriceFormatted = sellPriceNumber.toLocaleString('fr-FR');
 
   // Mise et Gains formatés avec le symbole F (ex: 90 F, 522 F, 156.6 F comme sur les captures)
   const stakeFormatted = formatCurrency(currentCoupon?.stake ?? 90);
@@ -713,10 +848,8 @@ export default function TicketDetailsScreen({
       ev.status === 'Gain' ||
       ev.status === 'Perte' ||
       ev.status === 'Payé' ||
-      ev.status === 'Perdu' ||
-      isPaid ||
-      isLost;
-    const isEventLost = ev.status === 'Perte' || ev.status === 'Perdu' || isLost;
+      ev.status === 'Perdu';
+    const isEventLost = ev.status === 'Perte' || ev.status === 'Perdu';
     const isEventPreMatch = !isFinishedOrResolved && !liveState.hasStarted;
 
     if (ev.isFifa) {
@@ -813,19 +946,29 @@ export default function TicketDetailsScreen({
 
   const rawHeaderBg = getHeaderBgColor(currentTheme);
   const rawScreenBg = getScreenBgColor(currentTheme);
-  const headerBg = isDark && isMelbet ? '#262B31' : rawHeaderBg;
-  const screenBg = isDark && isMelbet ? '#1E2328' : rawScreenBg;
+  const headerBg = isDark && isMelbet ? '#373F42' : rawHeaderBg;
+  const screenBg = isDark && isMelbet ? '#283033' : rawScreenBg;
   const cardSurfaceBg = isDark
     ? isMelbet
-      ? '#262B31'
+      ? '#373F42'
       : currentTheme.cardBackground
     : currentTheme.cardBackground;
   const dividerColor = isDark
-    ? '#323840'
+    ? isMelbet
+      ? '#454E53'
+      : '#323840'
     : (currentTheme.divider || currentTheme.border || '#F0F4F8');
-  const labelGrayColor = isDark ? '#8A949E' : currentTheme.textSecondary;
-  const valueWhiteColor = isDark ? '#FFFFFF' : currentTheme.textPrimary;
-  const headerRightIconColor = isDark ? '#8A949E' : primaryActionColor;
+  const labelGrayColor = isDark
+    ? isMelbet
+      ? '#98A0A3'
+      : '#8A949E'
+    : currentTheme.textSecondary;
+  const valueWhiteColor = isDark ? '#F4FBFF' : currentTheme.textPrimary;
+  const headerRightIconColor = isDark
+    ? isMelbet
+      ? '#98A0A3'
+      : '#8A949E'
+    : primaryActionColor;
 
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
   const topInset = insets.top;
@@ -852,7 +995,7 @@ export default function TicketDetailsScreen({
           {
             backgroundColor: headerBg,
             paddingTop: topInset,
-            height: 52 + topInset,
+            height: 44 + topInset,
           },
         ]}
       >
@@ -865,19 +1008,25 @@ export default function TicketDetailsScreen({
           <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
             <Path
               d="M15 19L8 12L15 5"
-              stroke={isDark ? '#9BA3AE' : primaryActionColor}
-              strokeWidth={2}
+              stroke={isDark ? '#98A0A3' : primaryActionColor}
+              strokeWidth={1.9}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </Svg>
         </TouchableOpacity>
 
-        <View style={styles.headerTitleWrap}>
+        <View
+          style={[
+            styles.headerTitleWrap,
+            { top: topInset, height: 44 },
+          ]}
+          pointerEvents="none"
+        >
           <Text
             style={[
               styles.headerTitle,
-              { color: isDark ? '#9BA3AE' : currentTheme.textPrimary },
+              { color: isDark ? '#9DA5A8' : currentTheme.textPrimary },
             ]}
           >
             Informations sur le pari
@@ -890,7 +1039,7 @@ export default function TicketDetailsScreen({
               style={styles.headerActionBtn}
               onPress={() => Alert.alert('Notifications', 'Notifications activées pour ce pari.')}
             >
-              <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+              <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                 <Path
                   d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"
                   stroke={headerRightIconColor}
@@ -914,10 +1063,10 @@ export default function TicketDetailsScreen({
             onPress={handleMore}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-              <Circle cx="3.5" cy="10" r="2" fill={headerRightIconColor} />
-              <Circle cx="10" cy="10" r="2" fill={headerRightIconColor} />
-              <Circle cx="16.5" cy="10" r="2" fill={headerRightIconColor} />
+            <Svg width={22} height={22} viewBox="0 0 22 22" fill="none">
+              <Circle cx="3.5" cy="11" r="2.1" fill={headerRightIconColor} />
+              <Circle cx="11" cy="11" r="2.1" fill={headerRightIconColor} />
+              <Circle cx="18.5" cy="11" r="2.1" fill={headerRightIconColor} />
             </Svg>
           </TouchableOpacity>
         </View>
@@ -931,7 +1080,7 @@ export default function TicketDetailsScreen({
         style={[
           styles.stickyFinancialBar,
           {
-            top: 52 + topInset,
+            top: 44 + topInset,
             opacity: stickyBarOpacity,
             backgroundColor: cardSurfaceBg,
           },
@@ -984,7 +1133,7 @@ export default function TicketDetailsScreen({
           styles.scrollContent,
           {
             paddingBottom:
-              bottomBarHeight + (showDuplicateFooter ? 88 : 28),
+              bottomBarHeight + (showSellButton ? 132 : 82),
           },
         ]}
         keyboardShouldPersistTaps="always"
@@ -1015,14 +1164,18 @@ export default function TicketDetailsScreen({
             { backgroundColor: cardSurfaceBg, overflow: 'hidden' },
           ]}
         >
-          {/* En-tête du ticket : Avatar (44x44) + Colonne centrale + Badge • En direct */}
+          {/* En-tête du ticket : Avatar (52x52) + Colonne centrale + Badge • En direct */}
           <View style={styles.summaryHeaderRow}>
             <View style={styles.avatarWrap}>
               <View
                 style={[
                   styles.avatarCircle,
                   {
-                    backgroundColor: isDark ? '#1E2328' : '#E9EFF6',
+                    backgroundColor: isDark
+                      ? isMelbet
+                        ? '#2C3437'
+                        : '#1E2328'
+                      : '#E9EFF6',
                   },
                 ]}
               >
@@ -1048,7 +1201,7 @@ export default function TicketDetailsScreen({
                         ? styles.avatarIconFifa
                         : styles.avatarIcon,
                       {
-                        tintColor: '#8A949E',
+                        tintColor: '#8C9497',
                       },
                     ]}
                     resizeMode="contain"
@@ -1056,7 +1209,7 @@ export default function TicketDetailsScreen({
                 )}
               </View>
 
-              {/* Badge circulaire (16x16, borderRadius: 8, borderWidth: 1.5, borderColor: #262B31) */}
+              {/* Badge circulaire (18x18, borderRadius: 9, borderWidth: 1.5, borderColor: #373F42) */}
               <View
                 style={[
                   styles.statusMiniDot,
@@ -1065,25 +1218,25 @@ export default function TicketDetailsScreen({
                       ? '#52B76E'
                       : isLost
                       ? perduColor
-                      : accepteColor,
-                    borderColor: cardSurfaceBg || '#262B31',
+                      : '#D58412',
+                    borderColor: cardSurfaceBg || '#373F42',
                     borderWidth: 1.5,
                   },
                 ]}
               >
                 {(isAccepted || isPaid) && (
-                  <Svg width={9.5} height={9.5} viewBox="0 0 12 12" fill="none" style={{ width: 9.5, height: 9.5 }}>
+                  <Svg width={10} height={10} viewBox="0 0 12 12" fill="none" style={{ width: 10, height: 10 }}>
                     <Path
                       d="M2.5 6.2L5 8.6L9.6 3.6"
                       stroke="#FFFFFF"
-                      strokeWidth={2}
+                      strokeWidth={2.1}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
                   </Svg>
                 )}
                 {isLost && (
-                  <Svg width={8.5} height={8.5} viewBox="0 0 12 12" fill="none" style={{ width: 8.5, height: 8.5 }}>
+                  <Svg width={9} height={9} viewBox="0 0 12 12" fill="none" style={{ width: 9, height: 9 }}>
                     <Rect x="2.5" y="5" width="7" height="2" rx="1" fill="#FFFFFF" />
                   </Svg>
                 )}
@@ -1100,14 +1253,14 @@ export default function TicketDetailsScreen({
               <Text
                 style={[
                   styles.summaryNumberText,
-                  { color: isDark ? '#B8C0C8' : '#557089' },
+                  { color: isDark ? '#D5E0E5' : '#557089' },
                 ]}
               >
                 № {ticketNumber}
               </Text>
             </View>
 
-            {/* Badge • En direct (#F04438, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2.5) */}
+            {/* Badge • En direct (#F83B37, borderRadius: 5, paddingHorizontal: 6.5, paddingVertical: 2) */}
             {(events.some((e) => {
               if (e.isBonus) return false;
               const prog = getEventLiveProgress(e, currentTime);
@@ -1115,9 +1268,7 @@ export default function TicketDetailsScreen({
                 e.status === 'Gain' ||
                 e.status === 'gagne' ||
                 e.status === 'Perte' ||
-                e.status === 'perdu' ||
-                isPaid ||
-                isLost;
+                e.status === 'perdu';
               const evFifa = Boolean(
                 e.isFifa ||
                   e.sport === 'FIFA' ||
@@ -1142,7 +1293,7 @@ export default function TicketDetailsScreen({
             ) : null}
           </View>
 
-          {/* Séparateur horizontal supérieur (height: 1, #323840, marginHorizontal: 16, marginTop: 12, marginBottom: 8) */}
+          {/* Séparateur horizontal supérieur (height: 1, #454E53, marginHorizontal: 15, marginTop: 10, marginBottom: 6) */}
           <View
             style={[
               styles.thinDivider,
@@ -1150,7 +1301,7 @@ export default function TicketDetailsScreen({
             ]}
           />
 
-          {/* Conteneur des lignes financières (paddingHorizontal: 16, paddingBottom: 12) */}
+          {/* Conteneur des lignes financières (paddingHorizontal: 15, paddingBottom: 11) */}
           <View style={styles.financialBlockContainer}>
             {/* Ligne Événements si Combiné */}
             {(isCombine || totalEventsCount > 1) && (
@@ -1227,8 +1378,9 @@ export default function TicketDetailsScreen({
         {/* CARTES DES ÉVÉNEMENTS / SÉLECTIONS                                */}
         {/* ================================================================ */}
         {events.map((ev, index) => {
-          const isEventGain = ev.status === 'Gain' || ev.status === 'gagne' || isPaid;
-          const isEventPerte = ev.status === 'Perte' || ev.status === 'perdu' || isLost;
+          // Chaque événement possède son statut propre (Accepté / Perdu / Gain) indépendamment des autres
+          const isEventGain = ev.status === 'Gain' || ev.status === 'gagne';
+          const isEventPerte = ev.status === 'Perte' || ev.status === 'perdu';
           const isEventSettled = isEventGain || isEventPerte;
           const eventStatusLabel = isEventGain ? 'Gain' : isEventPerte ? 'Perte' : 'Accepté';
           const eventStatusColor = isEventGain ? payeColor : isEventPerte ? perduColor : accepteColor;
@@ -1242,11 +1394,11 @@ export default function TicketDetailsScreen({
           );
 
           const isEventFinished = isEventSettled || liveProgress.isFinished;
-          const isEventLive = !isEventFinished && liveProgress.isLive;
+          const isEventLive = !isEventFinished && (liveProgress.isLive || isFifaEvent || ev.isLive);
           const isPreMatch = !isEventFinished && !isEventLive;
           const hasEventStarted = !isPreMatch;
 
-          // Date numérique exacte sur les cartes d'événements (ex: 14.11.2026 (14:40))
+          // Date numérique exacte sur les cartes d'événements (ex: 14.11.2026 (15:50))
           const displayDate =
             ev.matchDate && ev.matchTime
               ? `${ev.matchDate} (${ev.matchTime})`
@@ -1264,14 +1416,28 @@ export default function TicketDetailsScreen({
                 })
               : null;
 
-          // Sur l'état Accepté (!isEventSettled), on affiche toujours VS sans score ni sous-score
+          const liveComputedScore =
+            isStandardMatch && !isEventSettled && isEventLive
+              ? computeAdaptiveLiveScore({
+                  marketLabel: ev.market || '1X2. V1',
+                  elapsedSeconds: liveProgress.elapsedSeconds,
+                  durationSeconds: liveProgress.durationSeconds,
+                  isFifa: isFifaEvent,
+                })
+              : null;
+
+          // En direct (Capture D2) ou terminé : affiche le score (ex: 3:0) et sous-score (ex: 3:0 (3:0))
           const effectiveScoreFinal = isEventSettled
             ? finishedFormattedScore?.scoreFinal || ev.scoreFinal
-            : undefined;
+            : isEventLive
+            ? ev.scoreFinal || liveComputedScore?.scoreFinal
+            : ev.scoreFinal;
 
           const effectiveScoreDetail = isEventSettled
             ? finishedFormattedScore?.scoreDetail || ev.scoreDetail
-            : undefined;
+            : isEventLive
+            ? ev.scoreDetail || liveComputedScore?.scoreDetail
+            : ev.scoreDetail;
 
           const showEventLiveBadge =
             (!isEventSettled && (isFifaEvent || ev.isPoker || isEventLive)) ||
@@ -1323,16 +1489,21 @@ export default function TicketDetailsScreen({
               key={ev.id || index}
               activeOpacity={0.88}
               onPress={() => handlePressEvent(ev)}
+              onLongPress={() => {
+                setSelectedEventIdForEdit(ev.id || null);
+                setIsScoreModalVisible(true);
+              }}
+              delayLongPress={260}
               style={[styles.eventCard, { backgroundColor: cardSurfaceBg }]}
             >
-              {/* Badge • En direct positionné en absolu tout à l'angle supérieur droit (top: 8, right: 8) */}
+              {/* Badge • En direct positionné en absolu à l'angle supérieur droit (top: 4, right: 4 comme sur Capture D2) */}
               {showEventLiveBadge ? (
                 <View style={styles.cardCornerLiveBadge}>
                   <View style={styles.liveRedBadgeDot} />
                   <Text style={styles.liveRedBadgeText}>En direct</Text>
                 </View>
               ) : ev.badge === 'Serie A' ? (
-                <View style={[styles.leagueBadge, { position: 'absolute', top: 8, right: 8, zIndex: 5 }]}>
+                <View style={[styles.leagueBadge, { position: 'absolute', top: 6, right: 6, zIndex: 5 }]}>
                   <Text style={styles.leagueBadgeText}>Serie A</Text>
                 </View>
               ) : null}
@@ -1378,7 +1549,7 @@ export default function TicketDetailsScreen({
               {ev.isPoker ? (
                 // Bloc Poker
                 <View style={styles.eventPokerContainer}>
-                  {isAccepted ? (
+                  {!isEventSettled ? (
                     <Text style={[styles.eventPokerTitleLive, { color: valueWhiteColor }]}>
                       POKER
                     </Text>
@@ -1426,17 +1597,15 @@ export default function TicketDetailsScreen({
                   </Text>
                 </View>
               ) : (
-                // Match avec 2 équipes sur 1 seule ligne et VS au centre
+                // Match avec 2 équipes et Score / VS au centre (exactement comme sur Capture D2)
                 <View style={styles.eventMatchBlock}>
                   <View style={styles.eventFaceoffContainer}>
-                    {/* Équipe 1 (Gauche) : Texte aligné à droite (1 ligne) + Logo 36x36 */}
+                    {/* Équipe 1 (Gauche) : Texte aligné à droite (jusqu'à 2 lignes comme Manchester United) + Logo 35x35 */}
                     <View style={styles.teamLeftContainer}>
                       <View style={styles.teamLeftTextWrap}>
                         <Text
                           style={[styles.teamNameLeft, { color: valueWhiteColor }]}
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.82}
+                          numberOfLines={2}
                         >
                           {ev.homeTeam}
                         </Text>
@@ -1445,11 +1614,11 @@ export default function TicketDetailsScreen({
                         teamName={ev.homeTeam}
                         logoUrl={ev.homeLogo}
                         leagueName={ev.league}
-                        size={36}
+                        size={35}
                       />
                     </View>
 
-                    {/* Centre : VS (ou score final uniquement si événement terminé/résolu) */}
+                    {/* Centre : Score (ex: 3:0) ou VS si pré-match sans score */}
                     {effectiveScoreFinal ? (
                       <Text style={[styles.mainScoreText, { color: valueWhiteColor }]}>
                         {effectiveScoreFinal}
@@ -1460,20 +1629,18 @@ export default function TicketDetailsScreen({
                       </Text>
                     )}
 
-                    {/* Équipe 2 (Droite) : Logo 36x36 + Texte aligné à gauche sur 1 seule ligne */}
+                    {/* Équipe 2 (Droite) : Logo 35x35 + Texte aligné à gauche (jusqu'à 2 lignes comme West Ham United) */}
                     <View style={styles.teamRightContainer}>
                       <TeamLogo
                         teamName={ev.awayTeam}
                         logoUrl={ev.awayLogo}
                         leagueName={ev.league}
-                        size={36}
+                        size={35}
                       />
                       <View style={styles.teamRightTextWrap}>
                         <Text
                           style={[styles.teamNameRight, { color: valueWhiteColor }]}
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.82}
+                          numberOfLines={2}
                         >
                           {ev.awayTeam}
                         </Text>
@@ -1481,7 +1648,7 @@ export default function TicketDetailsScreen({
                     </View>
                   </View>
 
-                  {Boolean(effectiveScoreDetail) && (
+                  {Boolean(effectiveScoreDetail) ? (
                     <Text
                       style={[
                         styles.detailScoreBelowText,
@@ -1490,11 +1657,13 @@ export default function TicketDetailsScreen({
                     >
                       {effectiveScoreDetail}
                     </Text>
+                  ) : (
+                    <View style={{ height: 17 }} />
                   )}
                 </View>
               )}
 
-              {/* Séparateur interne de la carte (height: 1, #323840, marginBottom: 10) */}
+              {/* Séparateur interne de la carte (height: 1, #454E53, marginBottom: 9) */}
               <View
                 style={[
                   styles.eventInternalDivider,
@@ -1502,7 +1671,7 @@ export default function TicketDetailsScreen({
                 ]}
               />
 
-              {/* Pied de la carte : Uniquement 2 lignes (Marché & Cote + Statut) */}
+              {/* Pied de la carte : Marché & Cote + EN DIRECT / temps écoulé (si live) + Statut (cliquable pour modifier cet événement) */}
               <View style={styles.eventFooterBox}>
                 <View style={styles.eventMarketRow}>
                   <Text
@@ -1516,7 +1685,25 @@ export default function TicketDetailsScreen({
                   </Text>
                 </View>
 
-                <View style={styles.eventStatusRow}>
+                {!isEventSettled && isEventLive && !ev.isPoker && (
+                  <View style={styles.eventLiveTimeRow}>
+                    <Text style={[styles.eventLiveLabel, { color: labelGrayColor }]}>
+                      EN DIRECT
+                    </Text>
+                    <Text style={[styles.eventLiveTimeValue, { color: valueWhiteColor }]}>
+                      temps écoulé : {formatSecondsToMMSS(liveProgress.elapsedSeconds)}
+                    </Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setSelectedEventIdForEdit(ev.id || null);
+                    setIsScoreModalVisible(true);
+                  }}
+                  style={styles.eventStatusRow}
+                >
                   <Text style={[styles.eventStatusLabel, { color: labelGrayColor }]}>
                     Statut:
                   </Text>
@@ -1530,7 +1717,7 @@ export default function TicketDetailsScreen({
                   >
                     {eventStatusLabel}
                   </Text>
-                </View>
+                </TouchableOpacity>
               </View>
 
               {/* Informations supplémentaires pour Poker */}
@@ -1563,7 +1750,7 @@ export default function TicketDetailsScreen({
       </Animated.ScrollView>
 
       {/* ================================================================== */}
-      {/* 6. BARRE D'ACTION INFÉRIEURE (BOUTON UNIQUE COMME SUR LA CAPTURE 2) */}
+      {/* 6. BARRE D'ACTION INFÉRIEURE (VENDRE SELON PROBABILITÉ + DUPLIQUER TOUJOURS DISPONIBLE) */}
       {/* ================================================================== */}
       {showDuplicateFooter && (
         <View
@@ -1571,32 +1758,60 @@ export default function TicketDetailsScreen({
             styles.fixedFooter,
             {
               bottom: bottomBarHeight,
-              backgroundColor: cardSurfaceBg || (isDark ? '#262B31' : '#FFFFFF'),
+              backgroundColor: cardSurfaceBg || (isDark ? '#373F42' : '#FFFFFF'),
             },
           ]}
         >
+          {showSellButton && (
+            <TouchableOpacity
+              style={[
+                styles.sellFooterBtn,
+                {
+                  backgroundColor: isMelbet
+                    ? '#CC841E'
+                    : (currentTheme.cashoutButton?.bg || currentTheme.primary || '#4A8AE8'),
+                },
+              ]}
+              activeOpacity={0.85}
+              onPress={handleCashout}
+            >
+              <Text style={styles.sellFooterBtnText}>
+                Vendre pour {sellPriceFormatted} ₣
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={[
-              styles.singleFooterBtn,
+              styles.duplicateFooterBtn,
               {
-                backgroundColor: isMelbet
-                  ? '#D88D23'
-                  : (currentTheme.cashoutButton?.bg || currentTheme.primary || '#4A8AE8'),
+                backgroundColor: isDark
+                  ? isMelbet
+                    ? '#283033'
+                    : '#1A222C'
+                  : '#EEF2F6',
               },
             ]}
             activeOpacity={0.85}
-            onPress={showSellButton ? handleCashout : handleDuplicate}
+            onPress={handleDuplicate}
           >
-            <Text style={styles.singleFooterBtnText}>
-              {showSellButton
-                ? `Vendre pour ${sellPriceFormatted} ₣`
-                : 'Dupliquer le coupon de pari'}
+            <Text
+              style={[
+                styles.duplicateFooterBtnText,
+                {
+                  color: isMelbet
+                    ? '#CC8A1E'
+                    : (currentTheme.primary || '#4A8AE8'),
+                },
+              ]}
+            >
+              Dupliquer le coupon de pari
             </Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Menu d'options du coupon (Validation avec saisie des scores des 2 mi-temps) */}
+      {/* Menu d'options du coupon (Modification individuelle par événement ou globale) */}
       {isMoreModalVisible && (
       <Modal
         visible={isMoreModalVisible}
@@ -1618,13 +1833,14 @@ export default function TicketDetailsScreen({
           />
           <View
             style={{
-              backgroundColor: currentTheme.cardBackground || (isDark ? '#1E2A36' : '#FFFFFF'),
+              backgroundColor: cardSurfaceBg || (isDark ? '#373F42' : '#FFFFFF'),
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
               paddingHorizontal: 18,
               paddingTop: 14,
               paddingBottom: Math.max(24, insets.bottom + 14),
               zIndex: 2,
+              maxHeight: '82%',
             }}
           >
             <View
@@ -1632,7 +1848,7 @@ export default function TicketDetailsScreen({
                 width: 38,
                 height: 4,
                 borderRadius: 2,
-                backgroundColor: currentTheme.border || '#CBD5E1',
+                backgroundColor: dividerColor || '#CBD5E1',
                 alignSelf: 'center',
                 marginBottom: 12,
               }}
@@ -1641,25 +1857,121 @@ export default function TicketDetailsScreen({
               style={{
                 fontSize: 16,
                 fontWeight: '700',
-                color: currentTheme.textPrimary,
+                color: valueWhiteColor,
                 textAlign: 'center',
-                marginBottom: 14,
+                marginBottom: 10,
               }}
             >
               Pari № {ticketNumber}
             </Text>
+
+            {/* Liste des événements pour modifier chaque événement individuellement */}
+            {nonBonusEvents.length > 0 && (
+              <View style={{ marginBottom: 8 }}>
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: '600',
+                    color: labelGrayColor,
+                    marginBottom: 6,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Modifier un événement individuellement ({completedEventsCount}/{matchEventsTotal} terminés)
+                </Text>
+                {nonBonusEvents.map((evItem, idx) => {
+                  const isEvGain = evItem.status === 'Gain' || evItem.status === 'gagne';
+                  const isEvPerte = evItem.status === 'Perte' || evItem.status === 'perdu';
+                  const badgeColor = isEvGain ? payeColor : isEvPerte ? perduColor : accepteColor;
+                  const badgeText = isEvGain ? 'Gain' : isEvPerte ? 'Perdu' : 'Accepté';
+                  return (
+                    <TouchableOpacity
+                      key={evItem.id || idx}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingVertical: 10,
+                        paddingHorizontal: 12,
+                        borderRadius: 10,
+                        backgroundColor: isDark ? '#283033' : '#F1F5F9',
+                        marginBottom: 6,
+                      }}
+                      onPress={() => {
+                        setIsMoreModalVisible(false);
+                        setSelectedEventIdForEdit(evItem.id || null);
+                        setIsScoreModalVisible(true);
+                      }}
+                    >
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <Text
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: '600',
+                            color: valueWhiteColor,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {idx + 1}. {evItem.homeTeam} vs {evItem.awayTeam}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            color: labelGrayColor,
+                            marginTop: 2,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {evItem.market} • Cote {evItem.odd}
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <View
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 6,
+                            backgroundColor: badgeColor + '24',
+                            borderWidth: 1,
+                            borderColor: badgeColor,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 11.5,
+                              fontWeight: '700',
+                              color: badgeColor,
+                            }}
+                          >
+                            {badgeText}
+                          </Text>
+                        </View>
+                        <Ionicons name="create-outline" size={18} color={labelGrayColor} />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             <TouchableOpacity
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                paddingVertical: 14,
+                paddingVertical: 13,
                 borderBottomWidth: 1,
-                borderBottomColor: currentTheme.divider || currentTheme.border || '#E2E8F0',
+                borderBottomColor: dividerColor,
               }}
               onPress={() => {
                 setIsMoreModalVisible(false);
+                setSelectedEventIdForEdit(null);
                 setIsScoreModalVisible(true);
               }}
             >
@@ -1670,22 +1982,20 @@ export default function TicketDetailsScreen({
                   color: payeColor,
                 }}
               >
-                {isPaid
-                  ? 'Modifier les scores des 2 mi-temps'
-                  : 'Valider le coupon (Saisir les scores des 2 mi-temps)'}
+                Modifier tous les événements (Statuts & Scores)
               </Text>
-              <Ionicons name="checkmark-circle-outline" size={22} color={payeColor} />
+              <Ionicons name="options-outline" size={21} color={payeColor} />
             </TouchableOpacity>
 
-            {(isPaid || isLost) && (
+            {(isPaid || isLost || completedEventsCount > 0) && (
               <TouchableOpacity
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingVertical: 14,
+                  paddingVertical: 13,
                   borderBottomWidth: 1,
-                  borderBottomColor: currentTheme.divider || currentTheme.border || '#E2E8F0',
+                  borderBottomColor: dividerColor,
                 }}
                 onPress={() => {
                   updateCouponStatus(currentCoupon.id, 'Accepté');
@@ -1699,7 +2009,7 @@ export default function TicketDetailsScreen({
                     color: accepteColor,
                   }}
                 >
-                  Marquer comme Accepté (En cours)
+                  Réinitialiser tout en Accepté (0 sur {matchEventsTotal} terminés)
                 </Text>
                 <Ionicons name="refresh-outline" size={20} color={accepteColor} />
               </TouchableOpacity>
@@ -1710,9 +2020,9 @@ export default function TicketDetailsScreen({
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                paddingVertical: 14,
+                paddingVertical: 13,
                 borderBottomWidth: 1,
-                borderBottomColor: currentTheme.divider || currentTheme.border || '#E2E8F0',
+                borderBottomColor: dividerColor,
               }}
               onPress={() => {
                 setIsMoreModalVisible(false);
@@ -1723,12 +2033,12 @@ export default function TicketDetailsScreen({
                 style={{
                   fontSize: 15,
                   fontWeight: '500',
-                  color: currentTheme.textPrimary,
+                  color: valueWhiteColor,
                 }}
               >
                 Dupliquer le coupon
               </Text>
-              <Ionicons name="copy-outline" size={20} color={currentTheme.textSecondary} />
+              <Ionicons name="copy-outline" size={20} color={labelGrayColor} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1736,9 +2046,9 @@ export default function TicketDetailsScreen({
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                paddingVertical: 14,
+                paddingVertical: 13,
                 borderBottomWidth: 1,
-                borderBottomColor: currentTheme.divider || currentTheme.border || '#E2E8F0',
+                borderBottomColor: dividerColor,
               }}
               onPress={async () => {
                 try {
@@ -1753,17 +2063,17 @@ export default function TicketDetailsScreen({
                 style={{
                   fontSize: 15,
                   fontWeight: '500',
-                  color: currentTheme.textPrimary,
+                  color: valueWhiteColor,
                 }}
               >
                 Copier le numéro de coupon
               </Text>
-              <Ionicons name="clipboard-outline" size={20} color={currentTheme.textSecondary} />
+              <Ionicons name="clipboard-outline" size={20} color={labelGrayColor} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={{
-                paddingVertical: 14,
+                paddingVertical: 13,
                 marginTop: 4,
                 alignItems: 'center',
               }}
@@ -1773,7 +2083,7 @@ export default function TicketDetailsScreen({
                 style={{
                   fontSize: 15,
                   fontWeight: '600',
-                  color: currentTheme.textSecondary,
+                  color: labelGrayColor,
                 }}
               >
                 Fermer
@@ -1784,11 +2094,15 @@ export default function TicketDetailsScreen({
       </Modal>
       )}
 
-      {/* Modale de saisie des scores des 2 mi-temps avant validation */}
+      {/* Modale de modification individuelle ou globale des événements (Accepté / Perdu / Gain + Scores) */}
       <ScoreEditorModal
         visible={isScoreModalVisible}
         coupon={currentCoupon}
-        onClose={() => setIsScoreModalVisible(false)}
+        targetEventId={selectedEventIdForEdit}
+        onClose={() => {
+          setIsScoreModalVisible(false);
+          setSelectedEventIdForEdit(null);
+        }}
       />
     </View>
   );
@@ -1813,30 +2127,37 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  // 1. Barre d'En-tête Supérieure (Informations sur le pari)
+  // 1. Barre d'En-tête Supérieure (Informations sur le pari - Capture D2)
   header: {
-    height: 52,
-    backgroundColor: '#262B31',
+    height: 44,
+    backgroundColor: '#373F42',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    position: 'relative',
   },
   headerBtn: {
     width: 28,
     height: 44,
     justifyContent: 'center',
     alignItems: 'flex-start',
+    zIndex: 2,
   },
   headerTitleWrap: {
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16.5,
     fontWeight: '500',
-    color: '#9BA3AE',
+    color: '#9DA5A8',
     textAlign: 'center',
   },
   headerSubtitle: {
@@ -1848,7 +2169,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 18,
+    gap: 24,
+    zIndex: 2,
   },
   headerActionBtn: {
     padding: 0,
@@ -1859,14 +2181,14 @@ const styles = StyleSheet.create({
   // 1B. Barre collante Cotes / Mise / Gains au scroll
   stickyFinancialBar: {
     position: 'absolute',
-    top: 52,
+    top: 44,
     left: 0,
     right: 0,
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
     paddingTop: 8,
     paddingBottom: 10,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -1875,34 +2197,34 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
 
-  // 2. Bloc Résumé du Ticket
+  // 2. Bloc Résumé du Ticket (Capture D2)
   summaryCard: {
-    paddingTop: 14,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    marginBottom: 2,
+    paddingTop: 10,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    marginBottom: 0,
   },
   summaryHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
   },
   avatarWrap: {
     position: 'relative',
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
   },
   avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1E2328',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#2C3437',
     justifyContent: 'center',
     alignItems: 'center',
   },
   fifaAvatarText: {
-    color: '#8A949E',
-    fontSize: 11,
+    color: '#788083',
+    fontSize: 11.5,
     fontWeight: '800',
     letterSpacing: 0.2,
   },
@@ -1913,12 +2235,12 @@ const styles = StyleSheet.create({
   avatarIconPoker: {
     width: 24,
     height: 24,
-    tintColor: '#8A949E',
+    tintColor: '#8C9497',
   },
   avatarIconFifa: {
     width: 26,
     height: 18,
-    tintColor: '#8A949E',
+    tintColor: '#8C9497',
   },
   avatarIconCombine: {
     width: 22,
@@ -1926,92 +2248,92 @@ const styles = StyleSheet.create({
   },
   statusMiniDot: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    bottom: -1,
+    right: -1,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 1.5,
-    borderColor: '#262B31',
+    borderColor: '#373F42',
     justifyContent: 'center',
     alignItems: 'center',
   },
   summaryMetaCol: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 10,
     justifyContent: 'center',
   },
   summaryDateText: {
     fontSize: 13,
     fontWeight: '400',
-    color: '#8A949E',
+    color: '#98A0A3',
   },
   summaryTypeText: {
-    fontSize: 17.5,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
     marginTop: 1,
   },
   summaryNumberText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '400',
-    color: '#B8C0C8',
+    color: '#D5E0E5',
     marginTop: 1,
   },
 
   // Badge Ligue Bleu (Serie A uniquement)
   leagueBadge: {
     backgroundColor: '#527BFF',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
+    borderRadius: 5,
+    paddingHorizontal: 6.5,
+    paddingVertical: 2,
     alignSelf: 'flex-start',
   },
   leagueBadgeText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '600',
   },
 
-  // 3. Bloc Financier
+  // 3. Bloc Financier (Capture D2)
   thinDivider: {
     height: 1,
-    backgroundColor: '#323840',
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
+    backgroundColor: '#454E53',
+    marginHorizontal: 15,
+    marginTop: 10,
+    marginBottom: 6,
   },
   financialBlockContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 15,
+    paddingBottom: 11,
   },
   financialRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 5.5,
+    marginVertical: 5,
   },
   financialLabel: {
     fontSize: 15.5,
     fontWeight: '400',
-    color: '#8A949E',
+    color: '#98A0A3',
   },
   financialValueBold: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
   },
   financialValueStatus: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#D89228',
+    color: '#CC8A1E',
   },
 
   eventsRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: 5.5,
+    marginVertical: 5,
   },
   eventsLeftGroup: {
     flexDirection: 'row',
@@ -2020,32 +2342,33 @@ const styles = StyleSheet.create({
   eventsCountText: {
     fontSize: 15.5,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
   },
   eventsFinishedText: {
     fontSize: 15.5,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
   },
 
-  // 4. Carte d'Événement
+  // 4. Carte d'Événement (Capture D2)
   eventCard: {
-    backgroundColor: '#262B31',
+    backgroundColor: '#373F42',
     borderRadius: 12,
     marginHorizontal: 8,
     marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 11,
+    paddingTop: 12,
+    paddingBottom: 12,
     position: 'relative',
   },
   cardCornerLiveBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#F04438',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    top: 4,
+    right: 4,
+    backgroundColor: '#F83B37',
+    borderRadius: 5,
+    paddingHorizontal: 6.5,
+    paddingVertical: 1.5,
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 5,
@@ -2055,11 +2378,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   eventFifaLeftLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#8A949E',
-    marginRight: 10,
-    marginTop: 4,
+    width: 34,
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#8C9497',
+    marginRight: 6,
+    marginTop: 5,
   },
   eventSportIconWrap: {
     width: 24,
@@ -2067,32 +2391,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
+    marginTop: 2,
   },
   eventSportIcon: {
     width: 22,
     height: 22,
-    tintColor: '#8A949E',
+    tintColor: '#98A0A3',
   },
   eventPokerIcon: {
     width: 20,
     height: 20,
-    tintColor: '#8A949E',
+    tintColor: '#98A0A3',
   },
   eventLeagueInfoCol: {
     flex: 1,
-    paddingRight: 64,
+    paddingRight: 62,
     justifyContent: 'center',
   },
   eventLeagueText: {
     fontSize: 13,
     fontWeight: '400',
-    color: '#8A949E',
+    color: '#98A0A3',
+    lineHeight: 16.5,
   },
   eventDateText: {
     fontSize: 13,
     fontWeight: '400',
-    color: '#8A949E',
-    marginTop: 2,
+    color: '#98A0A3',
+    marginTop: 3,
   },
 
   // Carte Bonus
@@ -2103,7 +2429,7 @@ const styles = StyleSheet.create({
   },
   bonusHeaderTitle: {
     fontSize: 13,
-    color: '#8A949E',
+    color: '#98A0A3',
     fontWeight: '400',
   },
   bonusCenterBox: {
@@ -2114,7 +2440,7 @@ const styles = StyleSheet.create({
   bonusCenterTitle: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
     textAlign: 'center',
   },
   bonusFooterBox: {
@@ -2133,14 +2459,14 @@ const styles = StyleSheet.create({
   eventPokerTitleLive: {
     fontSize: 14.5,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
     textAlign: 'center',
     paddingVertical: 14,
   },
   eventPokerTitle: {
     fontSize: 14.5,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
     textAlign: 'center',
     marginBottom: 6,
   },
@@ -2150,7 +2476,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // 5. Zone d'Affrontement (VS & Noms d'Équipes sur 1 Ligne) et Pied de Carte
+  // 5. Zone d'Affrontement et Pied de Carte (Capture D2)
   eventMatchBlock: {
     width: '100%',
   },
@@ -2158,7 +2484,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
+    marginTop: 17,
   },
   teamLeftContainer: {
     flex: 1,
@@ -2173,9 +2499,10 @@ const styles = StyleSheet.create({
   },
   teamNameLeft: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '500',
+    color: '#F4FBFF',
     textAlign: 'right',
+    lineHeight: 17.5,
   },
   teamRightContainer: {
     flex: 1,
@@ -2190,28 +2517,30 @@ const styles = StyleSheet.create({
   },
   teamNameRight: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '500',
+    color: '#F4FBFF',
     textAlign: 'left',
+    lineHeight: 17.5,
   },
   vsText: {
     fontSize: 19,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
     marginHorizontal: 12,
   },
   mainScoreText: {
     fontSize: 19,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
     marginHorizontal: 12,
   },
   detailScoreBelowText: {
     fontSize: 12.5,
-    color: '#8A949E',
+    color: '#98A0A3',
     fontWeight: '400',
     textAlign: 'center',
-    marginBottom: 10,
+    marginTop: 22,
+    marginBottom: 9,
   },
 
   // Zone outright / vainqueur
@@ -2223,18 +2552,18 @@ const styles = StyleSheet.create({
   eventOutrightText: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
     textAlign: 'center',
   },
 
   // Séparateur interne de la carte
   eventInternalDivider: {
     height: 1,
-    backgroundColor: '#323840',
-    marginBottom: 10,
+    backgroundColor: '#454E53',
+    marginBottom: 9,
   },
 
-  // Pied de la carte (Uniquement 2 lignes comme sur la Capture 2)
+  // Pied de la carte (Capture D2 : Marché & Cote + EN DIRECT / temps écoulé + Statut)
   eventFooterBox: {
     width: '100%',
   },
@@ -2242,19 +2571,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 9,
   },
   eventMarketName: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
     flex: 1,
     marginRight: 10,
   },
   eventOddText: {
-    fontSize: 15.5,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
+  },
+  eventLiveTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 9,
+  },
+  eventLiveLabel: {
+    fontSize: 14.5,
+    fontWeight: '400',
+    color: '#98A0A3',
+  },
+  eventLiveTimeValue: {
+    fontSize: 14.5,
+    fontWeight: '500',
+    color: '#F4FBFF',
   },
   eventStatusRow: {
     flexDirection: 'row',
@@ -2262,25 +2607,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   eventStatusLabel: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '400',
-    color: '#8A949E',
+    color: '#98A0A3',
   },
   eventStatusValue: {
-    fontSize: 15.5,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#D89228',
+    color: '#CC8A1E',
   },
 
-  // Badge • En direct (Résumé & Carte)
+  // Badge • En direct (Résumé & Carte - Capture D2)
   liveRedBadge: {
-    backgroundColor: '#F04438',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
+    backgroundColor: '#F83B37',
+    borderRadius: 5,
+    paddingHorizontal: 6.5,
+    paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
+    marginTop: 2,
   },
   liveRedBadgeDot: {
     width: 3.5,
@@ -2291,7 +2637,7 @@ const styles = StyleSheet.create({
   },
   liveRedBadgeText: {
     fontSize: 10.5,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 
@@ -2302,37 +2648,51 @@ const styles = StyleSheet.create({
   extraInfoTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#8A949E',
+    color: '#98A0A3',
     marginBottom: 2,
   },
   extraInfoValue: {
     fontSize: 14.5,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: '#F4FBFF',
   },
 
-  // 6. Barre d'Action Inférieure (Bouton Unique comme sur la Capture 2)
+  // 6. Barre d'Action Inférieure (Vendre selon probabilité + Dupliquer toujours disponible)
   fixedFooter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: '#262B31',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: '#373F42',
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    paddingHorizontal: 15,
+    paddingTop: 11,
+    paddingBottom: 11,
+    gap: 9,
     zIndex: 100,
   },
-  singleFooterBtn: {
-    backgroundColor: '#D88D23',
-    height: 46,
+  sellFooterBtn: {
+    backgroundColor: '#CC841E',
+    height: 44,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  singleFooterBtnText: {
+  sellFooterBtnText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 15.5,
+    fontWeight: '600',
+  },
+  duplicateFooterBtn: {
+    backgroundColor: '#283033',
+    height: 44,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  duplicateFooterBtnText: {
+    color: '#CC8A1E',
+    fontSize: 15.5,
+    fontWeight: '600',
   },
 });

@@ -382,120 +382,120 @@ export const melbetTheme: AppTheme = {
   isDark: true,
 
   colors: {
-    primary: '#B9711A',            // Ambre doré Melbet exact (vidéo Melbet)
+    primary: '#CC841E',            // Ambre doré Melbet exact (Capture D2)
     primaryText: '#FFFFFF',
-    background: '#24292F',         // Fond sombre principal Melbet (vidéo Melbet)
-    cardBackground: '#30353B',     // Fond des cartes et blocs (vidéo Melbet)
-    cardBorder: '#38434D',         // Bordures subtiles
-    textPrimary: '#FFFFFF',
-    textSecondary: '#878C92',      // Gris des labels et onglets inactifs (vidéo Melbet)
-    accentGreen: '#47A072',        // Vert "Payé" / "Gain" (vidéo Melbet)
-    accentRed: '#D82F3F',          // Rouge "Perdu" / "Perte" (vidéo Melbet)
-    depositButtonBg: '#B9711A',    // Bouton "+ Déposer" ambre (vidéo Melbet)
-    depositButtonText: '#FFFFFF',  // Texte blanc "+ Déposer" (vidéo Melbet)
-    duplicateButtonBg: '#24292F',
-    duplicateButtonText: '#B9711A',
-    filterPillBg: '#24292F',       // Filtres "Par mois" & "Vente" encastrés (vidéo Melbet)
-    filterPillText: '#878C92',
-    filterChipBg: '#24292F',
-    filterChipText: '#878C92',
-    filterIconColor: '#B9711A',
-    bottomBarBg: '#30353B',
-    bottomBarActive: '#B9711A',
-    bottomBarInactive: '#878C92',
-    accentBlue: '#B9711A',
-    accentBlueLight: '#24292F',
-    accentStatusAccepted: '#B9711A',
-    headerBackground: '#30353B',
-    dividerBorder: '#38434D',
-    notchBg: '#24292F',
-    modalBackground: '#30353B',
-    couponCardBg: '#30353B',
-    couponBannerBg: '#24292F',
-    couponCloseIcon: '#B9711A',
+    background: '#283033',         // Fond sombre principal Melbet exact (Capture D2)
+    cardBackground: '#373F42',     // Fond des cartes, header et barre inférieure (Capture D2)
+    cardBorder: '#454E53',         // Bordures et séparateurs subtils (Capture D2)
+    textPrimary: '#F4FBFF',
+    textSecondary: '#98A0A3',      // Gris des labels et onglets inactifs (Capture D2)
+    accentGreen: '#47A072',        // Vert "Payé" / "Gain"
+    accentRed: '#F83B37',          // Rouge "Perdu" / "En direct"
+    depositButtonBg: '#CC841E',    // Bouton "+ Déposer" ambre
+    depositButtonText: '#FFFFFF',  // Texte blanc "+ Déposer"
+    duplicateButtonBg: '#283033',
+    duplicateButtonText: '#CC841E',
+    filterPillBg: '#283033',       // Filtres "Par mois" & "Vente" encastrés
+    filterPillText: '#98A0A3',
+    filterChipBg: '#283033',
+    filterChipText: '#98A0A3',
+    filterIconColor: '#CC841E',
+    bottomBarBg: '#373F42',
+    bottomBarActive: '#CC841E',
+    bottomBarInactive: '#98A0A3',
+    accentBlue: '#CC841E',
+    accentBlueLight: '#283033',
+    accentStatusAccepted: '#CC841E',
+    headerBackground: '#373F42',
+    dividerBorder: '#454E53',
+    notchBg: '#283033',
+    modalBackground: '#373F42',
+    couponCardBg: '#373F42',
+    couponBannerBg: '#283033',
+    couponCloseIcon: '#CC841E',
   },
 
   // Surfaces & Backgrounds
-  background: '#24292F',
-  cardBackground: '#30353B',
-  surface: '#30353B',
-  headerBackground: '#30353B',
-  border: '#38434D',
-  divider: '#38434D',
-  dividerBorder: '#38434D',
-  notchBg: '#24292F',
-  modalBackground: '#30353B',
-  bottomBarBg: '#30353B',
+  background: '#283033',
+  cardBackground: '#373F42',
+  surface: '#373F42',
+  headerBackground: '#373F42',
+  border: '#454E53',
+  divider: '#454E53',
+  dividerBorder: '#454E53',
+  notchBg: '#283033',
+  modalBackground: '#373F42',
+  bottomBarBg: '#373F42',
 
   // Core Brand Colors
-  primary: '#B9711A',
-  primaryAccent: '#B9711A',
-  primarySoft: '#24292F',
-  activeIcon: '#B9711A',
-  accentBlue: '#B9711A',
-  accentBlueLight: '#24292F',
+  primary: '#CC841E',
+  primaryAccent: '#CC841E',
+  primarySoft: '#283033',
+  activeIcon: '#CC841E',
+  accentBlue: '#CC841E',
+  accentBlueLight: '#283033',
   accentGreen: '#47A072',
-  accentStatusAccepted: '#B9711A',
-  couponCardBg: '#30353B',
-  couponBannerBg: '#24292F',
-  couponCloseIcon: '#B9711A',
+  accentStatusAccepted: '#CC841E',
+  couponCardBg: '#373F42',
+  couponBannerBg: '#283033',
+  couponCloseIcon: '#CC841E',
 
   // Typography
-  textPrimary: '#FFFFFF',
-  textSecondary: '#878C92',
-  textMuted: '#777C82',
+  textPrimary: '#F4FBFF',
+  textSecondary: '#98A0A3',
+  textMuted: '#788083',
   textWhite: '#FFFFFF',
 
   // Buttons
   depositButton: {
-    bg: '#B9711A',
+    bg: '#CC841E',
     text: '#FFFFFF',
   },
   duplicateButton: {
-    bg: '#24292F',
-    text: '#B9711A',
+    bg: '#283033',
+    text: '#CC841E',
   },
   cashoutButton: {
-    bg: '#B9711A',
+    bg: '#CC841E',
     text: '#FFFFFF',
   },
 
   filterPill: {
-    bg: '#24292F',
-    text: '#878C92',
+    bg: '#283033',
+    text: '#98A0A3',
   },
-  filterChipBg: '#24292F',
-  filterChipText: '#878C92',
-  filterIconColor: '#B9711A',
+  filterChipBg: '#283033',
+  filterChipText: '#98A0A3',
+  filterIconColor: '#CC841E',
 
   bottomBar: {
-    barBg: '#30353B',
-    barBorder: '#38434D',
-    inactive: '#878C92',
-    active: '#B9711A',
-    centerBg: '#B9711A',
+    barBg: '#373F42',
+    barBorder: '#454E53',
+    inactive: '#98A0A3',
+    active: '#CC841E',
+    centerBg: '#CC841E',
     centerTint: '#FFFFFF',
   },
 
   status: {
     paye: '#47A072',
-    accepte: '#B9711A',
-    perdu: '#D82F3F',
+    accepte: '#CC841E',
+    perdu: '#F83B37',
     gagne: '#47A072',
   },
 
   // Compatibility aliases
   key: 'melbet',
   tagline: 'Bookmaker Hautes Cotes & Cyber',
-  barBg: '#30353B',
-  barBorder: '#38434D',
-  inactive: '#878C92',
-  active: '#B9711A',
-  centerBg: '#B9711A',
+  barBg: '#373F42',
+  barBorder: '#454E53',
+  inactive: '#98A0A3',
+  active: '#CC841E',
+  centerBg: '#CC841E',
   centerTint: '#FFFFFF',
-  dotColor: '#B9711A',
-  badgeBg: '#D82F3F',
-  accentColor: '#B9711A',
+  dotColor: '#CC841E',
+  badgeBg: '#F83B37',
+  accentColor: '#CC841E',
 };
 
 export const melbetLightTheme: AppTheme = {
