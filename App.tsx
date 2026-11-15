@@ -17,7 +17,11 @@ import {
   getScreenBgColor,
   getStatusBarStyleForTheme,
 } from './src/theme/themes';
-import { useSystemUiStore } from './src/utils/systemTopBar';
+import {
+  persistThemeTopBarColor,
+  syncWebTopSafeArea,
+  useSystemUiStore,
+} from './src/utils/systemTopBar';
 
 setupCleanLogging();
 
@@ -100,27 +104,12 @@ export default function App() {
     typeof window !== 'undefined' ? React.useLayoutEffect : useEffect;
 
   useIsomorphicLayoutEffect(() => {
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      const metaThemes = document.querySelectorAll('meta[name="theme-color"]');
-      if (metaThemes.length === 0) {
-        const metaTheme = document.createElement('meta');
-        metaTheme.name = 'theme-color';
-        metaTheme.content = activeTopBg;
-        document.head.appendChild(metaTheme);
-      } else {
-        metaThemes.forEach((node) => {
-          (node as HTMLMetaElement).content = activeTopBg;
-        });
-      }
+    persistThemeTopBarColor(headerBg, barStyle === 'light-content');
+  }, [headerBg, barStyle]);
 
-      document.documentElement.style.backgroundColor = activeTopBg;
-      document.body.style.backgroundColor = activeTopBg;
-      const rootEl = document.getElementById('root');
-      if (rootEl) {
-        rootEl.style.backgroundColor = activeTopBg;
-      }
-    }
-  }, [activeTopBg]);
+  useIsomorphicLayoutEffect(() => {
+    syncWebTopSafeArea(activeTopBg, activeBarStyle === 'light-content');
+  }, [activeTopBg, activeBarStyle]);
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {

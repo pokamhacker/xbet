@@ -29,7 +29,7 @@ import Svg, {
 } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useResponsive } from '../utils/responsive';
-import { getHeaderMatchSafePad, useSystemTopBar } from '../utils/systemTopBar';
+import { getHeaderMatchSafePad, useSyncTopSafeAreaColor } from '../utils/systemTopBar';
 import { useThemeStore } from '../stores/themeStore';
 import { useCouponStore } from '../store/couponStore';
 import { getTeamById } from '../data/sportsCatalog';
@@ -1400,7 +1400,7 @@ export default function FifaLiveMatchScreen({ route, navigation }: any) {
 
   const streamUrl = passedEvent?.streamUrl;
   const topSafePad = getHeaderMatchSafePad(insets.top);
-  useSystemTopBar('#1B3A26', 'light-content');
+  useSyncTopSafeAreaColor('#19371D', true);
 
   const renderTeamStatsBlock = (inHeaderPreMatch: boolean = false) => (
     <View style={[styles.statsSection, inHeaderPreMatch && styles.statsSectionPreMatch]}>
@@ -2264,7 +2264,7 @@ const styles = StyleSheet.create({
   },
   headerBg: {
     width: '100%',
-    backgroundColor: '#1B3A26',
+    backgroundColor: '#19371D',
     paddingBottom: 8,
     zIndex: 10,
   },

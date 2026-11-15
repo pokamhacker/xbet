@@ -264,14 +264,46 @@ export default function AppNavigator() {
             <Stack.Screen name="TicketDetails" component={isIPhone ? IPhoneBetDetailScreen : BetDetailTicketScreen} />
             <Stack.Screen name="BetDetails" component={isIPhone ? IPhoneBetDetailScreen : BetDetailTicketScreen} />
             <Stack.Screen name="BetDetailsScreen" component={isIPhone ? IPhoneBetDetailScreen : BetDetailTicketScreen} />
-            <Stack.Screen name="MatchStatistics" component={MatchStatisticsScreen} />
-            <Stack.Screen name="MatchStatisticsScreen" component={MatchStatisticsScreen} />
-            <Stack.Screen name="MatchMarkets" component={MatchMarketsScreen} />
-            <Stack.Screen name="MatchMarketsScreen" component={MatchMarketsScreen} />
-            <Stack.Screen name="FifaLiveMatch" component={FifaLiveMatchScreen} />
-            <Stack.Screen name="FifaLiveMatchScreen" component={FifaLiveMatchScreen} />
-            <Stack.Screen name="PokerLiveMatch" component={PokerLiveMatchScreen} />
-            <Stack.Screen name="PokerLiveMatchScreen" component={PokerLiveMatchScreen} />
+            <Stack.Screen
+              name="MatchStatistics"
+              component={MatchStatisticsScreen}
+              options={{ contentStyle: { backgroundColor: '#03323C' } }}
+            />
+            <Stack.Screen
+              name="MatchStatisticsScreen"
+              component={MatchStatisticsScreen}
+              options={{ contentStyle: { backgroundColor: '#03323C' } }}
+            />
+            <Stack.Screen
+              name="MatchMarkets"
+              component={MatchMarketsScreen}
+              options={{ contentStyle: { backgroundColor: '#03323C' } }}
+            />
+            <Stack.Screen
+              name="MatchMarketsScreen"
+              component={MatchMarketsScreen}
+              options={{ contentStyle: { backgroundColor: '#03323C' } }}
+            />
+            <Stack.Screen
+              name="FifaLiveMatch"
+              component={FifaLiveMatchScreen}
+              options={{ contentStyle: { backgroundColor: '#19371D' } }}
+            />
+            <Stack.Screen
+              name="FifaLiveMatchScreen"
+              component={FifaLiveMatchScreen}
+              options={{ contentStyle: { backgroundColor: '#19371D' } }}
+            />
+            <Stack.Screen
+              name="PokerLiveMatch"
+              component={PokerLiveMatchScreen}
+              options={{ contentStyle: { backgroundColor: '#000000' } }}
+            />
+            <Stack.Screen
+              name="PokerLiveMatchScreen"
+              component={PokerLiveMatchScreen}
+              options={{ contentStyle: { backgroundColor: '#000000' } }}
+            />
             <Stack.Screen name="CouponScreen" component={isIPhone ? IPhoneCouponScreen : CouponScreen} />
             <Stack.Screen name="HistoryListScreen" component={isIPhone ? IPhoneBetHistoryScreen : HistoryListScreen} />
             <Stack.Screen name="BetHistory" component={isIPhone ? IPhoneBetHistoryScreen : HistoryListScreen} />

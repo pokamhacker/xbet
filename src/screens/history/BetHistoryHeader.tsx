@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 
 import { useThemeStore } from '../../stores/themeStore';
+import { getHeaderBgColor } from '../../theme/themes';
 import {
   CouponScanHeaderIcon,
   DepositCardPlusIcon,
@@ -152,7 +153,7 @@ export const BetHistoryTopBar: React.FC<BetHistoryTopBarProps> = ({
   const insets = useSafeAreaInsets();
   const statusBarHeight = getTopSafeInset(insets.top);
 
-  const headerBg = currentTheme.headerBackground || '#FFFFFF';
+  const headerBg = getHeaderBgColor(currentTheme);
   const titleColor = currentTheme.isDark ? currentTheme.textPrimary : '#577089';
   const rightIconColor = currentTheme.isDark
     ? currentTheme.textSecondary
@@ -270,7 +271,7 @@ export const BetHistoryCollapsibleHeader: React.FC<
   const { currentTheme } = useThemeStore();
   const formattedBalance = `${formatBalance(balance)} ${currencySymbol}`;
 
-  const headerBg = currentTheme.headerBackground || '#FFFFFF';
+  const headerBg = getHeaderBgColor(currentTheme);
   const accountLabelColor = currentTheme.isDark
     ? currentTheme.textSecondary
     : '#5E768D';
@@ -463,7 +464,7 @@ export const BetHistoryHeader: React.FC<BetHistoryHeaderProps> = ({
     <View
       style={[
         styles.container,
-        { backgroundColor: currentTheme.headerBackground || '#FFFFFF' },
+        { backgroundColor: getHeaderBgColor(currentTheme) },
         style,
       ]}
     >
@@ -586,7 +587,6 @@ const styles = StyleSheet.create({
   // CONTENEUR DÉFILANT (SOLDE CENTRÉ + 3 CARTES)
   // -------------------------------------------------------------------------
   collapsibleContainer: {
-    backgroundColor: '#FFFFFF',
     paddingBottom: 14,
   },
 

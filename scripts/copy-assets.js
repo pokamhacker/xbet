@@ -126,7 +126,7 @@ if (fs.existsSync(indexHtmlPath)) {
   // Supprimer les anciens méta-tags Apple / theme-color générés par Expo pour éviter les doublons
   html = html.replace(/<meta\s+name="(?:theme-color|apple-mobile-web-app-[^"]+|mobile-web-app-capable)"[^>]*>\s*/gi, '');
 
-  // Balises PWA Apple et Web App Standalone
+  // Balises PWA Apple et Web App Standalone (zéro #FFFFFF codé en dur)
   const pwaMetaTags = `
     <!-- iOS PWA Standalone Meta Tags (Plein écran bord à bord sans bande blanche/grise en haut) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -134,7 +134,19 @@ if (fs.existsSync(indexHtmlPath)) {
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="1xBet" />
     <meta name="application-name" content="1xBet" />
-    <meta name="theme-color" content="#FFFFFF" />
+    <meta name="theme-color" content="#1B2430" />
+    <script>
+      (function () {
+        try {
+          var bg = localStorage.getItem('app_top_bar_bg_v1') || '#1B2430';
+          var isDark = localStorage.getItem('app_top_bar_dark_v1') !== '0';
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', bg);
+          document.documentElement.style.backgroundColor = bg;
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
     <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BackArrowIcon } from './common/BackArrowIcon';
 import { useThemeStore } from '../stores/themeStore';
 import { useResponsive } from '../utils/responsive';
-import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
+import { getTopSafeInset, useSyncTopSafeAreaColor } from '../utils/systemTopBar';
 import {
   BrandChoice,
   ModeChoice,
@@ -62,18 +62,37 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
       ? '#D3242A'
       : '#2B78C9');
 
+  const isBlack =
+    modeChoice === 'noir' ||
+    (currentTheme?.name || '').toLowerCase().includes('black');
   const activeBorderColor = brandPrimaryColor;
-  const activeBgColor = isDark ? '#1C293A' : '#EDF5FD';
-  const inactiveBorderColor = isDark ? '#263342' : '#E8EDF3';
-  const inactiveBgColor = isDark ? '#16202C' : '#FFFFFF';
+  const activeBgColor = isBlack
+    ? '#141B24'
+    : isDark
+      ? '#1C293A'
+      : '#EDF5FD';
+  const inactiveBorderColor = isBlack
+    ? (currentTheme?.border || '#1F2937')
+    : isDark
+      ? '#263342'
+      : '#E8EDF3';
+  const inactiveBgColor = isBlack
+    ? (currentTheme?.cardBackground || '#0A0D10')
+    : isDark
+      ? '#16202C'
+      : '#FFFFFF';
   const textPrimary = isDark ? '#F8FAFC' : '#1E293B';
   const sectionTitleColor = isDark ? '#94A3B8' : '#5A738E';
-  const screenBg = isDark ? currentTheme?.background || '#0F172A' : '#F8FAFC';
+  const screenBg = isBlack
+    ? '#000000'
+    : isDark
+      ? currentTheme?.background || '#0F172A'
+      : '#F8FAFC';
   const headerBg = getHeaderBgColor(currentTheme);
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
   const { insets } = useResponsive();
   const topInset = getTopSafeInset(insets.top);
-  useSystemTopBar(headerBg, statusBarStyle, visible);
+  useSyncTopSafeAreaColor(headerBg, statusBarStyle === 'light-content', visible);
 
   // Helper pour les 3 capsules d'échantillons de couleur
   const renderSwatches = (c1: string, c2: string, c3: string) => (
@@ -96,7 +115,7 @@ export const ThemeSwitcherModal: React.FC<ThemeSwitcherModalProps> = ({
   return (
     <Modal
       visible={visible}
-      transparent={false}
+      transparent={true}
       animationType="slide"
       onRequestClose={onClose}
       statusBarTranslucent={true}

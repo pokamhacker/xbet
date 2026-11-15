@@ -27,7 +27,7 @@ import {
   getScreenBgColor,
   getStatusBarStyleForTheme,
 } from '../../theme/themes';
-import { getTopSafeInset, useSystemTopBar } from '../../utils/systemTopBar';
+import { getTopSafeInset, useSyncTopSafeAreaColor } from '../../utils/systemTopBar';
 import { ScoreEditorModal } from '../../components/ScoreEditorModal';
 
 // ============================================================================
@@ -676,7 +676,7 @@ export default function HistoryListScreen() {
   const screenBg = getScreenBgColor(currentTheme);
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
   const topInset = getTopSafeInset(insets.top);
-  useSystemTopBar(headerBg, statusBarStyle);
+  useSyncTopSafeAreaColor(headerBg, statusBarStyle === 'light-content');
   const isParipesa =
     brandChoice === 'paripesa' ||
     (currentTheme?.name || '').toLowerCase().includes('paripesa');

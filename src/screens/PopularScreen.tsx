@@ -20,7 +20,7 @@ import {
   getStatusBarStyleForTheme,
 } from '../theme/themes';
 import { useResponsive } from '../utils/responsive';
-import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
+import { getTopSafeInset, useSyncTopSafeAreaColor } from '../utils/systemTopBar';
 import { BrandLogo } from '../components/common/BrandLogo';
 import { ROUTE_TO_FEATURE_MAP } from '../types/permissions';
 import {
@@ -143,7 +143,7 @@ export default function PopularScreen({ navigation }: any) {
   const screenBg = getScreenBgColor(currentTheme);
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
   const topInset = getTopSafeInset(insets.top);
-  useSystemTopBar(headerBg, statusBarStyle);
+  useSyncTopSafeAreaColor(headerBg, statusBarStyle === 'light-content');
 
   return (
     <View style={[styles.container, { backgroundColor: screenBg }]}>

@@ -18,7 +18,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useIsFocused } from '@react-navigation/native';
 import { useResponsive } from '../utils/responsive';
-import { getTopSafeInset, useSystemTopBar } from '../utils/systemTopBar';
+import { getTopSafeInset, useSyncTopSafeAreaColor } from '../utils/systemTopBar';
 import { useThemeStore } from '../store/themeStore';
 import {
   getHeaderBgColor,
@@ -363,7 +363,7 @@ export default function CouponScreen({ navigation }: any) {
   const headerBg =
     isMelbet && isDark && !isBlack ? '#21262C' : hasSelections && isDark ? screenBg : rawHeaderBg;
   const statusBarStyle = getStatusBarStyleForTheme(currentTheme, headerBg);
-  useSystemTopBar(headerBg, statusBarStyle);
+  useSyncTopSafeAreaColor(headerBg, statusBarStyle === 'light-content');
 
   const textPrimary = currentTheme.textPrimary || (isDark ? '#FFFFFF' : '#00325E');
   const textSecondary = currentTheme.textSecondary || (isDark ? '#8FA2B6' : '#6E849B');
