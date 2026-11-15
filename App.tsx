@@ -177,19 +177,7 @@ export default function App() {
         const style = document.createElement('style');
         style.id = styleId;
         style.innerHTML = `
-          html, body {
-            width: 100% !important;
-            height: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: hidden !important;
-          }
-          #root {
-            position: fixed !important;
-            top: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            left: 0 !important;
+          html, body, #root {
             width: 100% !important;
             height: 100% !important;
             margin: 0 !important;

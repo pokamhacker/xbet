@@ -154,29 +154,12 @@ if (fs.existsSync(indexHtmlPath)) {
     <link rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png" />
     <style id="native-touch-feel">
       html, body {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
         overscroll-behavior: none;
         -webkit-overflow-scrolling: touch;
         -webkit-user-select: none;
         user-select: none;
         -webkit-touch-callout: none;
         -webkit-tap-highlight-color: transparent;
-      }
-      #root {
-        position: fixed;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
       }
       input, textarea {
         -webkit-user-select: text !important;

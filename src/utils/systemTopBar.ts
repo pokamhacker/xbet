@@ -170,10 +170,10 @@ export function getTopSafeInset(insetsTop?: number): number {
  */
 export function getHeaderMatchSafePad(insetsTop?: number): number {
   if (typeof insetsTop === 'number' && insetsTop > 0) {
-    return insetsTop + 4;
+    return insetsTop;
   }
   if (Platform.OS === 'android') {
-    return (StatusBar.currentHeight || 24) + 4;
+    return StatusBar.currentHeight || 28;
   }
   return 16;
 }
