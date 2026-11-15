@@ -142,8 +142,27 @@ if (fs.existsSync(indexHtmlPath)) {
           var isDark = localStorage.getItem('app_top_bar_dark_v1') !== '0';
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute('content', bg);
-          document.documentElement.style.backgroundColor = bg;
-          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+          var docEl = document.documentElement;
+          docEl.style.backgroundColor = bg;
+          docEl.style.colorScheme = isDark ? 'dark' : 'light';
+
+          // Fix WebKit iOS PWA black-translucent viewport height deficit (~59pt at bottom) before first paint
+          var ua = navigator.userAgent || '';
+          var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          var isStandalone = window.navigator.standalone === true ||
+            (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches));
+          if (isIOS && isStandalone && window.screen) {
+            var iw = window.innerWidth || docEl.clientWidth || 0;
+            var ih = window.innerHeight || docEl.clientHeight || 0;
+            var isLand = iw > ih;
+            var sw = isLand ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+            var sh = isLand ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+            var deficit = sh - Math.min(ih || sh, docEl.clientHeight || sh);
+            if (sw > 0 && Math.abs(iw - sw) <= 2 && deficit > 0 && deficit <= 96) {
+              docEl.setAttribute('data-ios-pwa-full', '1');
+              docEl.style.setProperty('--app-full-height', sh + 'px');
+            }
+          }
         } catch (e) {}
       })();
     </script>
@@ -153,6 +172,25 @@ if (fs.existsSync(indexHtmlPath)) {
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png" />
     <style id="native-touch-feel">
+      html, body, #root {
+        width: 100%;
+        height: var(--app-full-height, 100%);
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      html[data-ios-pwa-full="1"],
+      html[data-ios-pwa-full="1"] body,
+      html[data-ios-pwa-full="1"] #root {
+        height: var(--app-full-height, 100vh) !important;
+        min-height: var(--app-full-height, 100vh) !important;
+      }
+      html[data-ios-pwa-full="1"] #root {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+      }
       html, body {
         overscroll-behavior: none;
         -webkit-overflow-scrolling: touch;

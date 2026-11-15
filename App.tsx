@@ -1,6 +1,10 @@
 import React, { useEffect } from 'react';
 import { Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  SafeAreaInsetsContext,
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
   Ionicons,
@@ -18,7 +22,10 @@ import {
   getStatusBarStyleForTheme,
 } from './src/theme/themes';
 import {
+  isIOSStandalonePwa,
   persistThemeTopBarColor,
+  probeCssEnvSafeInsets,
+  syncIOSStandaloneViewportHeight,
   syncWebTopSafeArea,
   useSystemUiStore,
 } from './src/utils/systemTopBar';
@@ -82,6 +89,66 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
+/**
+ * Empêche NativeSafeAreaProvider.web d'ajouter le déficit `(rect.bottom - window.innerHeight)`
+ * (~59pt en PWA iOS black-translucent) sur `insets.bottom` lorsque `#root` occupe la vraie hauteur écran.
+ */
+function WebSafeAreaNormalizer({ children }: { children: React.ReactNode }) {
+  const providerInsets = useSafeAreaInsets();
+  const [cssInsets, setCssInsets] = React.useState(() => probeCssEnvSafeInsets());
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refresh = () => {
+      setCssInsets(probeCssEnvSafeInsets());
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setCssInsets(probeCssEnvSafeInsets()), 80);
+    };
+    refresh();
+    window.addEventListener('resize', refresh);
+    window.addEventListener('orientationchange', refresh);
+    window.addEventListener('pageshow', refresh);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('resize', refresh);
+      window.removeEventListener('orientationchange', refresh);
+      window.removeEventListener('pageshow', refresh);
+    };
+  }, []);
+
+  const normalizedInsets = React.useMemo(() => {
+    if (Platform.OS !== 'web' || !isIOSStandalonePwa()) {
+      return providerInsets;
+    }
+    const nextTop = Math.max(providerInsets.top, cssInsets.top);
+    const nextBottom =
+      providerInsets.bottom > cssInsets.bottom ? cssInsets.bottom : providerInsets.bottom;
+    const nextLeft = Math.max(providerInsets.left, cssInsets.left);
+    const nextRight = Math.max(providerInsets.right, cssInsets.right);
+    if (
+      nextTop === providerInsets.top &&
+      nextBottom === providerInsets.bottom &&
+      nextLeft === providerInsets.left &&
+      nextRight === providerInsets.right
+    ) {
+      return providerInsets;
+    }
+    return {
+      top: nextTop,
+      bottom: nextBottom,
+      left: nextLeft,
+      right: nextRight,
+    };
+  }, [providerInsets, cssInsets]);
+
+  return (
+    <SafeAreaInsetsContext.Provider value={normalizedInsets}>
+      {children}
+    </SafeAreaInsetsContext.Provider>
+  );
+}
+
 export default function App() {
   const { currentTheme } = useThemeStore();
   const topBarEntries = useSystemUiStore((state) => state.entries);
@@ -110,6 +177,34 @@ export default function App() {
   useIsomorphicLayoutEffect(() => {
     syncWebTopSafeArea(activeTopBg, activeBarStyle === 'light-content');
   }, [activeTopBg, activeBarStyle]);
+
+  useIsomorphicLayoutEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    let rafId: number | null = null;
+    const syncViewport = () => {
+      syncIOSStandaloneViewportHeight();
+      if (rafId != null && typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(rafId);
+      }
+      if (typeof requestAnimationFrame === 'function') {
+        rafId = requestAnimationFrame(() => syncIOSStandaloneViewportHeight());
+      }
+    };
+    syncViewport();
+    window.addEventListener('resize', syncViewport);
+    window.addEventListener('orientationchange', syncViewport);
+    window.addEventListener('pageshow', syncViewport);
+    document.addEventListener('visibilitychange', syncViewport);
+    return () => {
+      if (rafId != null && typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(rafId);
+      }
+      window.removeEventListener('resize', syncViewport);
+      window.removeEventListener('orientationchange', syncViewport);
+      window.removeEventListener('pageshow', syncViewport);
+      document.removeEventListener('visibilitychange', syncViewport);
+    };
+  }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -179,10 +274,22 @@ export default function App() {
         style.innerHTML = `
           html, body, #root {
             width: 100% !important;
-            height: 100% !important;
+            height: var(--app-full-height, 100%) !important;
             margin: 0 !important;
             padding: 0 !important;
             overflow: hidden !important;
+          }
+          html[data-ios-pwa-full="1"],
+          html[data-ios-pwa-full="1"] body,
+          html[data-ios-pwa-full="1"] #root {
+            height: var(--app-full-height, 100vh) !important;
+            min-height: var(--app-full-height, 100vh) !important;
+          }
+          html[data-ios-pwa-full="1"] #root {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
           }
           input, textarea {
             -webkit-user-select: text !important;
@@ -292,9 +399,11 @@ export default function App() {
         barStyle={activeBarStyle}
         {...({ translucent: true, backgroundColor: 'transparent' } as any)}
       />
-      <AppErrorBoundary>
-        <AppNavigator />
-      </AppErrorBoundary>
+      <WebSafeAreaNormalizer>
+        <AppErrorBoundary>
+          <AppNavigator />
+        </AppErrorBoundary>
+      </WebSafeAreaNormalizer>
     </SafeAreaProvider>
   );
 }

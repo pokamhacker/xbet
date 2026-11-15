@@ -150,6 +150,117 @@ export function syncWebTopSafeArea(
   }
 }
 
+export interface CssSafeInsets {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/**
+ * Détecte une PWA iOS installée sur l'écran d'accueil (`standalone`).
+ */
+export function isIOSStandalonePwa(): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return false;
+  }
+  const ua = navigator.userAgent || '';
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!isIOS) return false;
+
+  const isStandalone =
+    (window.navigator as any).standalone === true ||
+    window.matchMedia?.('(display-mode: standalone)')?.matches === true ||
+    window.matchMedia?.('(display-mode: fullscreen)')?.matches === true;
+  return Boolean(isStandalone);
+}
+
+/**
+ * Mesure les valeurs CSS réelles `env(safe-area-inset-*)` sans l'écart
+ * `(window.innerHeight - rect.bottom)` ajouté par NativeSafeAreaProvider.web.
+ */
+export function probeCssEnvSafeInsets(): CssSafeInsets {
+  if (Platform.OS !== 'web' || typeof document === 'undefined' || !document.body) {
+    return { top: 0, bottom: 0, left: 0, right: 0 };
+  }
+  const probe = document.createElement('div');
+  probe.style.position = 'fixed';
+  probe.style.left = '0';
+  probe.style.top = '0';
+  probe.style.width = '0';
+  probe.style.height = '0';
+  probe.style.visibility = 'hidden';
+  probe.style.pointerEvents = 'none';
+  probe.style.paddingTop = 'env(safe-area-inset-top, 0px)';
+  probe.style.paddingBottom = 'env(safe-area-inset-bottom, 0px)';
+  probe.style.paddingLeft = 'env(safe-area-inset-left, 0px)';
+  probe.style.paddingRight = 'env(safe-area-inset-right, 0px)';
+  document.body.appendChild(probe);
+  try {
+    const cs = window.getComputedStyle(probe);
+    return {
+      top: Math.max(0, parseInt(cs.paddingTop || '0', 10) || 0),
+      bottom: Math.max(0, parseInt(cs.paddingBottom || '0', 10) || 0),
+      left: Math.max(0, parseInt(cs.paddingLeft || '0', 10) || 0),
+      right: Math.max(0, parseInt(cs.paddingRight || '0', 10) || 0),
+    };
+  } finally {
+    probe.remove();
+  }
+}
+
+/**
+ * Corrige le bug WebKit iOS PWA (`apple-mobile-web-app-status-bar-style="black-translucent"`)
+ * où `window.innerHeight` / `height: 100%` perdent la hauteur de la status bar en bas (~59pt),
+ * créant une bande vide sous la barre de navigation inférieure.
+ */
+export function syncIOSStandaloneViewportHeight(): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof document === 'undefined') {
+    return false;
+  }
+  const docEl = document.documentElement;
+  if (!isIOSStandalonePwa() || !window.screen) {
+    docEl.removeAttribute('data-ios-pwa-full');
+    docEl.style.removeProperty('--app-full-height');
+    return false;
+  }
+
+  const innerW = window.innerWidth || docEl.clientWidth || 0;
+  const innerH = window.innerHeight || docEl.clientHeight || 0;
+  const isLandscape = innerW > innerH;
+  const screenW = isLandscape
+    ? Math.max(window.screen.width, window.screen.height)
+    : Math.min(window.screen.width, window.screen.height);
+  const screenH = isLandscape
+    ? Math.min(window.screen.width, window.screen.height)
+    : Math.max(window.screen.width, window.screen.height);
+
+  const isFullWidth = screenW > 0 && Math.abs(innerW - screenW) <= 2;
+  const wasApplied = docEl.getAttribute('data-ios-pwa-full') === '1';
+  const rootRectH = !wasApplied
+    ? document.getElementById('root')?.getBoundingClientRect().height || screenH
+    : screenH;
+  const measuredH = Math.min(innerH || screenH, (!wasApplied ? docEl.clientHeight : screenH) || screenH, rootRectH);
+  const deficit = screenH - measuredH;
+
+  if (isFullWidth && screenH > 0 && deficit > 0 && deficit <= 96) {
+    docEl.setAttribute('data-ios-pwa-full', '1');
+    docEl.style.setProperty('--app-full-height', `${screenH}px`);
+    return true;
+  }
+
+  if (wasApplied && isFullWidth && innerH > 0 && innerH < screenH && screenH - innerH <= 96) {
+    docEl.style.setProperty('--app-full-height', `${screenH}px`);
+    return true;
+  }
+
+  docEl.removeAttribute('data-ios-pwa-full');
+  docEl.style.removeProperty('--app-full-height');
+  return false;
+}
+
 /**
  * Calcule le padding top sécurisé pour que le header s'étende jusqu'à top: 0
  * tout en plaçant le contenu sous la barre de statut / notch / Dynamic Island.
