@@ -476,6 +476,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         // 1. Connexion en direct sur le serveur distant
+        let serverUnavailableError: string | null = null;
         try {
           const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
             method: 'POST',
@@ -561,9 +562,12 @@ export const useAuthStore = create<AuthState>()(
                 error: data?.error || 'Identifiant ou mot de passe incorrect.',
               };
             }
+          } else {
+            serverUnavailableError = `Le serveur est temporairement indisponible (${res.status}). Réessayez dans quelques secondes.`;
           }
         } catch {
-          // Serveur distant injoignable ou en cours de réveil, bascule sur le cache local uniquement hors ligne
+          serverUnavailableError =
+            "Impossible de joindre le serveur d'authentification. Vérifiez votre connexion Internet et réessayez.";
         }
 
         // 2. Repli hors ligne uniquement si le serveur est totalement injoignable
@@ -578,7 +582,10 @@ export const useAuthStore = create<AuthState>()(
         );
 
         if (!localAccount) {
-          return { success: false, error: 'Identifiant ou mot de passe incorrect.' };
+          return {
+            success: false,
+            error: serverUnavailableError || 'Identifiant ou mot de passe incorrect.',
+          };
         }
 
         const isPasswordCorrect =

@@ -1240,6 +1240,7 @@ export default function AdminDashboardScreen() {
                 value={newUsername}
                 onChangeText={setNewUsername}
                 autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
 
@@ -1252,6 +1253,7 @@ export default function AdminDashboardScreen() {
                 value={newPassword}
                 onChangeText={setNewPassword}
                 autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
 
@@ -1819,6 +1821,7 @@ export default function AdminDashboardScreen() {
                   value={userNewPassInput}
                   onChangeText={setUserNewPassInput}
                   autoCapitalize="none"
+                  autoCorrect={false}
                   secureTextEntry={!newUserPassVisible}
                 />
                 <TouchableOpacity

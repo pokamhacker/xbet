@@ -1,5 +1,18 @@
 [
   {
+    "id": "usr_1794806513604_n7688y",
+    "username": "jobel",
+    "raw_password": "jobel",
+    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
+    "role": "USER",
+    "balance": 100000,
+    "is_blocked": 0,
+    "blocked_reason": null,
+    "bound_device_id": null,
+    "last_device_id": null,
+    "created_at": "2026-11-16T05:21:54.000Z"
+  },
+  {
     "id": "usr_1794752344271_e836b13d",
     "username": "ccc",
     "raw_password": "ccc",
@@ -8,7 +21,7 @@
     "balance": 50000,
     "is_blocked": 1,
     "blocked_reason": "Tentative de connexion sur un autre appareil non autorisé (Règle stricte 1 Compte = 1 Seul Appareil)",
-    "bound_device_id": "dev_1794752126802_d8hza2n",
+    "bound_device_id": null,
     "last_device_id": "dev_1794752126802_d8hza2n",
     "created_at": "2026-11-15T14:19:04.000Z"
   },
@@ -60,7 +73,7 @@
     "balance": 50000,
     "is_blocked": 0,
     "blocked_reason": null,
-    "bound_device_id": "dev_1794794233647_bxfxmd6",
+    "bound_device_id": null,
     "last_device_id": "dev_1794794233647_bxfxmd6",
     "created_at": "2026-11-10T15:23:01.000Z"
   },
