@@ -513,8 +513,8 @@ export const useAuthStore = create<AuthState>()(
                 role: sUser.role as UserRole,
                 isActive: !sUser.isBlocked,
                 blockedReason: sUser.blockedReason || null,
-                boundDeviceId: sUser.boundDeviceId || localDeviceId,
-                currentDeviceId: localDeviceId,
+                boundDeviceId: sUser.boundDeviceId || targetDeviceId,
+                currentDeviceId: targetDeviceId,
                 allowedFeatures: allowed,
                 createdAt: sUser.createdAt || new Date().toISOString(),
               };
@@ -602,7 +602,7 @@ export const useAuthStore = create<AuthState>()(
         // Contrôle mono-appareil en mode local
         if (localAccount.role === 'USER') {
           const registeredDevice = localAccount.boundDeviceId || localAccount.currentDeviceId;
-          if (registeredDevice && registeredDevice !== localDeviceId) {
+          if (registeredDevice && registeredDevice !== targetDeviceId) {
             return {
               success: false,
               error:
@@ -613,8 +613,8 @@ export const useAuthStore = create<AuthState>()(
 
         const updatedAccount: UserAccount = {
           ...localAccount,
-          boundDeviceId: localAccount.boundDeviceId || localDeviceId,
-          currentDeviceId: localDeviceId,
+          boundDeviceId: localAccount.boundDeviceId || targetDeviceId,
+          currentDeviceId: targetDeviceId,
           blockedReason: null,
           rawPassword: localAccount.rawPassword || trimmedPass,
           allowedFeatures: localAccount.allowedFeatures || DEFAULT_ALLOWED_FEATURES,
@@ -699,7 +699,7 @@ export const useAuthStore = create<AuthState>()(
           return { valid: false, reason: 'blocked' };
         }
 
-        if (freshAccount.currentDeviceId && freshAccount.currentDeviceId !== localDeviceId) {
+        if (localDeviceId && freshAccount.currentDeviceId && freshAccount.currentDeviceId !== localDeviceId) {
           get().logout();
           set({
             sessionAlertMessage: 'Session expirée : Ce compte s\'est connecté sur un autre appareil.',
@@ -758,6 +758,8 @@ export const useAuthStore = create<AuthState>()(
         const { accounts: prevAccounts, currentUser: prevCurrentUser } = get();
         const matchesTarget = (a: UserAccount) =>
           a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+        const targetAcc = prevAccounts.find(matchesTarget);
+        const backendUserId = targetAcc?.id || userId;
 
         const nextAccounts = prevAccounts.map((a) =>
           matchesTarget(a) ? { ...a, allowedFeatures } : a
@@ -773,7 +775,7 @@ export const useAuthStore = create<AuthState>()(
           () => set({ authToken: null }),
           '/api/admin/update-permissions',
           'POST',
-          { userId, allowedFeatures }
+          { userId: backendUserId, allowedFeatures }
         );
         if (!response.ok) {
           set({ accounts: prevAccounts, currentUser: prevCurrentUser });
@@ -919,6 +921,7 @@ export const useAuthStore = create<AuthState>()(
         const { accounts: prevAccounts, currentUser: prevCurrentUser } = get();
         const matchesTarget = (a: UserAccount) =>
           a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+        const backendUserId = prevAccounts.find(matchesTarget)?.id || userId;
 
         set({
           accounts: prevAccounts.map((a) => (matchesTarget(a) ? { ...a, balance: safeBalance } : a)),
@@ -937,7 +940,7 @@ export const useAuthStore = create<AuthState>()(
           () => set({ authToken: null }),
           '/api/admin/update-balance',
           'POST',
-          { userId, newBalance: safeBalance }
+          { userId: backendUserId, newBalance: safeBalance }
         );
 
         if (!response.ok) {
@@ -963,6 +966,7 @@ export const useAuthStore = create<AuthState>()(
         const matchesTarget = (a: UserAccount) =>
           a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
         const target = prevAccounts.find(matchesTarget);
+        const backendUserId = target?.id || userId;
         const nextActive = target ? !target.isActive : false;
         const finalReason = nextActive ? null : reason || "Compte suspendu par l'administrateur";
 
@@ -993,7 +997,7 @@ export const useAuthStore = create<AuthState>()(
           () => set({ authToken: null }),
           '/api/admin/block-user',
           'POST',
-          { userId, isBlocked: !nextActive, reason: finalReason }
+          { userId: backendUserId, isBlocked: !nextActive, reason: finalReason }
         );
 
         if (!response.ok) {
@@ -1011,6 +1015,8 @@ export const useAuthStore = create<AuthState>()(
         const { accounts: prevAccounts, currentUser: prevCurrentUser } = get();
         const matchesTarget = (a: UserAccount) =>
           a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+        const targetAcc = prevAccounts.find(matchesTarget);
+        const backendUserId = targetAcc?.id || userId;
 
         set({
           accounts: prevAccounts.map((a) =>
@@ -1026,12 +1032,12 @@ export const useAuthStore = create<AuthState>()(
           ),
         });
 
-        const response = await executeAdminRequest(
+        const response = await executeAdminRequest<{ success: boolean; user?: { isBlocked?: boolean } }>(
           get().getFreshAdminAuthHeaders,
           () => set({ authToken: null }),
           '/api/admin/reset-device',
           'POST',
-          { userId }
+          { userId: backendUserId }
         );
 
         if (!response.ok) {
@@ -1042,6 +1048,25 @@ export const useAuthStore = create<AuthState>()(
           };
         }
 
+        // Repli compatible ancien backend Render (si reset-device laisse isBlocked=true, débloquer explicitement)
+        if (response.data?.user?.isBlocked !== false) {
+          const unblockRes = await executeAdminRequest(
+            get().getFreshAdminAuthHeaders,
+            () => set({ authToken: null }),
+            '/api/admin/block-user',
+            'POST',
+            { userId: backendUserId, isBlocked: false, reason: null }
+          );
+          if (!unblockRes.ok) {
+            set({ accounts: prevAccounts, currentUser: prevCurrentUser });
+            return {
+              success: false,
+              error: unblockRes.error || "Appareil dissocié mais impossible de débloquer le compte sur le serveur.",
+            };
+          }
+        }
+
+        await get().fetchRemoteUsers();
         return { success: true };
       },
 
@@ -1049,6 +1074,7 @@ export const useAuthStore = create<AuthState>()(
         const { accounts: prevAccounts } = get();
         const matchesTarget = (a: UserAccount) =>
           a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+        const backendUserId = prevAccounts.find(matchesTarget)?.id || userId;
 
         set({
           accounts: prevAccounts.map((a) =>
@@ -1061,7 +1087,7 @@ export const useAuthStore = create<AuthState>()(
           () => set({ authToken: null }),
           '/api/admin/revoke-session',
           'POST',
-          { userId }
+          { userId: backendUserId }
         );
 
         // Si la route n'est pas encore déployée sur Render (404 HTML sans payload JSON), ne pas bloquer l'action locale
@@ -1085,6 +1111,7 @@ export const useAuthStore = create<AuthState>()(
         } = get();
         const matchesTarget = (a: UserAccount) =>
           a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+        const backendUserId = prevAccounts.find(matchesTarget)?.id || userId;
 
         const isDeletingSimulated = Boolean(
           prevIsSimulating && prevCurrentUser && matchesTarget(prevCurrentUser)
@@ -1106,7 +1133,7 @@ export const useAuthStore = create<AuthState>()(
           () => set({ authToken: null }),
           '/api/admin/delete-user',
           'POST',
-          { userId }
+          { userId: backendUserId }
         );
 
         if (!response.ok) {

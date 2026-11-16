@@ -534,6 +534,10 @@ export function getAdminWebHtml(): string {
     async function resetDevice(userId) {
       const data = await adminPost('/api/admin/reset-device', { userId }, "Erreur dissociation de l'appareil");
       if (!data) return;
+      if (data.user && data.user.isBlocked !== false) {
+        const unblocked = await adminPost('/api/admin/block-user', { userId, isBlocked: false, reason: null }, 'Erreur déblocage');
+        if (!unblocked) return;
+      }
       showToast('Appareil dissocié avec succès');
       fetchUsers();
     }
