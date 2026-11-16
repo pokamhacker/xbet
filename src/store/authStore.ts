@@ -10,6 +10,11 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'https://xbet-backend.onr
 
 export type UserRole = 'ADMIN' | 'USER';
 
+export interface CrudResult {
+  success: boolean;
+  error?: string;
+}
+
 export interface UserAccount {
   id: string;
   username: string;
@@ -52,19 +57,19 @@ interface AuthState {
 
   // Permissions & Features
   hasAccessToFeature: (featureKey: string) => boolean;
-  updateUserPermissions: (userId: string, allowedFeatures: string[]) => Promise<{ success: boolean; error?: string }>;
+  updateUserPermissions: (userId: string, allowedFeatures: string[]) => Promise<CrudResult>;
   setUserPermissionsLocally: (userId: string, allowedFeatures: string[]) => void;
 
   // Admin Actions
   getFreshAdminAuthHeaders: () => Promise<Record<string, string>>;
-  createUser: (username: string, password: string, initialBalance: number, allowedFeatures?: string[]) => Promise<{ success: boolean; error?: string }>;
-  updateUserBalance: (userId: string, newBalance: number) => Promise<void>;
-  toggleUserActive: (userId: string, reason?: string) => Promise<void>;
-  resetUserDevice: (userId: string) => Promise<void>;
-  revokeUserDevice: (userId: string) => Promise<void>;
-  deleteUser: (userId: string) => Promise<void>;
-  changePassword: (userId: string, newPassword: string) => { success: boolean; error?: string };
-  adminUpdateUserPassword: (userId: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  createUser: (username: string, password: string, initialBalance: number, allowedFeatures?: string[]) => Promise<CrudResult>;
+  updateUserBalance: (userId: string, newBalance: number) => Promise<CrudResult>;
+  toggleUserActive: (userId: string, reason?: string) => Promise<CrudResult>;
+  resetUserDevice: (userId: string) => Promise<CrudResult>;
+  revokeUserDevice: (userId: string) => Promise<CrudResult>;
+  deleteUser: (userId: string) => Promise<CrudResult>;
+  changePassword: (userId: string, newPassword: string) => Promise<CrudResult>;
+  adminUpdateUserPassword: (userId: string, newPassword: string) => Promise<CrudResult>;
 }
 
 const DEFAULT_ACCOUNTS: UserAccount[] = [
@@ -80,31 +85,67 @@ const DEFAULT_ACCOUNTS: UserAccount[] = [
     allowedFeatures: DEFAULT_ALLOWED_FEATURES,
     createdAt: '01.01.2026 (00:00)',
   },
-  {
-    id: 'usr_joueur1_seed',
-    username: 'joueur1',
-    passwordHash: 'Pass2026##?',
-    rawPassword: 'Pass2026##?',
-    balance: 50000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '08.11.2026 (00:00)',
-  },
-  {
-    id: 'usr_client_vip_seed',
-    username: 'client_vip',
-    passwordHash: 'Vip2026##?',
-    rawPassword: 'Vip2026##?',
-    balance: 100000,
-    role: 'USER',
-    isActive: true,
-    currentDeviceId: null,
-    allowedFeatures: DEFAULT_ALLOWED_FEATURES,
-    createdAt: '08.11.2026 (00:00)',
-  },
 ];
+
+interface AdminApiResponse<T = any> {
+  ok: boolean;
+  status: number;
+  data: T | null;
+  error?: string;
+}
+
+/**
+ * Exécute une requête API Admin avec gestion unique du rafraîchissement de jeton et des erreurs HTTP.
+ */
+async function executeAdminRequest<T = any>(
+  getFreshAdminAuthHeaders: () => Promise<Record<string, string>>,
+  clearAuthToken: () => void,
+  path: string,
+  method: 'GET' | 'POST' | 'DELETE' = 'POST',
+  body?: Record<string, any>
+): Promise<AdminApiResponse<T>> {
+  const url = `${BACKEND_URL}${path}?adminKey=${encodeURIComponent('Bolingo2024##?')}`;
+  const serializeBody = body ? JSON.stringify({ ...body, adminKey: 'Bolingo2024##?' }) : undefined;
+
+  try {
+    let headers = await getFreshAdminAuthHeaders();
+    let res = await fetch(url, {
+      method,
+      headers,
+      ...(serializeBody ? { body: serializeBody } : {}),
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      clearAuthToken();
+      headers = await getFreshAdminAuthHeaders();
+      res = await fetch(url, {
+        method,
+        headers,
+        ...(serializeBody ? { body: serializeBody } : {}),
+      });
+    }
+
+    const data = await res.json().catch(() => null);
+    const isSuccess = res.ok && (!data || data.success !== false);
+    if (!isSuccess) {
+      return {
+        ok: false,
+        status: res.status,
+        data,
+        error: data?.error || `Erreur serveur (${res.status}).`,
+      };
+    }
+
+    return { ok: true, status: res.status, data };
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      error: 'Serveur inaccessible. Vérifiez votre connexion et réessayez.',
+    };
+  }
+}
 
 const DEVICE_STORAGE_KEY = 'xbet_local_device_unique_id';
 
@@ -291,156 +332,119 @@ export const useAuthStore = create<AuthState>()(
       },
 
       fetchRemoteUsers: async () => {
-        const { accounts: localAccounts, isSimulatingUser, currentUser } = get();
-        try {
-          let headers = await get().getFreshAdminAuthHeaders();
-          const adminUrl = `${BACKEND_URL}/api/admin/users?adminKey=${encodeURIComponent('Bolingo2024##?')}`;
+        const { accounts: localAccounts, isSimulatingUser, currentUser, adminOriginalSession } = get();
+        const response = await executeAdminRequest<{ success: boolean; users: any[] }>(
+          get().getFreshAdminAuthHeaders,
+          () => set({ authToken: null }),
+          '/api/admin/users',
+          'GET'
+        );
 
-          let res = await fetch(adminUrl, { headers });
-          if (res.status === 401 || res.status === 403) {
-            set({ authToken: null });
-            headers = await get().getFreshAdminAuthHeaders();
-            res = await fetch(adminUrl, { headers });
-          }
-
-          if (!res.ok) return;
-
-          const data = await res.json();
-          if (data.success && Array.isArray(data.users)) {
-            const remoteAccounts: UserAccount[] = data.users.map((u: any) => {
-              const uId = String(u.id || u._id);
-              const uName = String(u.username || '');
-              const localMatch = localAccounts.find(
-                (a) => a.id === uId || a.username.toLowerCase() === uName.toLowerCase()
-              );
-
-              // Préserver les permissions locales si le backend distant ne les fournit pas ou en cas de divergence
-              let allowed: (FeatureKey | string)[] = DEFAULT_ALLOWED_FEATURES;
-              if (Array.isArray(u.allowedFeatures)) {
-                allowed = u.allowedFeatures;
-              } else if (localMatch && Array.isArray(localMatch.allowedFeatures)) {
-                allowed = localMatch.allowedFeatures;
-              }
-
-              // Helper pour détecter un hash bcrypt
-              const isBcrypt = (str?: string | null) =>
-                typeof str === 'string' && (str.startsWith('$2a$') || str.startsWith('$2b$') || str.startsWith('$2y$'));
-
-              // Sélectionner le mot de passe en clair garanti sans écrasement par un hash bcrypt
-              let cleanRawPassword = '';
-              if (u.rawPassword && !isBcrypt(u.rawPassword)) {
-                cleanRawPassword = u.rawPassword;
-              } else if (localMatch?.rawPassword && !isBcrypt(localMatch.rawPassword)) {
-                cleanRawPassword = localMatch.rawPassword;
-              } else if (u.password && !isBcrypt(u.password)) {
-                cleanRawPassword = u.password;
-              } else if (localMatch?.passwordHash && !isBcrypt(localMatch.passwordHash)) {
-                cleanRawPassword = localMatch.passwordHash;
-              } else {
-                cleanRawPassword = localMatch?.rawPassword || u.rawPassword || '';
-              }
-
-              const resolvedHash = (u.password && isBcrypt(u.password))
-                ? u.password
-                : (u.passwordHash && isBcrypt(u.passwordHash))
-                ? u.passwordHash
-                : (localMatch?.passwordHash) || cleanRawPassword;
-
-              return {
-                id: uId,
-                username: uName,
-                passwordHash: resolvedHash,
-                rawPassword: cleanRawPassword,
-                balance: Number(u.balance) || 0,
-                role: (u.role || 'USER') as UserRole,
-                isActive: !u.isBlocked,
-                blockedReason: u.blockedReason || null,
-                boundDeviceId: u.boundDeviceId || null,
-                currentDeviceId: u.hasActiveSession ? (u.lastDeviceId || 'active') : null,
-                allowedFeatures: allowed,
-                createdAt: u.createdAt || new Date().toISOString(),
-              };
-            });
-
-            // Conserver le compte ADMIN local ainsi que les utilisateurs créés localement en attente de synchronisation distante
-            const localAdmin = localAccounts.find((a) => a.role === 'ADMIN');
-            const remoteUsernames = new Set(remoteAccounts.map((r) => r.username.toLowerCase()));
-            const localPendingUsers = localAccounts.filter(
-              (a) => a.role === 'USER' && !remoteUsernames.has(a.username.toLowerCase())
-            );
-
-            // Synchroniser automatiquement vers le serveur Render tout compte local qui n'y figurait pas encore
-            if (localPendingUsers.length > 0) {
-              const createEndpoint = `${BACKEND_URL}/api/admin/create-user?adminKey=${encodeURIComponent('Bolingo2024##?')}`;
-              for (const pending of localPendingUsers) {
-                const pwd = pending.rawPassword || pending.passwordHash;
-                if (pwd && !pwd.startsWith('$2')) {
-                  try {
-                    await fetch(createEndpoint, {
-                      method: 'POST',
-                      headers,
-                      body: JSON.stringify({
-                        id: pending.id,
-                        username: pending.username.trim().toLowerCase(),
-                        password: pwd,
-                        initialBalance: Number(pending.balance) || 0,
-                        allowedFeatures: pending.allowedFeatures || DEFAULT_ALLOWED_FEATURES,
-                        role: 'USER',
-                        isBlocked: !pending.isActive,
-                        blockedReason: pending.blockedReason || null,
-                        boundDeviceId: pending.boundDeviceId || null,
-                        adminKey: 'Bolingo2024##?',
-                      }),
-                    });
-                  } catch (_) {}
-                }
-              }
-            }
-
-            // Fusionner les comptes en préservant tous les utilisateurs locaux valides
-            const byIdOrUsername = new Map<string, UserAccount>();
-
-            if (localAdmin) {
-              byIdOrUsername.set(localAdmin.username.toLowerCase(), localAdmin);
-            }
-
-            // Ajouter d'abord les comptes locaux (USER)
-            for (const loc of localAccounts) {
-              if (loc.role === 'USER') {
-                byIdOrUsername.set(loc.username.toLowerCase(), loc);
-              }
-            }
-
-            // Enrichir avec les données distantes (statut bloqué, solde à jour, etc.)
-            for (const rem of remoteAccounts) {
-              const uLower = rem.username.toLowerCase();
-              if (uLower === 'bookmekerstudio' || uLower === 'admin') continue;
-              const existing = byIdOrUsername.get(uLower);
-              byIdOrUsername.set(uLower, {
-                ...(existing || {}),
-                ...rem,
-                rawPassword: existing?.rawPassword || rem.rawPassword || '',
-              });
-            }
-
-            const mergedList = Array.from(byIdOrUsername.values());
-
-            // Si un utilisateur est en cours de session ou simulation, synchroniser son profil avec les données fraîches
-            let updatedCurrentUser = currentUser;
-            if (currentUser && (currentUser.role === 'USER' || isSimulatingUser)) {
-              const freshUser = mergedList.find(
-                (a) => a.id === currentUser.id || a.username.toLowerCase() === currentUser.username.toLowerCase()
-              );
-              if (freshUser) {
-                updatedCurrentUser = freshUser;
-              }
-            }
-
-            set({ accounts: mergedList, currentUser: updatedCurrentUser });
-          }
-        } catch {
-          // Échec silencieux de la synchronisation distante
+        if (!response.ok || !response.data?.success || !Array.isArray(response.data.users)) {
+          return;
         }
+
+        const isBcrypt = (str?: string | null) =>
+          typeof str === 'string' && (str.startsWith('$2a$') || str.startsWith('$2b$') || str.startsWith('$2y$'));
+
+        const remoteAccounts: UserAccount[] = response.data.users.map((u: any) => {
+          const uId = String(u.id || u._id);
+          const uName = String(u.username || '');
+          const localMatch = localAccounts.find(
+            (a) => a.id === uId || a.username.toLowerCase() === uName.toLowerCase()
+          );
+
+          const allowed: (FeatureKey | string)[] = Array.isArray(u.allowedFeatures)
+            ? u.allowedFeatures
+            : localMatch && Array.isArray(localMatch.allowedFeatures)
+            ? localMatch.allowedFeatures
+            : DEFAULT_ALLOWED_FEATURES;
+
+          // Le serveur fait foi : prioriser le mot de passe en clair renvoyé par Render
+          let cleanRawPassword = '';
+          if (u.rawPassword && !isBcrypt(u.rawPassword)) {
+            cleanRawPassword = u.rawPassword;
+          } else if (u.password && !isBcrypt(u.password)) {
+            cleanRawPassword = u.password;
+          } else if (localMatch?.rawPassword && !isBcrypt(localMatch.rawPassword)) {
+            cleanRawPassword = localMatch.rawPassword;
+          } else if (localMatch?.passwordHash && !isBcrypt(localMatch.passwordHash)) {
+            cleanRawPassword = localMatch.passwordHash;
+          }
+
+          const resolvedHash =
+            u.password && isBcrypt(u.password)
+              ? u.password
+              : u.passwordHash && isBcrypt(u.passwordHash)
+              ? u.passwordHash
+              : localMatch?.passwordHash || cleanRawPassword;
+
+          return {
+            id: uId,
+            username: uName,
+            passwordHash: resolvedHash,
+            rawPassword: cleanRawPassword,
+            balance: Number(u.balance) || 0,
+            role: (u.role || 'USER') as UserRole,
+            isActive: !u.isBlocked,
+            blockedReason: u.blockedReason || null,
+            boundDeviceId: u.boundDeviceId || null,
+            currentDeviceId: u.hasActiveSession ? u.lastDeviceId || 'active' : null,
+            allowedFeatures: allowed,
+            createdAt: u.createdAt || new Date().toISOString(),
+          };
+        });
+
+        // Conserver le compte ADMIN local et prendre exclusivement la liste fraîche du serveur pour les comptes USER
+        const localAdmin =
+          localAccounts.find((a) => a.role === 'ADMIN') ||
+          adminOriginalSession ||
+          DEFAULT_ACCOUNTS[0];
+        const byUsername = new Map<string, UserAccount>();
+        byUsername.set(localAdmin.username.toLowerCase(), localAdmin);
+
+        for (const rem of remoteAccounts) {
+          const uLower = rem.username.toLowerCase();
+          if (uLower === 'bookmekerstudio' || uLower === 'admin' || rem.role === 'ADMIN') {
+            continue;
+          }
+          byUsername.set(uLower, rem);
+        }
+
+        const mergedList = Array.from(byUsername.values());
+
+        let updatedCurrentUser = currentUser;
+        let nextIsSimulating = isSimulatingUser;
+        let nextAdminOriginal = adminOriginalSession;
+        let nextAuthToken = get().authToken;
+        let nextAlert = get().sessionAlertMessage;
+
+        if (currentUser && (currentUser.role === 'USER' || isSimulatingUser)) {
+          const freshUser = mergedList.find(
+            (a) => a.id === currentUser.id || a.username.toLowerCase() === currentUser.username.toLowerCase()
+          );
+          if (freshUser) {
+            updatedCurrentUser = freshUser;
+            useBetStore.getState().setBalance(freshUser.balance);
+          } else if (isSimulatingUser) {
+            updatedCurrentUser = adminOriginalSession || localAdmin;
+            nextIsSimulating = false;
+            nextAdminOriginal = null;
+          } else {
+            updatedCurrentUser = null;
+            nextAuthToken = null;
+            nextAlert = "Votre compte a été supprimé par l'administrateur.";
+          }
+        }
+
+        set({
+          accounts: mergedList,
+          currentUser: updatedCurrentUser,
+          isSimulatingUser: nextIsSimulating,
+          adminOriginalSession: nextAdminOriginal,
+          authToken: nextAuthToken,
+          sessionAlertMessage: nextAlert,
+        });
       },
 
       clearSessionAlert: () => {
@@ -550,37 +554,19 @@ export const useAuthStore = create<AuthState>()(
               return { success: true };
             }
 
-            // Compte bloqué ou tentative sur un second téléphone (Mono-appareil)
-            if (res.status === 403) {
+            // Le serveur a répondu en JSON : sa décision (refus, suppression ou blocage) fait foi
+            if (res.status === 403 || res.status === 401 || res.status === 400 || !res.ok) {
               return {
                 success: false,
-                error:
-                  data.error ||
-                  "Sécurité : Ce compte est bloqué ou lié à un autre appareil. Veuillez contacter l'administrateur.",
+                error: data?.error || 'Identifiant ou mot de passe incorrect.',
               };
-            }
-
-            if (res.status === 401 || res.status === 400) {
-              // Vérifier si le compte existe localement (cas où Render Free vient de redémarrer avec une base SQLite vierge)
-              const hasMatchingLocal = accounts.some(
-                (a) =>
-                  a.username.toLowerCase() === trimmedUser.toLowerCase() &&
-                  (a.rawPassword === trimmedPass || a.passwordHash === trimmedPass)
-              );
-              if (!hasMatchingLocal) {
-                return {
-                  success: false,
-                  error: data.error || 'Identifiant ou mot de passe incorrect.',
-                };
-              }
-              // Si le compte existe localement avec le bon mot de passe, on poursuit vers le bloc 2 pour le restaurer sur Render et connecter l'utilisateur
             }
           }
         } catch {
-          // Serveur distant injoignable ou en cours de réveil, bascule transparente sur le cache local
+          // Serveur distant injoignable ou en cours de réveil, bascule sur le cache local uniquement hors ligne
         }
 
-        // 2. Repli de sécurité en local si le serveur est injoignable ou en veille
+        // 2. Repli hors ligne uniquement si le serveur est totalement injoignable
         const isTargetAdmin =
           trimmedUser.toLowerCase() === 'admin' ||
           trimmedUser.toLowerCase() === 'bookmekerstudio';
@@ -646,29 +632,6 @@ export const useAuthStore = create<AuthState>()(
         if (updatedAccount.role === 'USER') {
           useBetStore.getState().setBalance(updatedAccount.balance);
           useBetStore.getState().syncUserBets(updatedAccount.id);
-
-          // Restaurer le compte sur Render en arrière-plan si Render venait de redémarrer
-          const createEndpoint = `${BACKEND_URL}/api/admin/create-user?adminKey=${encodeURIComponent('Bolingo2024##?')}`;
-          fetch(createEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-admin-key': 'Bolingo2024##?',
-              Authorization: 'Bearer Bolingo2024##?',
-            },
-            body: JSON.stringify({
-              id: updatedAccount.id,
-              username: updatedAccount.username.trim().toLowerCase(),
-              password: updatedAccount.rawPassword || trimmedPass,
-              initialBalance: Number(updatedAccount.balance) || 0,
-              allowedFeatures: updatedAccount.allowedFeatures || DEFAULT_ALLOWED_FEATURES,
-              role: 'USER',
-              isBlocked: !updatedAccount.isActive,
-              blockedReason: updatedAccount.blockedReason || null,
-              boundDeviceId: updatedAccount.boundDeviceId || localDeviceId,
-              adminKey: 'Bolingo2024##?',
-            }),
-          }).catch(() => {});
         }
 
         return { success: true };
@@ -792,50 +755,47 @@ export const useAuthStore = create<AuthState>()(
       },
 
       updateUserPermissions: async (userId: string, allowedFeatures: string[]) => {
-        const { accounts, currentUser } = get();
-        const nextAccounts = accounts.map((a) =>
-          a.id === userId || a.username.toLowerCase() === userId.toLowerCase()
-            ? { ...a, allowedFeatures }
-            : a
+        const { accounts: prevAccounts, currentUser: prevCurrentUser } = get();
+        const matchesTarget = (a: UserAccount) =>
+          a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+
+        const nextAccounts = prevAccounts.map((a) =>
+          matchesTarget(a) ? { ...a, allowedFeatures } : a
         );
-        let nextCurrentUser = currentUser;
-        if (
-          currentUser &&
-          (currentUser.id === userId || currentUser.username.toLowerCase() === userId.toLowerCase())
-        ) {
-          nextCurrentUser = { ...currentUser, allowedFeatures };
-        }
+        const nextCurrentUser =
+          prevCurrentUser && matchesTarget(prevCurrentUser)
+            ? { ...prevCurrentUser, allowedFeatures }
+            : prevCurrentUser;
         set({ accounts: nextAccounts, currentUser: nextCurrentUser });
 
-        try {
-          const headers = await get().getFreshAdminAuthHeaders();
-          await fetch(`${BACKEND_URL}/api/admin/update-permissions?adminKey=${encodeURIComponent('Bolingo2024##?')}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ userId, allowedFeatures, adminKey: 'Bolingo2024##?' }),
-          });
-          return { success: true };
-        } catch {
-          // Même si le backend distant est inaccessible, le blocage local est actif et garanti
-          return { success: true };
+        const response = await executeAdminRequest(
+          get().getFreshAdminAuthHeaders,
+          () => set({ authToken: null }),
+          '/api/admin/update-permissions',
+          'POST',
+          { userId, allowedFeatures }
+        );
+        if (!response.ok) {
+          set({ accounts: prevAccounts, currentUser: prevCurrentUser });
+          return {
+            success: false,
+            error: response.error || 'Impossible de mettre à jour les permissions.',
+          };
         }
+        return { success: true };
       },
 
       setUserPermissionsLocally: (userId: string, allowedFeatures: string[]) => {
         const { accounts, currentUser } = get();
-        const nextAccounts = accounts.map((a) =>
-          a.id === userId || a.username.toLowerCase() === userId.toLowerCase()
-            ? { ...a, allowedFeatures }
-            : a
-        );
-        let nextCurrentUser = currentUser;
-        if (
-          currentUser &&
-          (currentUser.id === userId || currentUser.username.toLowerCase() === userId.toLowerCase())
-        ) {
-          nextCurrentUser = { ...currentUser, allowedFeatures };
-        }
-        set({ accounts: nextAccounts, currentUser: nextCurrentUser });
+        const matchesTarget = (a: UserAccount) =>
+          a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+        set({
+          accounts: accounts.map((a) => (matchesTarget(a) ? { ...a, allowedFeatures } : a)),
+          currentUser:
+            currentUser && matchesTarget(currentUser)
+              ? { ...currentUser, allowedFeatures }
+              : currentUser,
+        });
       },
 
       adminUpdateUserPassword: async (userId: string, newPassword: string) => {
@@ -843,33 +803,39 @@ export const useAuthStore = create<AuthState>()(
         if (!trimmed || trimmed.length < 3) {
           return { success: false, error: 'Le mot de passe doit contenir au moins 3 caractères.' };
         }
-        const { accounts, currentUser } = get();
-        const nextAccounts = accounts.map((a) =>
-          a.id === userId || a.username.toLowerCase() === userId.toLowerCase()
-            ? { ...a, passwordHash: trimmed, rawPassword: trimmed }
-            : a
-        );
-        let nextCurrentUser = currentUser;
-        if (
-          currentUser &&
-          (currentUser.id === userId || currentUser.username.toLowerCase() === userId.toLowerCase())
-        ) {
-          nextCurrentUser = { ...currentUser, passwordHash: trimmed, rawPassword: trimmed };
-        }
-        set({ accounts: nextAccounts, currentUser: nextCurrentUser });
+        const { accounts: prevAccounts, currentUser: prevCurrentUser } = get();
+        const matchesTarget = (a: UserAccount) =>
+          a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
 
-        try {
-          const headers = await get().getFreshAdminAuthHeaders();
-          await fetch(`${BACKEND_URL}/api/admin/update-password?adminKey=${encodeURIComponent('Bolingo2024##?')}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ userId, newPassword: trimmed, adminKey: 'Bolingo2024##?' }),
-          });
-          return { success: true };
-        } catch {
-          // Même en cas de coupure réseau distante, la mise à jour locale est garantie et persistée
-          return { success: true };
+        const targetAcc = prevAccounts.find(matchesTarget);
+        const backendUserId =
+          targetAcc?.id === 'admin-default' ? targetAcc.username : targetAcc?.id || userId;
+
+        set({
+          accounts: prevAccounts.map((a) =>
+            matchesTarget(a) ? { ...a, passwordHash: trimmed, rawPassword: trimmed } : a
+          ),
+          currentUser:
+            prevCurrentUser && matchesTarget(prevCurrentUser)
+              ? { ...prevCurrentUser, passwordHash: trimmed, rawPassword: trimmed }
+              : prevCurrentUser,
+        });
+
+        const response = await executeAdminRequest(
+          get().getFreshAdminAuthHeaders,
+          () => set({ authToken: null }),
+          '/api/admin/update-password',
+          'POST',
+          { userId: backendUserId, newPassword: trimmed }
+        );
+        if (!response.ok) {
+          set({ accounts: prevAccounts, currentUser: prevCurrentUser });
+          return {
+            success: false,
+            error: response.error || 'Impossible de modifier le mot de passe sur le serveur.',
+          };
         }
+        return { success: true };
       },
 
       // --- Actions Administrateur Connectées à SQLite Render ---
@@ -880,77 +846,52 @@ export const useAuthStore = create<AuthState>()(
         initialBalance: number,
         allowedFeatures?: string[]
       ) => {
-        const { accounts, localDeviceId } = get();
+        const { accounts } = get();
         const trimmedUser = username.trim().toLowerCase();
         const trimmedPass = password.trim();
-        const assignedFeatures = Array.isArray(allowedFeatures) ? allowedFeatures : DEFAULT_ALLOWED_FEATURES;
+        const assignedFeatures = Array.isArray(allowedFeatures)
+          ? allowedFeatures
+          : DEFAULT_ALLOWED_FEATURES;
+        const safeInitialBalance = Math.max(0, Number(initialBalance) || 0);
 
         if (!trimmedUser || !trimmedPass) {
-          return { success: false, error: 'Nom d\'utilisateur et mot de passe requis.' };
+          return { success: false, error: "Nom d'utilisateur et mot de passe requis." };
         }
 
-        const alreadyExistsLocally = accounts.some(
-          (a) => a.username.toLowerCase() === trimmedUser
-        );
-        if (alreadyExistsLocally) {
+        if (accounts.some((a) => a.username.toLowerCase() === trimmedUser)) {
           return { success: false, error: "Ce nom d'utilisateur est déjà utilisé." };
         }
 
-        const createPayload = {
-          username: trimmedUser,
-          password: trimmedPass,
-          initialBalance: Math.max(0, initialBalance || 0),
-          allowedFeatures: assignedFeatures,
-          role: 'USER',
-          adminKey: 'Bolingo2024##?',
-        };
-        const createEndpoint = `${BACKEND_URL}/api/admin/create-user?adminKey=${encodeURIComponent('Bolingo2024##?')}`;
-
-        let remoteUserId: string | null = null;
-
-        try {
-          let headers = await get().getFreshAdminAuthHeaders();
-
-          let res = await fetch(createEndpoint, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(createPayload),
-          });
-
-          // Si session expirée ou rejetée, re-login d'urgence (bookmekerstudio / admin) et nouvelle tentative
-          if (res.status === 401 || res.status === 403) {
-            set({ authToken: null });
-            headers = await get().getFreshAdminAuthHeaders();
-            res = await fetch(createEndpoint, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(createPayload),
-            });
+        const clientUserId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const response = await executeAdminRequest<{ success: boolean; user?: any }>(
+          get().getFreshAdminAuthHeaders,
+          () => set({ authToken: null }),
+          '/api/admin/create-user',
+          'POST',
+          {
+            id: clientUserId,
+            username: trimmedUser,
+            password: trimmedPass,
+            initialBalance: safeInitialBalance,
+            allowedFeatures: assignedFeatures,
+            role: 'USER',
           }
+        );
 
-          if (res.status === 409) {
-            return {
-              success: false,
-              error: "Ce nom d'utilisateur est déjà utilisé.",
-            };
-          }
-
-          if (res.ok) {
-            const data = await res.json();
-            if (data.success && data.user?.id) {
-              remoteUserId = String(data.user.id);
-            }
-          }
-        } catch (_) {
-          // Si le serveur Render est en cours de réveil ou de redéploiement, création immédiate en local + synchronisation différée
+        if (!response.ok) {
+          return {
+            success: false,
+            error: response.error || "Impossible de créer l'utilisateur sur le serveur.",
+          };
         }
 
+        const confirmedId = String(response.data?.user?.id || clientUserId);
         const newUser: UserAccount = {
-          id: remoteUserId || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          id: confirmedId,
           username: trimmedUser,
           passwordHash: trimmedPass,
           rawPassword: trimmedPass,
-          balance: Math.max(0, initialBalance || 0),
+          balance: safeInitialBalance,
           role: 'USER',
           isActive: true,
           boundDeviceId: null,
@@ -964,61 +905,69 @@ export const useAuthStore = create<AuthState>()(
           accounts: [
             newUser,
             ...currentList.filter(
-              (a) => a.id !== newUser.id && a.username.toLowerCase() !== newUser.username.toLowerCase()
+              (a) =>
+                a.id !== newUser.id && a.username.toLowerCase() !== newUser.username.toLowerCase()
             ),
           ],
         });
-
-        // Si le serveur n'a pas encore confirmé l'ID distant, relancer la synchronisation en arrière-plan
-        if (!remoteUserId) {
-          setTimeout(async () => {
-            try {
-              const retryHeaders = await get().getFreshAdminAuthHeaders();
-              await fetch(createEndpoint, {
-                method: 'POST',
-                headers: retryHeaders,
-                body: JSON.stringify(createPayload),
-              });
-            } catch (_) {}
-          }, 3000);
-        }
 
         return { success: true };
       },
 
       updateUserBalance: async (userId: string, newBalance: number) => {
-        const safeBalance = Math.max(0, newBalance);
-        const { accounts, currentUser } = get();
+        const safeBalance = Math.max(0, Number(newBalance) || 0);
+        const { accounts: prevAccounts, currentUser: prevCurrentUser } = get();
+        const matchesTarget = (a: UserAccount) =>
+          a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
 
         set({
-          accounts: accounts.map((a) => (a.id === userId ? { ...a, balance: safeBalance } : a)),
-          currentUser: currentUser && currentUser.id === userId ? { ...currentUser, balance: safeBalance } : currentUser,
+          accounts: prevAccounts.map((a) => (matchesTarget(a) ? { ...a, balance: safeBalance } : a)),
+          currentUser:
+            prevCurrentUser && matchesTarget(prevCurrentUser)
+              ? { ...prevCurrentUser, balance: safeBalance }
+              : prevCurrentUser,
         });
 
-        if (currentUser && currentUser.id === userId) {
+        if (prevCurrentUser && matchesTarget(prevCurrentUser)) {
           useBetStore.getState().setBalance(safeBalance);
         }
 
-        try {
-          const headers = await get().getFreshAdminAuthHeaders();
-          await fetch(`${BACKEND_URL}/api/admin/update-balance?adminKey=${encodeURIComponent('Bolingo2024##?')}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ userId, newBalance: safeBalance, adminKey: 'Bolingo2024##?' }),
-          });
-        } catch {
-          // Synchronisation solde silencieuse
+        const response = await executeAdminRequest(
+          get().getFreshAdminAuthHeaders,
+          () => set({ authToken: null }),
+          '/api/admin/update-balance',
+          'POST',
+          { userId, newBalance: safeBalance }
+        );
+
+        if (!response.ok) {
+          const shouldRollback =
+            prevCurrentUser?.role === 'ADMIN' || response.status >= 400;
+          if (shouldRollback) {
+            set({ accounts: prevAccounts, currentUser: prevCurrentUser });
+            if (prevCurrentUser && matchesTarget(prevCurrentUser)) {
+              useBetStore.getState().setBalance(prevCurrentUser.balance);
+            }
+          }
+          return {
+            success: false,
+            error: response.error || 'Impossible de mettre à jour le solde.',
+          };
         }
+
+        return { success: true };
       },
 
       toggleUserActive: async (userId: string, reason?: string) => {
-        const { accounts, currentUser } = get();
-        const target = accounts.find((a) => a.id === userId || a.username.toLowerCase() === userId.toLowerCase());
+        const { accounts: prevAccounts, currentUser: prevCurrentUser } = get();
+        const matchesTarget = (a: UserAccount) =>
+          a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+        const target = prevAccounts.find(matchesTarget);
         const nextActive = target ? !target.isActive : false;
-        const finalReason = nextActive ? null : (reason || "Compte suspendu par l'administrateur");
+        const finalReason = nextActive ? null : reason || "Compte suspendu par l'administrateur";
 
-        const nextAccounts = accounts.map((a) =>
-          a.id === userId || a.username.toLowerCase() === userId.toLowerCase()
+        const nextAccounts = prevAccounts.map((a) =>
+          matchesTarget(a)
             ? {
                 ...a,
                 isActive: nextActive,
@@ -1027,44 +976,45 @@ export const useAuthStore = create<AuthState>()(
               }
             : a
         );
-
-        let nextCurrentUser = currentUser;
-        if (
-          currentUser &&
-          (currentUser.id === userId || currentUser.username.toLowerCase() === userId.toLowerCase())
-        ) {
-          nextCurrentUser = {
-            ...currentUser,
-            isActive: nextActive,
-            blockedReason: finalReason,
-            currentDeviceId: nextActive ? currentUser.currentDeviceId : null,
-          };
-        }
+        const nextCurrentUser =
+          prevCurrentUser && matchesTarget(prevCurrentUser)
+            ? {
+                ...prevCurrentUser,
+                isActive: nextActive,
+                blockedReason: finalReason,
+                currentDeviceId: nextActive ? prevCurrentUser.currentDeviceId : null,
+              }
+            : prevCurrentUser;
 
         set({ accounts: nextAccounts, currentUser: nextCurrentUser });
 
-        try {
-          const headers = await get().getFreshAdminAuthHeaders();
-          await fetch(`${BACKEND_URL}/api/admin/block-user?adminKey=${encodeURIComponent('Bolingo2024##?')}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              userId,
-              isBlocked: !nextActive,
-              reason: finalReason,
-              adminKey: 'Bolingo2024##?',
-            }),
-          });
-        } catch {
-          // Synchronisation statut silencieuse
+        const response = await executeAdminRequest(
+          get().getFreshAdminAuthHeaders,
+          () => set({ authToken: null }),
+          '/api/admin/block-user',
+          'POST',
+          { userId, isBlocked: !nextActive, reason: finalReason }
+        );
+
+        if (!response.ok) {
+          set({ accounts: prevAccounts, currentUser: prevCurrentUser });
+          return {
+            success: false,
+            error: response.error || 'Impossible de modifier le statut du compte.',
+          };
         }
+
+        return { success: true };
       },
 
       resetUserDevice: async (userId: string) => {
-        const { accounts } = get();
+        const { accounts: prevAccounts, currentUser: prevCurrentUser } = get();
+        const matchesTarget = (a: UserAccount) =>
+          a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+
         set({
-          accounts: accounts.map((a) =>
-            a.id === userId
+          accounts: prevAccounts.map((a) =>
+            matchesTarget(a)
               ? {
                   ...a,
                   boundDeviceId: null,
@@ -1076,47 +1026,106 @@ export const useAuthStore = create<AuthState>()(
           ),
         });
 
-        try {
-          const headers = await get().getFreshAdminAuthHeaders();
-          await fetch(`${BACKEND_URL}/api/admin/reset-device?adminKey=${encodeURIComponent('Bolingo2024##?')}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ userId, adminKey: 'Bolingo2024##?' }),
-          });
-        } catch {
-          // Réinitialisation appareil silencieuse
+        const response = await executeAdminRequest(
+          get().getFreshAdminAuthHeaders,
+          () => set({ authToken: null }),
+          '/api/admin/reset-device',
+          'POST',
+          { userId }
+        );
+
+        if (!response.ok) {
+          set({ accounts: prevAccounts, currentUser: prevCurrentUser });
+          return {
+            success: false,
+            error: response.error || "Impossible de dissocier l'appareil.",
+          };
         }
+
+        return { success: true };
       },
 
       revokeUserDevice: async (userId: string) => {
-        const { accounts } = get();
+        const { accounts: prevAccounts } = get();
+        const matchesTarget = (a: UserAccount) =>
+          a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+
         set({
-          accounts: accounts.map((a) =>
-            a.id === userId ? { ...a, currentDeviceId: null } : a
+          accounts: prevAccounts.map((a) =>
+            matchesTarget(a) ? { ...a, currentDeviceId: null } : a
           ),
         });
+
+        const response = await executeAdminRequest(
+          get().getFreshAdminAuthHeaders,
+          () => set({ authToken: null }),
+          '/api/admin/revoke-session',
+          'POST',
+          { userId }
+        );
+
+        // Si la route n'est pas encore déployée sur Render (404 HTML sans payload JSON), ne pas bloquer l'action locale
+        if (!response.ok && !(response.status === 404 && !response.data)) {
+          set({ accounts: prevAccounts });
+          return {
+            success: false,
+            error: response.error || 'Impossible de déconnecter la session.',
+          };
+        }
+
+        return { success: true };
       },
 
       deleteUser: async (userId: string) => {
-        const { accounts, currentUser } = get();
+        const {
+          accounts: prevAccounts,
+          currentUser: prevCurrentUser,
+          adminOriginalSession: prevAdminOriginal,
+          isSimulatingUser: prevIsSimulating,
+        } = get();
+        const matchesTarget = (a: UserAccount) =>
+          a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
+
+        const isDeletingSimulated = Boolean(
+          prevIsSimulating && prevCurrentUser && matchesTarget(prevCurrentUser)
+        );
+
         set({
-          accounts: accounts.filter((a) => a.id !== userId),
-          currentUser: currentUser && currentUser.id === userId ? null : currentUser,
+          accounts: prevAccounts.filter((a) => !matchesTarget(a)),
+          currentUser: isDeletingSimulated
+            ? prevAdminOriginal
+            : prevCurrentUser && matchesTarget(prevCurrentUser)
+            ? null
+            : prevCurrentUser,
+          adminOriginalSession: isDeletingSimulated ? null : prevAdminOriginal,
+          isSimulatingUser: isDeletingSimulated ? false : prevIsSimulating,
         });
 
-        try {
-          const headers = await get().getFreshAdminAuthHeaders();
-          await fetch(`${BACKEND_URL}/api/admin/delete-user?adminKey=${encodeURIComponent('Bolingo2024##?')}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ userId, adminKey: 'Bolingo2024##?' }),
+        const response = await executeAdminRequest(
+          get().getFreshAdminAuthHeaders,
+          () => set({ authToken: null }),
+          '/api/admin/delete-user',
+          'POST',
+          { userId }
+        );
+
+        if (!response.ok) {
+          set({
+            accounts: prevAccounts,
+            currentUser: prevCurrentUser,
+            adminOriginalSession: prevAdminOriginal,
+            isSimulatingUser: prevIsSimulating,
           });
-        } catch {
-          // Suppression utilisateur silencieuse
+          return {
+            success: false,
+            error: response.error || 'Impossible de supprimer cet utilisateur.',
+          };
         }
+
+        return { success: true };
       },
 
-      changePassword: (userId: string, newPassword: string) => {
+      changePassword: async (userId: string, newPassword: string) => {
         const trimmedPass = newPassword.trim();
         if (!trimmedPass) {
           return { success: false, error: 'Le mot de passe ne peut pas être vide.' };
@@ -1124,27 +1133,7 @@ export const useAuthStore = create<AuthState>()(
         if (trimmedPass.length < 4) {
           return { success: false, error: 'Le mot de passe doit contenir au moins 4 caractères.' };
         }
-
-        set((state) => {
-          const updatedAccounts = state.accounts.map((a) =>
-            a.id === userId || a.username.toLowerCase() === userId.toLowerCase()
-              ? { ...a, passwordHash: trimmedPass }
-              : a
-          );
-
-          let updatedCurrentUser = state.currentUser;
-          if (
-            state.currentUser &&
-            (state.currentUser.id === userId ||
-              state.currentUser.username.toLowerCase() === userId.toLowerCase())
-          ) {
-            updatedCurrentUser = { ...state.currentUser, passwordHash: trimmedPass };
-          }
-
-          return { accounts: updatedAccounts, currentUser: updatedCurrentUser };
-        });
-
-        return { success: true };
+        return get().adminUpdateUserPassword(userId, trimmedPass);
       },
 
       // --- Mode Test / Simulation Admin ---

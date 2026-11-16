@@ -7,7 +7,6 @@ import {
   ScrollView,
   TextInput,
   Modal,
-  Alert,
   Platform,
   StatusBar,
   RefreshControl,
@@ -124,6 +123,28 @@ export default function AdminDashboardScreen() {
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [showAllPasswords, setShowAllPasswords] = useState(false);
 
+  // Generic In-App Confirmation Modal (works cleanly on Web/PWA and Mobile)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    confirmColor: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
+
+  const handleConfirmDialogSubmit = async () => {
+    if (!confirmDialog || isConfirmLoading) return;
+    setIsConfirmLoading(true);
+    try {
+      await confirmDialog.onConfirm();
+      setConfirmDialog(null);
+    } finally {
+      setIsConfirmLoading(false);
+    }
+  };
+
   const toggleAllPasswords = () => {
     setShowAllPasswords((prev) => {
       const next = !prev;
@@ -226,23 +247,19 @@ export default function AdminDashboardScreen() {
 
   // Tester les accès utilisateur (Simulation)
   const handleTestUserSession = (user: UserAccount) => {
-    Alert.alert(
-      'Tester les accès utilisateur',
-      `Voulez-vous simuler l'application avec le compte de "${user.username}" ?\n\nVous pourrez vérifier en direct quels jeux ou studios sont débloqués ou protégés par cadenas.\n\nUn bandeau supérieur vous permettra de revenir à votre interface Admin en 1 clic.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: '⚡ Lancer le test',
-          style: 'default',
-          onPress: () => {
-            const res = simulateUserSession(user.id);
-            if (!res.success) {
-              Alert.alert('Erreur', res.error || 'Impossible de démarrer le test.');
-            }
-          },
-        },
-      ]
-    );
+    setConfirmDialog({
+      title: 'Tester les accès utilisateur',
+      message: `Voulez-vous simuler l'application avec le compte de "${user.username}" ?\n\nVous pourrez vérifier en direct quels jeux ou studios sont débloqués ou protégés par cadenas.\n\nUn bandeau supérieur vous permettra de revenir à votre interface Admin en 1 clic.`,
+      confirmLabel: 'Lancer le test',
+      confirmColor: '#F59E0B',
+      icon: 'flash',
+      onConfirm: () => {
+        const res = simulateUserSession(user.id);
+        if (!res.success) {
+          showToast(res.error || 'Impossible de démarrer le test.', 'error');
+        }
+      },
+    });
   };
 
   // Edit User Password Handlers
@@ -346,7 +363,7 @@ export default function AdminDashboardScreen() {
     setChangePassModalVisible(true);
   };
 
-  const handleChangePassSubmit = () => {
+  const handleChangePassSubmit = async () => {
     setChangePassError(null);
     setChangePassSuccess(null);
 
@@ -372,7 +389,7 @@ export default function AdminDashboardScreen() {
       return;
     }
 
-    const res = changePassword(currentUser.id, newPassInput.trim());
+    const res = await changePassword(currentUser.id, newPassInput.trim());
     if (!res.success) {
       setChangePassError(res.error || 'Erreur lors de la modification.');
       return;
@@ -438,10 +455,14 @@ export default function AdminDashboardScreen() {
     if (!editingUser) return;
     const num = parseFloat(balanceInput);
     if (isNaN(num) || num < 0) {
-      Alert.alert('Erreur', 'Veuillez saisir un montant de solde valide.');
+      showToast('Veuillez saisir un montant de solde valide.', 'error');
       return;
     }
-    await updateUserBalance(editingUser.id, num);
+    const res = await updateUserBalance(editingUser.id, num);
+    if (!res.success) {
+      showToast(res.error || 'Erreur lors de la mise à jour du solde.', 'error');
+      return;
+    }
     showToast(`Solde de ${editingUser.username} mis à jour : ${num.toLocaleString('fr-FR')} ₣`);
     setEditingUser(null);
   };
@@ -455,19 +476,27 @@ export default function AdminDashboardScreen() {
   const handleQuickRecharge = async (user: UserAccount, amount: number) => {
     const current = user.balance || 0;
     const nextVal = current + amount;
-    await updateUserBalance(user.id, nextVal);
+    const res = await updateUserBalance(user.id, nextVal);
+    if (!res.success) {
+      showToast(res.error || 'Erreur lors de la recharge.', 'error');
+      return;
+    }
     showToast(`+${amount.toLocaleString('fr-FR')} ₣ crédités à ${user.username}`);
   };
 
   // Block / Unblock Handlers
-  const handleToggleActive = (user: UserAccount) => {
+  const handleToggleActive = async (user: UserAccount) => {
     if (user.isActive) {
       setBlockingUser(user);
       setSelectedBlockReason("Utilisateur situé en Côte d'Ivoire (Zone interdite)");
       setCustomBlockReason('');
       setBlockModalVisible(true);
     } else {
-      toggleUserActive(user.id);
+      const res = await toggleUserActive(user.id);
+      if (!res.success) {
+        showToast(res.error || 'Erreur lors du déblocage.', 'error');
+        return;
+      }
       showToast(`Accès débloqué pour "${user.username}"`);
     }
   };
@@ -479,7 +508,11 @@ export default function AdminDashboardScreen() {
         ? customBlockReason.trim() || "Compte suspendu par l'administrateur"
         : selectedBlockReason;
 
-    await toggleUserActive(blockingUser.id, finalReason);
+    const res = await toggleUserActive(blockingUser.id, finalReason);
+    if (!res.success) {
+      showToast(res.error || 'Erreur lors du blocage du compte.', 'error');
+      return;
+    }
     setBlockModalVisible(false);
     showToast(`Compte "${blockingUser.username}" bloqué`, 'error');
     setBlockingUser(null);
@@ -487,44 +520,49 @@ export default function AdminDashboardScreen() {
 
   // Device Controls
   const handleRevokeDevice = async (user: UserAccount) => {
-    await revokeUserDevice(user.id);
+    const res = await revokeUserDevice(user.id);
+    if (!res.success) {
+      showToast(res.error || 'Erreur lors de la déconnexion.', 'error');
+      return;
+    }
     showToast(`Session déconnectée pour "${user.username}"`);
   };
 
   const handleResetDevice = (user: UserAccount) => {
-    Alert.alert(
-      "Changer d'appareil / Dissocier",
-      `Dissocier l'appareil lié au compte "${user.username}" ?\n\nCela réactivera le compte et permettra à l'utilisateur de se connecter immédiatement avec son nouvel appareil.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Dissocier & Débloquer',
-          onPress: async () => {
-            await resetUserDevice(user.id);
-            showToast(`Appareil dissocié pour "${user.username}"`);
-          },
-        },
-      ]
-    );
+    setConfirmDialog({
+      title: "Changer d'appareil / Dissocier",
+      message: `Dissocier l'appareil lié au compte "${user.username}" ?\n\nCela réactivera le compte et permettra à l'utilisateur de se connecter immédiatement avec son nouvel appareil.`,
+      confirmLabel: 'Dissocier & Débloquer',
+      confirmColor: '#0284C7',
+      icon: 'phone-portrait-outline',
+      onConfirm: async () => {
+        const res = await resetUserDevice(user.id);
+        if (!res.success) {
+          showToast(res.error || "Erreur lors de la dissociation de l'appareil.", 'error');
+          return;
+        }
+        showToast(`Appareil dissocié pour "${user.username}"`);
+      },
+    });
   };
 
   // Delete User Handler
   const handleDeleteUser = (user: UserAccount) => {
-    Alert.alert(
-      'Supprimer le compte',
-      `Voulez-vous vraiment supprimer définitivement le compte de "${user.username}" ?\n\nCette action est irréversible.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer définitivement',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteUser(user.id);
-            showToast(`Compte "${user.username}" supprimé`, 'info');
-          },
-        },
-      ]
-    );
+    setConfirmDialog({
+      title: 'Supprimer le compte',
+      message: `Voulez-vous vraiment supprimer définitivement le compte de "${user.username}" ?\n\nCette action est irréversible.`,
+      confirmLabel: 'Supprimer définitivement',
+      confirmColor: '#DC2626',
+      icon: 'trash-outline',
+      onConfirm: async () => {
+        const res = await deleteUser(user.id);
+        if (!res.success) {
+          showToast(res.error || 'Erreur lors de la suppression.', 'error');
+          return;
+        }
+        showToast(`Compte "${user.username}" supprimé`, 'info');
+      },
+    });
   };
 
   return (
@@ -1836,6 +1874,71 @@ export default function AdminDashboardScreen() {
                     <Ionicons name="save-outline" size={16} color="#FFFFFF" />
                     <Text style={styles.modalConfirmText}>Enregistrer le mot de passe</Text>
                   </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* MODAL 7 : DIALOGUE DE CONFIRMATION (COMPATIBLE WEB & MOBILE)        */}
+      {/* =================================================================== */}
+      <Modal
+        visible={confirmDialog !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isConfirmLoading) setConfirmDialog(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { borderColor: confirmDialog?.confirmColor || '#38BDF8' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <Ionicons
+                  name={confirmDialog?.icon || 'alert-circle-outline'}
+                  size={20}
+                  color={confirmDialog?.confirmColor || '#38BDF8'}
+                />
+                <Text style={styles.modalTitle} numberOfLines={1}>
+                  {confirmDialog?.title || ''}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!isConfirmLoading) setConfirmDialog(null);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.editingSubtitle}>{confirmDialog?.message || ''}</Text>
+
+            <View style={[styles.modalButtonsRow, { marginTop: 14 }]}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setConfirmDialog(null)}
+                disabled={isConfirmLoading}
+              >
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalConfirmBtn,
+                  { backgroundColor: confirmDialog?.confirmColor || '#2563EB' },
+                  isConfirmLoading && { opacity: 0.7 },
+                ]}
+                onPress={handleConfirmDialogSubmit}
+                disabled={isConfirmLoading}
+              >
+                {isConfirmLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>{confirmDialog?.confirmLabel || 'Confirmer'}</Text>
                 )}
               </TouchableOpacity>
             </View>

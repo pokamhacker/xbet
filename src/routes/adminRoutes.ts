@@ -6,6 +6,7 @@ import {
   createUser,
   updateBalance,
   resetDevice,
+  revokeSession,
   updatePermissions,
   updateUserPassword,
 } from '../controllers/adminController';
@@ -25,6 +26,7 @@ router.post('/delete-user', deleteUser);
 router.delete('/delete-user', deleteUser);
 router.post('/update-balance', updateBalance);
 router.post('/reset-device', resetDevice);
+router.post('/revoke-session', revokeSession);
 router.post('/update-permissions', updatePermissions);
 router.post('/update-password', updateUserPassword);
 

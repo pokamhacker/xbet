@@ -421,7 +421,7 @@ export function getAdminWebHtml(): string {
                 <button onclick="toggleBlock('\${u.id}', \${!u.isBlocked})" class="px-3 py-1.5 rounded-lg \${u.isBlocked ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'} text-xs font-bold cursor-pointer">
                   \${u.isBlocked ? '🔓 Débloquer' : '🔒 Bloquer'}
                 </button>
-                <button onclick="deleteAccount('\${u.id}', '\${u.username}')" class="px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-bold cursor-pointer">
+                <button onclick="deleteAccount('\${u.id}')" class="px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-bold cursor-pointer">
                   🗑️ Supprimer
                 </button>
               </div>
@@ -442,30 +442,39 @@ export function getAdminWebHtml(): string {
       document.getElementById('create-modal').classList.remove('flex');
     }
 
+    async function adminPost(url, payload, fallbackError) {
+      await ensureAdminToken();
+      let res = await fetch(url, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify(payload)
+      });
+      if (res.status === 401 || res.status === 403) {
+        token = '';
+        localStorage.removeItem('xbet_admin_jwt');
+        await ensureAdminToken();
+        res = await fetch(url, {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: JSON.stringify(payload)
+        });
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        showToast(data.error || fallbackError || 'Erreur serveur', true);
+        return null;
+      }
+      return data;
+    }
+
     async function submitCreateUser() {
       const username = document.getElementById('new-username').value.trim();
       const password = document.getElementById('new-password').value.trim();
       const initialBalance = Number(document.getElementById('new-balance').value) || 0;
       if (!username || !password) return showToast('Veuillez remplir tous les champs', true);
 
-      await ensureAdminToken();
-      let res = await fetch('/api/admin/create-user', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({ username, password, initialBalance })
-      });
-      if (res.status === 401 || res.status === 403) {
-        token = '';
-        localStorage.removeItem('xbet_admin_jwt');
-        await ensureAdminToken();
-        res = await fetch('/api/admin/create-user', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: JSON.stringify({ username, password, initialBalance })
-        });
-      }
-      const data = await res.json();
-      if (!res.ok || !data.success) return showToast(data.error || 'Erreur création', true);
+      const data = await adminPost('/api/admin/create-user', { username, password, initialBalance }, 'Erreur création');
+      if (!data) return;
       closeCreateModal();
       showToast('Compte ' + username + ' créé !');
       fetchUsers();
@@ -490,24 +499,8 @@ export function getAdminWebHtml(): string {
     async function submitEditPassword() {
       const newPassword = document.getElementById('edit-pass-input').value.trim();
       if (!newPassword || newPassword.length < 3) return showToast('Minimum 3 caractères requis', true);
-      await ensureAdminToken();
-      let res = await fetch('/api/admin/update-password', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({ userId: activePassUserId, newPassword })
-      });
-      if (res.status === 401 || res.status === 403) {
-        token = '';
-        localStorage.removeItem('xbet_admin_jwt');
-        await ensureAdminToken();
-        res = await fetch('/api/admin/update-password', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: JSON.stringify({ userId: activePassUserId, newPassword })
-        });
-      }
-      const data = await res.json();
-      if (!res.ok || !data.success) return showToast(data.error || 'Erreur modification', true);
+      const data = await adminPost('/api/admin/update-password', { userId: activePassUserId, newPassword }, 'Erreur modification');
+      if (!data) return;
       visiblePassMap[activePassUserId] = true;
       closePassModal();
       showToast('Mot de passe mis à jour : ' + newPassword);
@@ -515,22 +508,8 @@ export function getAdminWebHtml(): string {
     }
 
     async function quickAddBalance(userId, newBalance) {
-      await ensureAdminToken();
-      let res = await fetch('/api/admin/update-balance', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({ userId, newBalance })
-      });
-      if (res.status === 401 || res.status === 403) {
-        token = '';
-        localStorage.removeItem('xbet_admin_jwt');
-        await ensureAdminToken();
-        await fetch('/api/admin/update-balance', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: JSON.stringify({ userId, newBalance })
-        });
-      }
+      const data = await adminPost('/api/admin/update-balance', { userId, newBalance }, 'Erreur mise à jour du solde');
+      if (!data) return;
       showToast('Solde mis à jour : ' + newBalance.toLocaleString('fr-FR') + ' ₣');
       fetchUsers();
     }
@@ -546,43 +525,15 @@ export function getAdminWebHtml(): string {
       if (!u) return;
       const cur = Array.isArray(u.allowedFeatures) ? u.allowedFeatures : FEATURES.map(f => f.key);
       const next = cur.includes(key) ? cur.filter(k => k !== key) : [...cur, key];
-      await ensureAdminToken();
-      let res = await fetch('/api/admin/update-permissions', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({ userId, allowedFeatures: next })
-      });
-      if (res.status === 401 || res.status === 403) {
-        token = '';
-        localStorage.removeItem('xbet_admin_jwt');
-        await ensureAdminToken();
-        await fetch('/api/admin/update-permissions', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: JSON.stringify({ userId, allowedFeatures: next })
-        });
-      }
+      const data = await adminPost('/api/admin/update-permissions', { userId, allowedFeatures: next }, 'Erreur mise à jour des permissions');
+      if (!data) return;
       showToast('Permissions mises à jour');
       fetchUsers();
     }
 
     async function resetDevice(userId) {
-      await ensureAdminToken();
-      let res = await fetch('/api/admin/reset-device', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({ userId })
-      });
-      if (res.status === 401 || res.status === 403) {
-        token = '';
-        localStorage.removeItem('xbet_admin_jwt');
-        await ensureAdminToken();
-        await fetch('/api/admin/reset-device', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: JSON.stringify({ userId })
-        });
-      }
+      const data = await adminPost('/api/admin/reset-device', { userId }, "Erreur dissociation de l'appareil");
+      if (!data) return;
       showToast('Appareil dissocié avec succès');
       fetchUsers();
     }
@@ -593,44 +544,18 @@ export function getAdminWebHtml(): string {
         reason = prompt('Motif du blocage :', "Utilisateur situé en Côte d'Ivoire (Zone interdite)");
         if (reason === null) return;
       }
-      await ensureAdminToken();
-      let res = await fetch('/api/admin/block-user', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({ userId, isBlocked, reason })
-      });
-      if (res.status === 401 || res.status === 403) {
-        token = '';
-        localStorage.removeItem('xbet_admin_jwt');
-        await ensureAdminToken();
-        await fetch('/api/admin/block-user', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: JSON.stringify({ userId, isBlocked, reason })
-        });
-      }
+      const data = await adminPost('/api/admin/block-user', { userId, isBlocked, reason }, 'Erreur modification statut');
+      if (!data) return;
       showToast(isBlocked ? 'Compte suspendu' : 'Compte débloqué');
       fetchUsers();
     }
 
-    async function deleteAccount(userId, username) {
-      if (!confirm('Supprimer définitivement le compte ' + username + ' ?')) return;
-      await ensureAdminToken();
-      let res = await fetch('/api/admin/delete-user', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({ userId })
-      });
-      if (res.status === 401 || res.status === 403) {
-        token = '';
-        localStorage.removeItem('xbet_admin_jwt');
-        await ensureAdminToken();
-        await fetch('/api/admin/delete-user', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: JSON.stringify({ userId })
-        });
-      }
+    async function deleteAccount(userId) {
+      const u = users.find(x => String(x.id) === String(userId));
+      const label = u ? u.username : userId;
+      if (!confirm('Supprimer définitivement le compte ' + label + ' ?')) return;
+      const data = await adminPost('/api/admin/delete-user', { userId }, 'Erreur suppression');
+      if (!data) return;
       showToast('Compte supprimé');
       fetchUsers();
     }

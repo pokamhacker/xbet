@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
+import { useBetStore } from '../store/useBetStore';
 
 // URL du backend unifié (Render.com ou variable d'environnement)
 const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'https://xbet-backend.onrender.com';
@@ -72,9 +73,10 @@ export function getSocketClient(): Socket {
 
     // 4. Écoute des mises à jour de solde en direct
     socketInstance.on('BALANCE_UPDATED', (payload: { balance: number }) => {
-      const { currentUser, updateUserBalance } = useAuthStore.getState();
-      if (currentUser?.id) {
-        updateUserBalance(currentUser.id, payload.balance);
+      const { currentUser, syncBalanceFromBetStore } = useAuthStore.getState();
+      if (currentUser?.id && typeof payload?.balance === 'number') {
+        syncBalanceFromBetStore(payload.balance);
+        useBetStore.getState().setBalance(payload.balance);
       }
     });
 

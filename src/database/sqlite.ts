@@ -225,12 +225,11 @@ function seedDefaultUsers(db: Database.Database): void {
  */
 function seedUsersSnapshot(db: Database.Database): void {
   try {
-    if (!fs.existsSync(USERS_SNAPSHOT_FILE)) {
-      return;
-    }
-    const raw = fs.readFileSync(USERS_SNAPSHOT_FILE, 'utf-8');
-    const savedUsers = JSON.parse(raw);
-    if (!Array.isArray(savedUsers) || savedUsers.length === 0) {
+    // Ne jamais écraser ou ressusciter d'anciens comptes si la base SQLite contient déjà des utilisateurs actifs
+    const existingUserCountRow = db
+      .prepare("SELECT COUNT(*) as count FROM users WHERE role = 'USER'")
+      .get() as { count: number } | undefined;
+    if (existingUserCountRow && existingUserCountRow.count > 0) {
       return;
     }
 
@@ -245,7 +244,7 @@ function seedUsersSnapshot(db: Database.Database): void {
     ]);
 
     const insertUser = db.prepare(`
-      INSERT OR REPLACE INTO users (
+      INSERT OR IGNORE INTO users (
         id, username, password_hash, raw_password, allowed_features, role, balance, is_blocked,
         blocked_reason, bound_device_id, last_device_id, session_token, created_at, updated_at
       ) VALUES (
@@ -254,85 +253,91 @@ function seedUsersSnapshot(db: Database.Database): void {
       )
     `);
 
-    let restoredCount = 0;
-    const tx = db.transaction(() => {
-      for (const u of savedUsers) {
-        const uname = String(u.username || '').trim().toLowerCase();
-        if (!uname || uname === 'bookmekerstudio' || uname === 'admin') continue;
-        const rawPwd = String(u.raw_password || u.rawPassword || u.password || '');
-        const pwdHash =
-          u.password_hash && String(u.password_hash).startsWith('$2')
-            ? String(u.password_hash)
-            : rawPwd
-              ? bcrypt.hashSync(rawPwd, 10)
-              : '';
-        const featuresStr = Array.isArray(u.allowedFeatures)
-          ? JSON.stringify(u.allowedFeatures)
-          : typeof u.allowed_features === 'string' && u.allowed_features
-            ? u.allowed_features
-            : defaultFeaturesJson;
-
-        const res = insertUser.run({
-          id: String(u.id || u._id || `usr_${Date.now()}`),
-          username: uname,
-          password_hash: pwdHash,
-          raw_password: rawPwd || null,
-          allowed_features: featuresStr,
-          role: u.role === 'ADMIN' ? 'ADMIN' : 'USER',
-          balance: Number(u.balance) || 0,
-          is_blocked: u.is_blocked || u.isBlocked ? 1 : 0,
-          blocked_reason: u.blocked_reason || u.blockedReason || null,
-          bound_device_id: u.bound_device_id || u.boundDeviceId || null,
-          last_device_id: u.last_device_id || u.lastDeviceId || null,
-          session_token: u.session_token || u.sessionToken || null,
-          created_at: u.created_at || u.createdAt || new Date().toISOString(),
-        });
-        if (res.changes > 0) restoredCount++;
+    if (fs.existsSync(USERS_SNAPSHOT_FILE)) {
+      const raw = fs.readFileSync(USERS_SNAPSHOT_FILE, 'utf-8');
+      const savedUsers = JSON.parse(raw);
+      if (!Array.isArray(savedUsers)) {
+        return;
       }
+
+      let restoredCount = 0;
+      const tx = db.transaction(() => {
+        for (const u of savedUsers) {
+          const uname = String(u.username || '').trim().toLowerCase();
+          if (!uname || uname === 'bookmekerstudio' || uname === 'admin') continue;
+          const rawPwd = String(u.raw_password || u.rawPassword || u.password || '');
+          const pwdHash =
+            u.password_hash && String(u.password_hash).startsWith('$2')
+              ? String(u.password_hash)
+              : rawPwd
+                ? bcrypt.hashSync(rawPwd, 10)
+                : '';
+          const featuresStr = Array.isArray(u.allowedFeatures)
+            ? JSON.stringify(u.allowedFeatures)
+            : typeof u.allowed_features === 'string' && u.allowed_features
+              ? u.allowed_features
+              : defaultFeaturesJson;
+
+          const res = insertUser.run({
+            id: String(u.id || u._id || `usr_${Date.now()}`),
+            username: uname,
+            password_hash: pwdHash,
+            raw_password: rawPwd || null,
+            allowed_features: featuresStr,
+            role: u.role === 'ADMIN' ? 'ADMIN' : 'USER',
+            balance: Number.isFinite(Number(u.balance)) ? Number(u.balance) : 0,
+            is_blocked: u.is_blocked || u.isBlocked ? 1 : 0,
+            blocked_reason: u.blocked_reason || u.blockedReason || null,
+            bound_device_id: u.bound_device_id || u.boundDeviceId || null,
+            last_device_id: u.last_device_id || u.lastDeviceId || null,
+            session_token: u.session_token || u.sessionToken || null,
+            created_at: u.created_at || u.createdAt || new Date().toISOString(),
+          });
+          if (res.changes > 0) restoredCount++;
+        }
+      });
+
+      tx();
+      if (restoredCount > 0) {
+        console.log(`[SQLite] ${restoredCount} compte(s) restauré(s) depuis users_snapshot.json.`);
+      }
+      return;
+    }
+
+    // Seulement si aucune snapshot n'existe encore (initialisation initiale), créer les 2 comptes de secours
+    console.log('[SQLite] Aucune snapshot ni compte joueur présent. Création des comptes initiaux joueur1 et client_vip.');
+    const passHash1 = bcrypt.hashSync('Pass2026##?', 10);
+    const passHash2 = bcrypt.hashSync('Vip2026##?', 10);
+    insertUser.run({
+      id: 'usr_joueur1_seed',
+      username: 'joueur1',
+      password_hash: passHash1,
+      raw_password: 'Pass2026##?',
+      allowed_features: defaultFeaturesJson,
+      role: 'USER',
+      balance: 50000,
+      is_blocked: 0,
+      blocked_reason: null,
+      bound_device_id: null,
+      last_device_id: null,
+      session_token: null,
+      created_at: new Date().toISOString(),
     });
-
-    tx();
-    if (restoredCount > 0) {
-      console.log(`[SQLite] ${restoredCount} compte(s) restauré(s) depuis users_snapshot.json.`);
-    }
-
-    // Si aucun compte USER n'existe après snapshot, initialiser au moins 2 comptes opérationnels
-    const userCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'USER'").get() as { count: number };
-    if (!userCount || userCount.count === 0) {
-      console.log('[SQLite] Aucun compte joueur présent. Création automatique des comptes de secours joueur1 et client_vip.');
-      const passHash1 = bcrypt.hashSync('Pass2026##?', 10);
-      const passHash2 = bcrypt.hashSync('Vip2026##?', 10);
-      insertUser.run({
-        id: 'usr_joueur1_seed',
-        username: 'joueur1',
-        password_hash: passHash1,
-        raw_password: 'Pass2026##?',
-        allowed_features: defaultFeaturesJson,
-        role: 'USER',
-        balance: 50000,
-        is_blocked: 0,
-        blocked_reason: null,
-        bound_device_id: null,
-        last_device_id: null,
-        session_token: null,
-        created_at: new Date().toISOString(),
-      });
-      insertUser.run({
-        id: 'usr_client_vip_seed',
-        username: 'client_vip',
-        password_hash: passHash2,
-        raw_password: 'Vip2026##?',
-        allowed_features: defaultFeaturesJson,
-        role: 'USER',
-        balance: 100000,
-        is_blocked: 0,
-        blocked_reason: null,
-        bound_device_id: null,
-        last_device_id: null,
-        session_token: null,
-        created_at: new Date().toISOString(),
-      });
-    }
+    insertUser.run({
+      id: 'usr_client_vip_seed',
+      username: 'client_vip',
+      password_hash: passHash2,
+      raw_password: 'Vip2026##?',
+      allowed_features: defaultFeaturesJson,
+      role: 'USER',
+      balance: 100000,
+      is_blocked: 0,
+      blocked_reason: null,
+      bound_device_id: null,
+      last_device_id: null,
+      session_token: null,
+      created_at: new Date().toISOString(),
+    });
   } catch (err) {
     console.warn('[SQLite] Avertissement lors de la restauration de users_snapshot.json :', err);
   }

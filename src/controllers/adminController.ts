@@ -120,8 +120,16 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
     notifyAccountDeleted(user._id.toString());
     forceLogoutUser(user._id.toString(), 'ACCOUNT_DELETED');
 
-    await User.findByIdAndDelete(userId);
-    console.log(`[AdminController] Utilisateur ${user.username} (${userId}) supprimé.`);
+    await User.findByIdAndDelete(user._id.toString());
+    const stillExists = await User.findById(user._id.toString());
+    if (stillExists) {
+      res.status(500).json({
+        success: false,
+        error: "Échec de la suppression de l'utilisateur en base.",
+      });
+      return;
+    }
+    console.log(`[AdminController] Utilisateur ${user.username} (${user._id}) supprimé.`);
 
     res.status(200).json({
       success: true,
@@ -220,8 +228,16 @@ export async function createUser(req: Request, res: Response): Promise<void> {
     const passwordHash = await bcrypt.hash(password, 10);
     const assignedFeatures = Array.isArray(allowedFeatures) ? allowedFeatures : DEFAULT_ALLOWED_FEATURES;
 
+    let targetId = id ? String(id).trim() : undefined;
+    if (targetId) {
+      const existingById = await User.findById(targetId);
+      if (existingById) {
+        targetId = undefined;
+      }
+    }
+
     const newUser = await User.create({
-      id: id ? String(id) : undefined,
+      id: targetId,
       username: username.trim().toLowerCase(),
       passwordHash,
       rawPassword: password.trim(),
@@ -447,6 +463,50 @@ export async function updateUserPassword(req: Request, res: Response): Promise<v
     res.status(500).json({
       success: false,
       error: 'Erreur interne lors de la mise à jour du mot de passe.',
+    });
+  }
+}
+
+/**
+ * 9. Déconnecter de force la session active d'un utilisateur sans le bloquer
+ * Route : POST /api/admin/revoke-session
+ */
+export async function revokeSession(req: Request, res: Response): Promise<void> {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        error: "L'identifiant utilisateur (userId) est requis.",
+      });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        error: 'Utilisateur introuvable.',
+      });
+      return;
+    }
+
+    user.sessionToken = null;
+    await user.save();
+
+    forceLogoutUser(user._id.toString(), 'ADMIN_FORCE_LOGOUT');
+    console.log(`[AdminController] Session révoquée pour ${user.username} (${user._id}).`);
+
+    res.status(200).json({
+      success: true,
+      message: `Session de ${user.username} déconnectée avec succès.`,
+    });
+  } catch (error) {
+    console.error('[AdminController] Erreur lors de la révocation de session :', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur interne lors de la déconnexion de la session.',
     });
   }
 }

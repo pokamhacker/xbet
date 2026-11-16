@@ -24,22 +24,27 @@ function fetchRemoteUsers() {
         res.on('end', () => {
           try {
             const parsed = JSON.parse(body);
-            const userList = Array.isArray(parsed.users)
+            const userList = Array.isArray(parsed?.users)
               ? parsed.users
-              : Array.isArray(parsed.data)
+              : Array.isArray(parsed?.data)
               ? parsed.data
-              : [];
-            resolve(userList);
+              : null;
+            const isOk =
+              res.statusCode >= 200 &&
+              res.statusCode < 300 &&
+              parsed?.success !== false &&
+              Array.isArray(userList);
+            resolve({ ok: Boolean(isOk), users: isOk ? userList : [] });
           } catch (_) {
-            resolve([]);
+            resolve({ ok: false, users: [] });
           }
         });
       }
     );
-    req.on('error', () => resolve([]));
+    req.on('error', () => resolve({ ok: false, users: [] }));
     req.on('timeout', () => {
       req.destroy();
-      resolve([]);
+      resolve({ ok: false, users: [] });
     });
   });
 }
@@ -71,9 +76,20 @@ function getLocalSqliteUsers() {
 }
 
 async function syncSnapshot() {
+  const DEFAULT_FEATURES = [
+    'studio_match',
+    'studio_tv',
+    'studio_mk',
+    'game_crash',
+    'game_apple',
+    'game_royal_feast',
+    'game_kamikaze',
+  ];
+
   let existing = [];
+  const hasSnapshotFile = fs.existsSync(SNAPSHOT_PATH);
   try {
-    if (fs.existsSync(SNAPSHOT_PATH)) {
+    if (hasSnapshotFile) {
       existing = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf-8'));
       if (!Array.isArray(existing)) existing = [];
     }
@@ -81,126 +97,76 @@ async function syncSnapshot() {
     existing = [];
   }
 
-  const byUsername = new Map();
-
-  // 1. Comptes de secours indispensables (toujours garantis)
-  const fallbackAccounts = [
-    {
-      id: 'usr_joueur1_seed',
-      username: 'joueur1',
-      raw_password: 'Pass2026##?',
-      allowed_features: JSON.stringify([
-        'studio_match',
-        'studio_tv',
-        'studio_mk',
-        'game_crash',
-        'game_apple',
-        'game_royal_feast',
-        'game_kamikaze',
-      ]),
-      role: 'USER',
-      balance: 50000,
-      is_blocked: 0,
-      blocked_reason: null,
-      bound_device_id: null,
-      last_device_id: null,
-      created_at: '2026-11-08T00:00:00.000Z',
-    },
-    {
-      id: 'usr_client_vip_seed',
-      username: 'client_vip',
-      raw_password: 'Vip2026##?',
-      allowed_features: JSON.stringify([
-        'studio_match',
-        'studio_tv',
-        'studio_mk',
-        'game_crash',
-        'game_apple',
-        'game_royal_feast',
-        'game_kamikaze',
-      ]),
-      role: 'USER',
-      balance: 100000,
-      is_blocked: 0,
-      blocked_reason: null,
-      bound_device_id: null,
-      last_device_id: null,
-      created_at: '2026-11-08T00:00:00.000Z',
-    },
-  ];
-
-  for (const fa of fallbackAccounts) {
-    byUsername.set(fa.username.toLowerCase(), fa);
-  }
-
-  // 2. Intégrer les comptes déjà dans la snapshot
+  const prevByUsername = new Map();
   for (const u of existing) {
     const uname = String(u.username || '').trim().toLowerCase();
     if (uname && uname !== 'bookmekerstudio' && uname !== 'admin') {
-      byUsername.set(uname, { ...byUsername.get(uname), ...u });
+      prevByUsername.set(uname, u);
     }
   }
 
-  // 3. Intégrer les comptes de la base SQLite locale
-  const localDbUsers = getLocalSqliteUsers();
-  for (const u of localDbUsers) {
-    const uname = String(u.username || '').trim().toLowerCase();
-    if (uname && uname !== 'bookmekerstudio' && uname !== 'admin') {
-      const prev = byUsername.get(uname) || {};
-      byUsername.set(uname, { ...prev, ...u });
+  // Le serveur Render fait foi : refléter fidèlement ses comptes sans ressusciter les comptes supprimés
+  const remote = await fetchRemoteUsers();
+  if (!remote.ok) {
+    if (hasSnapshotFile) {
+      console.warn('[UsersSnapshot] Backend Render inaccessible. Snapshot existante conservée sans modification.');
+      return;
     }
-  }
 
-  // 4. Intégrer les comptes distants de Render
-  const remoteUsers = await fetchRemoteUsers();
-  for (const u of remoteUsers) {
-    const uname = String(u.username || '').trim().toLowerCase();
-    if (uname && uname !== 'bookmekerstudio' && uname !== 'admin') {
-      const prev = byUsername.get(uname) || {};
-      const rawPwd = u.rawPassword || u.password || prev.raw_password || '';
-      byUsername.set(uname, {
-        id: u.id || u._id || prev.id || `usr_${Date.now()}`,
-        username: uname,
-        raw_password: rawPwd,
-        allowed_features: JSON.stringify(
-          Array.isArray(u.allowedFeatures)
-            ? u.allowedFeatures
-            : [
-                'studio_match',
-                'studio_tv',
-                'studio_mk',
-                'game_crash',
-                'game_apple',
-                'game_royal_feast',
-                'game_kamikaze',
-              ]
-        ),
-        role: u.role || 'USER',
-        balance: Number(u.balance) || prev.balance || 0,
-        is_blocked: u.isBlocked ? 1 : 0,
-        blocked_reason: u.blockedReason || null,
-        bound_device_id: u.boundDeviceId || null,
-        last_device_id: u.lastDeviceId || null,
-        created_at: u.createdAt || prev.created_at || new Date().toISOString(),
-      });
+    const localDbUsers = getLocalSqliteUsers().filter((u) => {
+      const uname = String(u.username || '').trim().toLowerCase();
+      return uname && uname !== 'bookmekerstudio' && uname !== 'admin';
+    });
+    const dir = path.dirname(SNAPSHOT_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
-  }
-
-  const merged = Array.from(byUsername.values());
-  if (merged.length === 0) {
-    console.warn('[UsersSnapshot] Aucun compte à enregistrer. Conservation de la snapshot existante.');
+    fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify(localDbUsers, null, 2), 'utf-8');
+    console.log(`[UsersSnapshot] ${localDbUsers.length} compte(s) local(aux) exporté(s) dans src/data/users_snapshot.json.`);
     return;
   }
 
+  const byUsername = new Map();
+  for (const u of remote.users) {
+    const uname = String(u.username || '').trim().toLowerCase();
+    if (!uname || uname === 'bookmekerstudio' || uname === 'admin' || u.role === 'ADMIN') {
+      continue;
+    }
+    const prev = prevByUsername.get(uname) || {};
+    const candidatePwd =
+      u.rawPassword ||
+      (u.password && !String(u.password).startsWith('$2') ? u.password : '') ||
+      prev.raw_password ||
+      '';
+    const numericBalance = Number(u.balance);
+
+    byUsername.set(uname, {
+      id: String(u.id || u._id || prev.id || `usr_${Date.now()}`),
+      username: uname,
+      raw_password: candidatePwd,
+      allowed_features: JSON.stringify(
+        Array.isArray(u.allowedFeatures) ? u.allowedFeatures : DEFAULT_FEATURES
+      ),
+      role: 'USER',
+      balance: Number.isFinite(numericBalance) ? numericBalance : 0,
+      is_blocked: u.isBlocked ? 1 : 0,
+      blocked_reason: u.blockedReason || null,
+      bound_device_id: u.boundDeviceId || null,
+      last_device_id: u.lastDeviceId || null,
+      created_at: u.createdAt || prev.created_at || new Date().toISOString(),
+    });
+  }
+
+  const synced = Array.from(byUsername.values());
   const dir = path.dirname(SNAPSHOT_PATH);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify(merged, null, 2), 'utf-8');
-  console.log(`[UsersSnapshot] ${merged.length} compte(s) utilisateur synchronisé(s) dans src/data/users_snapshot.json :`);
-  for (const m of merged) {
-    console.log(`  - ${m.username} (Solde: ${m.balance} F, Mot de passe: ${m.raw_password})`);
+  fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify(synced, null, 2), 'utf-8');
+  console.log(`[UsersSnapshot] ${synced.length} compte(s) utilisateur synchronisé(s) depuis Render dans src/data/users_snapshot.json :`);
+  for (const m of synced) {
+    console.log(`  - ${m.username} (Solde: ${m.balance} F, Statut: ${m.is_blocked ? 'Bloqué' : 'Actif'})`);
   }
 }
 
