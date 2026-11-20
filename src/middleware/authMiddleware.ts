@@ -116,8 +116,11 @@ export async function authMiddleware(
     if (user.isBlocked) {
       res.status(403).json({
         success: false,
-        error: 'Accès refusé : Votre compte a été suspendu par un administrateur.',
+        error: user.blockedReason
+          ? `Compte bloqué : ${user.blockedReason}. Déconnexion immédiate.`
+          : 'Accès refusé : Votre compte a été suspendu par un administrateur.',
         code: 'ACCOUNT_BLOCKED',
+        reason: user.blockedReason || null,
       });
       return;
     }

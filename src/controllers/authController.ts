@@ -229,6 +229,8 @@ export async function getMe(req: AuthenticatedRequest, res: Response): Promise<v
       role: req.user.role,
       balance: req.user.balance,
       isBlocked: req.user.isBlocked,
+      blockedReason: req.user.blockedReason || null,
+      allowedFeatures: req.user.allowedFeatures || [],
       lastLoginAt: req.user.lastLoginAt,
     },
   });

@@ -85,6 +85,7 @@ export default function AppNavigator() {
     isInitialized,
     initAuth,
     checkDeviceSession,
+    verifyRemoteSession,
     isSimulatingUser,
     exitUserSimulation,
   } = useAuthStore();
@@ -142,14 +143,20 @@ export default function AppNavigator() {
     return () => clearTimeout(safetyTimer);
   }, []);
 
-  // Periodic Single-Session Verification
+  // Periodic Single-Session & Remote Block Verification
   useEffect(() => {
     if (!currentUser) return;
+    if (currentUser.role === 'USER' && !isSimulatingUser) {
+      verifyRemoteSession();
+    }
     const interval = setInterval(() => {
       checkDeviceSession();
-    }, 3000);
+      if (currentUser.role === 'USER' && !isSimulatingUser) {
+        verifyRemoteSession();
+      }
+    }, 4000);
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser?.id, currentUser?.role, isSimulatingUser]);
 
   // Loading state while persistent storage is restored
   if (!isInitialized) {
@@ -194,6 +201,9 @@ export default function AppNavigator() {
     const route = getCurrentRouteName();
     setCurrentRoute(route);
     checkDeviceSession();
+    if (currentUser.role === 'USER' && !isSimulatingUser) {
+      verifyRemoteSession();
+    }
   };
 
   // Masquer la barre de navigation sur les écrans de jeux plein écran ou si demandée masquée

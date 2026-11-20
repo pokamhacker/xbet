@@ -41,6 +41,18 @@ export function initSocketManager(serverIo: SocketIOServer): void {
  * Associe un socket à un utilisateur et le fait rejoindre sa chambre dédiée user_${userId}
  */
 function registerSocketUser(socket: Socket, userId: string): void {
+  const prevUserId = socket.data?.userId as string | undefined;
+  if (prevUserId && prevUserId !== userId) {
+    socket.leave(`user_${prevUserId}`);
+    const prevSockets = userSocketsMap.get(prevUserId);
+    if (prevSockets) {
+      prevSockets.delete(socket.id);
+      if (prevSockets.size === 0) {
+        userSocketsMap.delete(prevUserId);
+      }
+    }
+  }
+
   const roomName = `user_${userId}`;
   socket.join(roomName);
 
@@ -97,10 +109,22 @@ export function sendToUser(userId: string, event: string, payload: any): void {
  * 1. Single Device Login : Révoque immédiatement toute ancienne session
  * Émet l'événement FORCE_LOGOUT à l'ancienne session
  */
-export function forceLogoutUser(userId: string, reason: string = 'NEW_DEVICE_LOGIN'): void {
+export function forceLogoutUser(
+  userId: string,
+  reason: string = 'NEW_DEVICE_LOGIN',
+  customMessage?: string
+): void {
+  const defaultMessages: Record<string, string> = {
+    NEW_DEVICE_LOGIN: 'Une nouvelle session a été ouverte sur un autre appareil. Vous avez été déconnecté.',
+    ACCOUNT_BLOCKED: "Votre compte a été suspendu par l'administrateur. Déconnexion immédiate.",
+    ACCOUNT_DELETED: "Votre compte a été supprimé par l'administrateur.",
+    DEVICE_RESET: "L'appareil lié à votre compte a été dissocié par l'administrateur. Veuillez vous reconnecter.",
+    ADMIN_FORCE_LOGOUT: "Votre session a été déconnectée par l'administrateur.",
+  };
+
   sendToUser(userId, 'FORCE_LOGOUT', {
     reason,
-    message: 'Une nouvelle session a été ouverte sur un autre appareil. Vous avez été déconnecté.',
+    message: customMessage || defaultMessages[reason] || defaultMessages.NEW_DEVICE_LOGIN,
     timestamp: new Date().toISOString(),
   });
 }

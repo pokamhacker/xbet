@@ -47,8 +47,9 @@ export async function blockUser(req: Request, res: Response): Promise<void> {
       user.blockedReason = reason || "Compte suspendu par l'administrateur";
       console.log(`[AdminController] Suspension du compte ${user.username} (${user._id}). Émission du signal ACCOUNT_BLOCKED.`);
 
-      notifyAccountBlocked(user._id.toString(), reason);
-      forceLogoutUser(user._id.toString(), 'ACCOUNT_BLOCKED');
+      const blockAlertText = `Compte bloqué : ${user.blockedReason}. Déconnexion immédiate.`;
+      notifyAccountBlocked(user._id.toString(), user.blockedReason || undefined);
+      forceLogoutUser(user._id.toString(), 'ACCOUNT_BLOCKED', blockAlertText);
     } else {
       user.blockedReason = null;
       console.log(`[AdminController] Déblocage du compte ${user.username} (${user._id}) par l'administrateur.`);

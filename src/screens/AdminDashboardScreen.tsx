@@ -8,6 +8,7 @@ import {
   TextInput,
   Modal,
   Platform,
+  KeyboardAvoidingView,
   StatusBar,
   RefreshControl,
   ActivityIndicator,
@@ -118,6 +119,7 @@ export default function AdminDashboardScreen() {
     "Utilisateur situé en Côte d'Ivoire (Zone interdite)"
   );
   const [customBlockReason, setCustomBlockReason] = useState<string>('');
+  const [isBlockingSubmitting, setIsBlockingSubmitting] = useState(false);
 
   // Password Visibility State & Global Reveal Toggle
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
@@ -492,7 +494,7 @@ export default function AdminDashboardScreen() {
       setCustomBlockReason('');
       setBlockModalVisible(true);
     } else {
-      const res = await toggleUserActive(user.id);
+      const res = await toggleUserActive(user.id, undefined, false);
       if (!res.success) {
         showToast(res.error || 'Erreur lors du déblocage.', 'error');
         return;
@@ -502,20 +504,29 @@ export default function AdminDashboardScreen() {
   };
 
   const handleConfirmBlock = async () => {
-    if (!blockingUser) return;
-    const finalReason =
-      selectedBlockReason === 'Autre motif personnalisé'
-        ? customBlockReason.trim() || "Compte suspendu par l'administrateur"
-        : selectedBlockReason;
-
-    const res = await toggleUserActive(blockingUser.id, finalReason);
-    if (!res.success) {
-      showToast(res.error || 'Erreur lors du blocage du compte.', 'error');
+    if (!blockingUser || isBlockingSubmitting) return;
+    if (selectedBlockReason === 'Autre motif personnalisé' && !customBlockReason.trim()) {
+      showToast('Veuillez saisir le motif personnalisé de blocage.', 'error');
       return;
     }
-    setBlockModalVisible(false);
-    showToast(`Compte "${blockingUser.username}" bloqué`, 'error');
-    setBlockingUser(null);
+    const finalReason =
+      selectedBlockReason === 'Autre motif personnalisé'
+        ? customBlockReason.trim()
+        : selectedBlockReason;
+
+    setIsBlockingSubmitting(true);
+    try {
+      const res = await toggleUserActive(blockingUser.id, finalReason, true);
+      if (!res.success) {
+        showToast(res.error || 'Erreur lors du blocage du compte.', 'error');
+        return;
+      }
+      setBlockModalVisible(false);
+      showToast(`Compte "${blockingUser.username}" bloqué : ${finalReason}`, 'error');
+      setBlockingUser(null);
+    } finally {
+      setIsBlockingSubmitting(false);
+    }
   };
 
   // Device Controls
@@ -1486,93 +1497,119 @@ export default function AdminDashboardScreen() {
         visible={isBlockModalVisible && blockingUser !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setBlockModalVisible(false)}
+        onRequestClose={() => {
+          if (!isBlockingSubmitting) setBlockModalVisible(false);
+        }}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { borderColor: '#EF4444' }]}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalCard, { borderColor: '#EF4444', maxHeight: '88%' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="shield-outline" size={20} color="#EF4444" />
                 <Text style={[styles.modalTitle, { color: '#EF4444' }]}>Bloquer le compte</Text>
               </View>
-              <TouchableOpacity onPress={() => setBlockModalVisible(false)}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!isBlockingSubmitting) setBlockModalVisible(false);
+                }}
+              >
                 <Ionicons name="close" size={22} color="#94A3B8" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.editingSubtitle}>
-              Compte : <Text style={{ color: '#F87171', fontWeight: '800' }}>{blockingUser?.username}</Text>
-            </Text>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.editingSubtitle}>
+                Compte : <Text style={{ color: '#F87171', fontWeight: '800' }}>{blockingUser?.username}</Text>
+              </Text>
 
-            <Text style={{ fontSize: 13, color: '#94A3B8', marginBottom: 12 }}>
-              Sélectionnez ou saisissez le motif de blocage. L'utilisateur sera déconnecté immédiatement :
-            </Text>
+              <Text style={{ fontSize: 13, color: '#94A3B8', marginBottom: 12 }}>
+                Sélectionnez ou saisissez le motif de blocage. L'utilisateur sera déconnecté immédiatement :
+              </Text>
 
-            {/* Quick Reason Options */}
-            {[
-              { label: "Utilisateur situé en Côte d'Ivoire (Zone interdite)" },
-              { label: 'Suspension administrative temporaire' },
-              { label: 'Activité suspecte / Non-respect des règles' },
-              { label: 'Tentative de connexion sur un second appareil' },
-              { label: 'Autre motif personnalisé' },
-            ].map((option) => {
-              const isSelected = selectedBlockReason === option.label;
-              return (
-                <TouchableOpacity
-                  key={option.label}
-                  style={[styles.blockReasonOption, isSelected && styles.blockReasonOptionSelected]}
-                  onPress={() => setSelectedBlockReason(option.label)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons
-                    name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                    size={17}
-                    color={isSelected ? '#EF4444' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      styles.blockReasonOptionText,
-                      isSelected && { color: '#FFFFFF', fontWeight: '700' },
-                    ]}
+              {/* Quick Reason Options */}
+              {[
+                { label: "Utilisateur situé en Côte d'Ivoire (Zone interdite)" },
+                { label: 'Suspension administrative temporaire' },
+                { label: 'Activité suspecte / Non-respect des règles' },
+                { label: 'Tentative de connexion sur un second appareil' },
+                { label: 'Autre motif personnalisé' },
+              ].map((option) => {
+                const isSelected = selectedBlockReason === option.label;
+                return (
+                  <TouchableOpacity
+                    key={option.label}
+                    style={[styles.blockReasonOption, isSelected && styles.blockReasonOptionSelected]}
+                    onPress={() => setSelectedBlockReason(option.label)}
+                    activeOpacity={0.8}
+                    disabled={isBlockingSubmitting}
                   >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <Ionicons
+                      name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                      size={17}
+                      color={isSelected ? '#EF4444' : '#64748B'}
+                    />
+                    <Text
+                      style={[
+                        styles.blockReasonOptionText,
+                        isSelected && { color: '#FFFFFF', fontWeight: '700' },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
 
-            {/* Custom Reason Input */}
-            {selectedBlockReason === 'Autre motif personnalisé' && (
-              <View style={[styles.formGroup, { marginTop: 10 }]}>
-                <Text style={styles.formLabel}>Précisez le motif :</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Ex: Hors zone autorisée"
-                  placeholderTextColor="#64748B"
-                  value={customBlockReason}
-                  onChangeText={setCustomBlockReason}
-                  autoFocus
-                />
-              </View>
-            )}
+              {/* Custom Reason Input */}
+              {selectedBlockReason === 'Autre motif personnalisé' && (
+                <View style={[styles.formGroup, { marginTop: 10 }]}>
+                  <Text style={styles.formLabel}>Précisez le motif :</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Ex: Hors zone autorisée"
+                    placeholderTextColor="#64748B"
+                    value={customBlockReason}
+                    onChangeText={setCustomBlockReason}
+                    autoCorrect={false}
+                    editable={!isBlockingSubmitting}
+                  />
+                </View>
+              )}
+            </ScrollView>
 
             <View style={[styles.modalButtonsRow, { marginTop: 16 }]}>
               <TouchableOpacity
                 style={styles.modalCancelBtn}
                 onPress={() => setBlockModalVisible(false)}
+                disabled={isBlockingSubmitting}
               >
                 <Text style={styles.modalCancelText}>Annuler</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalConfirmBtn, { backgroundColor: '#EF4444' }]}
+                style={[
+                  styles.modalConfirmBtn,
+                  { backgroundColor: '#EF4444' },
+                  isBlockingSubmitting && { opacity: 0.7 },
+                ]}
                 onPress={handleConfirmBlock}
+                disabled={isBlockingSubmitting}
               >
-                <Text style={styles.modalConfirmText}>Bloquer immédiatement</Text>
+                {isBlockingSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>Bloquer immédiatement</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* =================================================================== */}

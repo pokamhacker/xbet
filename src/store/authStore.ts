@@ -53,6 +53,7 @@ interface AuthState {
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   checkDeviceSession: () => { valid: boolean; reason?: 'blocked' | 'device_mismatch' | 'deleted' };
+  verifyRemoteSession: () => Promise<void>;
   syncBalanceFromBetStore: (newBalance: number) => void;
 
   // Permissions & Features
@@ -64,7 +65,7 @@ interface AuthState {
   getFreshAdminAuthHeaders: () => Promise<Record<string, string>>;
   createUser: (username: string, password: string, initialBalance: number, allowedFeatures?: string[]) => Promise<CrudResult>;
   updateUserBalance: (userId: string, newBalance: number) => Promise<CrudResult>;
-  toggleUserActive: (userId: string, reason?: string) => Promise<CrudResult>;
+  toggleUserActive: (userId: string, reason?: string, forceIsBlocked?: boolean) => Promise<CrudResult>;
   resetUserDevice: (userId: string) => Promise<CrudResult>;
   revokeUserDevice: (userId: string) => Promise<CrudResult>;
   deleteUser: (userId: string) => Promise<CrudResult>;
@@ -148,6 +149,7 @@ async function executeAdminRequest<T = any>(
 }
 
 const DEVICE_STORAGE_KEY = 'xbet_local_device_unique_id';
+let isVerifyingRemoteSession = false;
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -724,6 +726,90 @@ export const useAuthStore = create<AuthState>()(
         return { valid: true };
       },
 
+      verifyRemoteSession: async () => {
+        if (isVerifyingRemoteSession) return;
+        const { currentUser, authToken, isSimulatingUser } = get();
+        if (!currentUser || currentUser.role !== 'USER' || isSimulatingUser || !authToken) {
+          return;
+        }
+
+        isVerifyingRemoteSession = true;
+        try {
+          const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          const contentType = res.headers.get('content-type') || '';
+          if (!contentType.includes('application/json')) return;
+          const data = await res.json().catch(() => null);
+          if (!data) return;
+
+          // S'assurer que l'utilisateur n'a pas changé pendant la requête réseau
+          const latest = get();
+          if (!latest.currentUser || latest.currentUser.id !== currentUser.id) return;
+
+          if (res.status === 403 && data.code === 'ACCOUNT_BLOCKED') {
+            let blockReason: string | null = data.reason || null;
+
+            // Compatibilité ancien backend Render : /api/auth/me ne renvoie pas encore `reason`,
+            // mais /api/auth/login s'arrête dès l'étape 2 (compte bloqué) sans rien modifier et renvoie `reason`.
+            if (!blockReason) {
+              try {
+                const probeRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    username: currentUser.username,
+                    password: currentUser.rawPassword || '__status_check__',
+                  }),
+                });
+                const probeData = await probeRes.json().catch(() => null);
+                if (probeRes.status === 403 && probeData?.reason) {
+                  blockReason = String(probeData.reason);
+                }
+              } catch (_) {}
+            }
+
+            get().logout();
+            set({
+              sessionAlertMessage: blockReason
+                ? `Compte bloqué : ${blockReason}. Déconnexion immédiate.`
+                : data.error || "Votre compte a été suspendu par l'administrateur. Déconnexion immédiate.",
+            });
+            return;
+          }
+
+          if (res.status === 401 && (data.code === 'SESSION_REVOKED' || data.code === 'USER_NOT_FOUND')) {
+            get().logout();
+            set({
+              sessionAlertMessage:
+                data.code === 'USER_NOT_FOUND'
+                  ? "Votre compte a été supprimé par l'administrateur."
+                  : data.error || "Session révoquée : Ce compte a été déconnecté ou ouvert sur un autre appareil.",
+            });
+            return;
+          }
+
+          if (res.ok && data.success && data.user) {
+            if (typeof data.user.balance === 'number' && data.user.balance !== latest.currentUser.balance) {
+              get().syncBalanceFromBetStore(data.user.balance);
+              useBetStore.getState().setBalance(data.user.balance);
+            }
+            if (Array.isArray(data.user.allowedFeatures)) {
+              get().setUserPermissionsLocally(latest.currentUser.id, data.user.allowedFeatures);
+            }
+          }
+        } catch {
+          // Mode hors ligne ou perte réseau temporaire : ne pas déconnecter à tort
+        } finally {
+          isVerifyingRemoteSession = false;
+        }
+      },
+
       syncBalanceFromBetStore: (newBalance: number) => {
         const { currentUser, accounts } = get();
         if (currentUser && currentUser.role === 'USER') {
@@ -968,14 +1054,15 @@ export const useAuthStore = create<AuthState>()(
         return { success: true };
       },
 
-      toggleUserActive: async (userId: string, reason?: string) => {
+      toggleUserActive: async (userId: string, reason?: string, forceIsBlocked?: boolean) => {
         const { accounts: prevAccounts, currentUser: prevCurrentUser } = get();
         const matchesTarget = (a: UserAccount) =>
           a.id === userId || a.username.toLowerCase() === userId.toLowerCase();
         const target = prevAccounts.find(matchesTarget);
         const backendUserId = target?.id || userId;
-        const nextActive = target ? !target.isActive : false;
-        const finalReason = nextActive ? null : reason || "Compte suspendu par l'administrateur";
+        const nextActive =
+          typeof forceIsBlocked === 'boolean' ? !forceIsBlocked : target ? !target.isActive : false;
+        const finalReason = nextActive ? null : reason?.trim() || "Compte suspendu par l'administrateur";
 
         const nextAccounts = prevAccounts.map((a) =>
           matchesTarget(a)
@@ -999,7 +1086,10 @@ export const useAuthStore = create<AuthState>()(
 
         set({ accounts: nextAccounts, currentUser: nextCurrentUser });
 
-        const response = await executeAdminRequest(
+        const response = await executeAdminRequest<{
+          success: boolean;
+          user?: { isBlocked?: boolean; blockedReason?: string | null };
+        }>(
           get().getFreshAdminAuthHeaders,
           () => set({ authToken: null }),
           '/api/admin/block-user',
@@ -1013,6 +1103,18 @@ export const useAuthStore = create<AuthState>()(
             success: false,
             error: response.error || 'Impossible de modifier le statut du compte.',
           };
+        }
+
+        if (response.data?.user) {
+          const confirmedActive = !response.data.user.isBlocked;
+          const confirmedReason = response.data.user.blockedReason ?? (confirmedActive ? null : finalReason);
+          set((state) => ({
+            accounts: state.accounts.map((a) =>
+              matchesTarget(a)
+                ? { ...a, isActive: confirmedActive, blockedReason: confirmedReason }
+                : a
+            ),
+          }));
         }
 
         return { success: true };

@@ -13,19 +13,6 @@
     "created_at": "2026-11-16T05:21:54.000Z"
   },
   {
-    "id": "usr_1794752344271_e836b13d",
-    "username": "ccc",
-    "raw_password": "ccc",
-    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
-    "role": "USER",
-    "balance": 50000,
-    "is_blocked": 1,
-    "blocked_reason": "Tentative de connexion sur un autre appareil non autorisé (Règle stricte 1 Compte = 1 Seul Appareil)",
-    "bound_device_id": null,
-    "last_device_id": "dev_1794752126802_d8hza2n",
-    "created_at": "2026-11-15T14:19:04.000Z"
-  },
-  {
     "id": "usr_1794496534772_7a5fa537",
     "username": "perres",
     "raw_password": "perres34$.",
@@ -33,36 +20,10 @@
     "role": "USER",
     "balance": 5811000,
     "is_blocked": 1,
-    "blocked_reason": "Suspension administrative temporaire",
+    "blocked_reason": "Tentative de connexion sur un second appareil",
     "bound_device_id": "dev_1794497496116_ohgdu8p",
     "last_device_id": "dev_1794497496116_ohgdu8p",
     "created_at": "2026-11-12T15:15:34.000Z"
-  },
-  {
-    "id": "usr_1794435672572_8a10bd38",
-    "username": "parkeur",
-    "raw_password": "88#",
-    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
-    "role": "USER",
-    "balance": 50000,
-    "is_blocked": 1,
-    "blocked_reason": "Suspension administrative temporaire",
-    "bound_device_id": "dev_1793685876457_l7wu90o",
-    "last_device_id": "dev_1793685876457_l7wu90o",
-    "created_at": "2026-11-11T22:21:12.000Z"
-  },
-  {
-    "id": "usr_1794415240423_j4f8rm",
-    "username": "dario",
-    "raw_password": "dario",
-    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
-    "role": "USER",
-    "balance": 100000,
-    "is_blocked": 1,
-    "blocked_reason": "Suspension administrative temporaire",
-    "bound_device_id": "dev_1793686215094_61nl8ff",
-    "last_device_id": "dev_1793686215094_61nl8ff",
-    "created_at": "2026-11-11T22:19:44.000Z"
   },
   {
     "id": "usr_1794324181074_ec83b763",
@@ -70,11 +31,11 @@
     "raw_password": "000",
     "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
     "role": "USER",
-    "balance": 50000,
+    "balance": 94456840,
     "is_blocked": 0,
     "blocked_reason": null,
-    "bound_device_id": null,
-    "last_device_id": "dev_1794794233647_bxfxmd6",
+    "bound_device_id": "dev_1794806078857_4zhjtel",
+    "last_device_id": "dev_1794806078857_4zhjtel",
     "created_at": "2026-11-10T15:23:01.000Z"
   },
   {
@@ -83,11 +44,11 @@
     "raw_password": "safe#",
     "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
     "role": "USER",
-    "balance": 1459910,
-    "is_blocked": 0,
-    "blocked_reason": null,
-    "bound_device_id": "dev_1794312582910_h1qq9qq",
-    "last_device_id": "dev_1794312582910_h1qq9qq",
+    "balance": 4640810,
+    "is_blocked": 1,
+    "blocked_reason": "Tentative de connexion sur un second appareil",
+    "bound_device_id": "dev_1794927200497_pan87oz",
+    "last_device_id": "dev_1794927200497_pan87oz",
     "created_at": "2026-11-10T12:08:19.000Z"
   },
   {
@@ -96,7 +57,7 @@
     "raw_password": "111",
     "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
     "role": "USER",
-    "balance": 62632480,
+    "balance": 64206470,
     "is_blocked": 0,
     "blocked_reason": null,
     "bound_device_id": "dev_1794794233647_bxfxmd6",
@@ -149,9 +110,9 @@
     "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
     "role": "USER",
     "balance": 50000,
-    "is_blocked": 1,
-    "blocked_reason": "Tentative de connexion sur un autre appareil non autorisé (Règle stricte 1 Compte = 1 Seul Appareil)",
-    "bound_device_id": "test_device_login_123",
+    "is_blocked": 0,
+    "blocked_reason": null,
+    "bound_device_id": null,
     "last_device_id": "test_device_login_123",
     "created_at": "2026-11-08T05:00:23.000Z"
   },
@@ -167,18 +128,5 @@
     "bound_device_id": null,
     "last_device_id": null,
     "created_at": "2026-11-08T04:49:47.000Z"
-  },
-  {
-    "id": "usr_1794113385969_1ee4a298",
-    "username": "user",
-    "raw_password": "user123",
-    "allowed_features": "[\"studio_match\",\"studio_tv\",\"studio_mk\",\"game_crash\",\"game_apple\",\"game_royal_feast\",\"game_kamikaze\"]",
-    "role": "USER",
-    "balance": 50000,
-    "is_blocked": 1,
-    "blocked_reason": "Tentative de connexion sur un autre appareil non autorisé (Règle stricte 1 Compte = 1 Seul Appareil)",
-    "bound_device_id": "my_iphone_16",
-    "last_device_id": "my_iphone_16",
-    "created_at": "2026-11-08T04:49:45.000Z"
   }
 ]
